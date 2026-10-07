@@ -1,289 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TerraNova</title>
-<meta name="description" content="Find places on Earth that behave like Moon and Mars base sites, scored from NASA data.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23f08a4b'/%3E%3Cellipse cx='16' cy='16' rx='15' ry='5' fill='none' stroke='%23e8edf3' stroke-width='1.6' transform='rotate(-25 16 16)'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css">
-<script type="importmap">
-  { "imports": { "three": "./vendor/three/three.module.min.js" } }
-</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TerraNova · Earth analogs for Moon and Mars bases</title>
+  <meta name="description" content="TerraNova scores every land cell on Earth against Moon and Mars base sites using NASA data, and ranks the closest analogs.">
+  <meta name="theme-color" content="#06090f">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='18' r='10' fill='none' stroke='%23eef0f3' stroke-width='2.4'/%3E%3Ccircle cx='25.5' cy='6.5' r='4.5' fill='%23e03c31'/%3E%3C/svg%3E">
+  <link rel="preload" href="vendor/fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js" } }
+  </script>
 </head>
 <body>
-<a class="skip" href="#results">Skip to ranked sites</a>
+  <a class="skip" href="#main">Skip to content</a>
+  <canvas id="starfield" aria-hidden="true"></canvas>
 
-<header class="topbar">
-  <div class="brand">
-    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-      <circle cx="16" cy="16" r="9" fill="var(--accent)"/>
-      <ellipse cx="16" cy="16" rx="15" ry="5" fill="none" stroke="currentColor" stroke-width="1.6" transform="rotate(-25 16 16)"/>
-    </svg>
-    <div>
-      <h1>TerraNova</h1>
-      <p class="tagline">Earth analogs for Moon &amp; Mars base sites, scored from NASA data</p>
+  <header class="topbar">
+    <div class="brand">
+      <a href="index.html" aria-label="TerraNova home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+        <span class="wordmark">TerraNova</span>
+      </a>
     </div>
-  </div>
-  <div class="chips" aria-live="polite">
-    <span class="chip" id="chipMode">connecting…</span>
-    <span class="chip" id="chipCells"></span>
-    <button class="chip chip-button" id="chipAuc" type="button" hidden></button>
-  </div>
-  <nav class="top-actions">
-    <button class="ghost tour-button" id="startTour" type="button" title="Guided tour (T)"><span aria-hidden="true">▶</span> Tour</button>
-    <button class="ghost" id="openMethod" type="button">How it works</button>
-    <button class="ghost" id="openSources" type="button">Data sources</button>
-    <button class="icon-button" id="openKeys" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
-  </nav>
-</header>
-
-<main class="layout">
-  <aside class="panel panel-left" id="leftPanel" aria-label="Target and weights">
-    <section class="block">
-      <h2 class="eyebrow"><button class="fold" type="button" data-fold="targets" aria-expanded="true"><span class="chev" aria-hidden="true">▾</span> 1 · Choose a target</button></h2>
-      <div id="targets" role="radiogroup" aria-label="Target site"></div>
-      <div class="target-detail" id="targetDetail"></div>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <h2 class="eyebrow"><button class="fold" type="button" data-fold="weights" aria-expanded="true"><span class="chev" aria-hidden="true">▾</span> 2 · Weight the criteria</button></h2>
-        <button class="link-button" id="resetWeights" type="button">Reset</button>
-      </div>
-      <p class="hint">Drag to change how much each criterion counts. The globe and ranking update live.</p>
-      <div class="weights" id="weights"></div>
-    </section>
-  </aside>
-
-  <section class="stage" aria-label="Map of Earth analog scores">
-    <div class="view" id="globe" role="img" aria-label="3D globe of analog scores. Click anywhere to inspect a location."></div>
-    <canvas class="view" id="flatmap" hidden aria-label="Flat map of analog scores. Click anywhere to inspect a location."></canvas>
-    <div class="labels" id="labels" aria-hidden="true"></div>
-
-    <div class="stage-controls">
-      <div class="search" role="search">
-        <label class="visually-hidden" for="search">Search a place or type lat, lon</label>
-        <input id="search" type="search" placeholder="Search place or lat, lon  ( / )" autocomplete="off"
-          role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
-        <ul class="search-results" id="searchResults" role="listbox" hidden></ul>
-      </div>
-      <button class="ghost surprise" id="surprise" type="button" title="Fly to a random strong match you have not seen (R)" aria-label="Surprise me">🎲 <span>Surprise me</span></button>
-      <div class="segmented" role="group" aria-label="View">
-        <button type="button" data-view="globe" aria-pressed="true">Globe</button>
-        <button type="button" data-view="map" aria-pressed="false">Map</button>
-      </div>
-      <label class="select">
-        <span class="visually-hidden">Map layer</span>
-        <select id="layer"></select>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="showKnown" checked>
-        <span>Known analogs</span>
-      </label>
-      <label class="toggle opacity" title="Opacity of the data overlay">
-        <span>Overlay</span>
-        <input type="range" id="overlayOpacity" min="0" max="100" step="5" value="100" aria-label="Overlay opacity">
-      </label>
-    </div>
-
-    <div class="zoom-controls" role="group" aria-label="Zoom">
-      <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in (or scroll)">+</button>
-      <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button>
-      <button type="button" id="zoomHome" aria-label="Reset view" title="Reset view">⌂</button>
-    </div>
-
-    <div class="legend" id="legend" aria-live="polite"></div>
-
-    <button class="edge-toggle left" id="toggleLeft" type="button" aria-controls="leftPanel" aria-expanded="true" aria-label="Hide the target panel">‹</button>
-    <button class="edge-toggle right" id="toggleRight" type="button" aria-controls="rightPanel" aria-expanded="true" aria-label="Hide the results panel">›</button>
-
-    <figure class="twin" id="twin">
-      <button class="box-toggle" id="twinToggle" type="button" aria-expanded="true" aria-label="Hide the target globe">▾</button>
-      <canvas id="twinCanvas" width="360" height="360" tabindex="0" role="img"
-        aria-label="Target body globe. Drag or use arrow keys to rotate, scroll to zoom, double-click or Home to return to the site."></canvas>
-      <figcaption id="twinCaption"></figcaption>
-    </figure>
-
-    <div class="tooltip" id="tooltip" role="status" hidden></div>
-    <div class="tour-caption" id="tourCaption" role="status" aria-live="polite" hidden>
-      <div class="tour-step" id="tourStep"></div>
-      <p id="tourText"></p>
-      <div class="tour-actions">
-        <button class="ghost small" id="tourPrev" type="button">Back</button>
-        <button class="primary small" id="tourNext" type="button">Next</button>
-        <button class="link-button" id="tourStop" type="button">End tour</button>
-      </div>
-      <div class="tour-progress"><i id="tourBar"></i></div>
-    </div>
-
-    <div class="loading" id="loading">
-      <div class="spinner" aria-hidden="true"></div>
-      <p id="loadingText">Loading NASA imagery…</p>
-    </div>
-  </section>
-
-  <aside class="panel panel-right" id="rightPanel" aria-label="Results">
-    <div class="tabs" role="tablist">
-      <button role="tab" id="tabResults" aria-selected="true" aria-controls="results" type="button">Ranked sites</button>
-      <button role="tab" id="tabExplore" aria-selected="false" aria-controls="explore" type="button">Explore</button>
-      <button role="tab" id="tabValidation" aria-selected="false" aria-controls="validation" type="button">Validation</button>
-    </div>
-
-    <section id="results" role="tabpanel" aria-labelledby="tabResults" tabindex="-1">
-      <details class="discovery" open>
-        <summary>Discovery settings</summary>
-        <div class="topk">
-          <label for="topK">Show top <b class="num" id="topKValue">20</b> sites</label>
-          <input type="range" id="topK" min="5" max="100" step="5" value="20">
-        </div>
-        <label class="toggle disc-toggle"><input type="checkbox" id="newOnly" checked>
-          <span>New sites only <small>hide places within 500 km of a known analog</small></span></label>
-        <div class="topk">
-          <label for="spreadKm">Spread results: at least <b class="num" id="spreadValue">800 km</b> apart</label>
-          <input type="range" id="spreadKm" min="0" max="2000" step="100" value="800">
-        </div>
-        <div class="disc-row">
-          <label for="perCountry">Max per country</label>
-          <select id="perCountry">
-            <option value="0">no limit</option><option value="1">1</option>
-            <option value="2" selected>2</option><option value="3">3</option><option value="5">5</option>
-          </select>
-        </div>
-        <div class="topk">
-          <label for="tolerance">Permissible error <b class="num" id="toleranceValue">exact</b></label>
-          <input type="range" id="tolerance" min="0" max="3" step="0.25" value="0">
-          <small class="hint">Higher = a criterion counts as a full match anywhere within a band around the target,
-            sized from how confident the target value is.</small>
-        </div>
-      </details>
-      <div class="results-head">
-        <p class="hint" id="resultsSummary">Scoring…</p>
-        <div class="export">
-          <button class="ghost small" id="exportGeojson" type="button">GeoJSON</button>
-          <button class="ghost small" id="exportCsv" type="button">CSV</button>
-        </div>
-      </div>
-      <section class="compare" id="compare" hidden aria-label="Pinned sites"></section>
-      <ol class="site-list" id="siteList"></ol>
-      <article class="detail" id="detail" hidden></article>
-    </section>
-
-    <section id="explore" role="tabpanel" aria-labelledby="tabExplore" tabindex="-1" hidden></section>
-    <section id="validation" role="tabpanel" aria-labelledby="tabValidation" tabindex="-1" hidden></section>
-  </aside>
-</main>
-
-<dialog id="methodDialog" aria-labelledby="methodTitle">
-  <div class="dialog-body">
-    <div class="dialog-head">
-      <h2 id="methodTitle">How it works</h2>
-      <button class="icon-button" data-close type="button" aria-label="Close">✕</button>
-    </div>
-    <div id="methodContent"></div>
-  </div>
-</dialog>
-
-<dialog id="sourcesDialog" aria-labelledby="sourcesTitle">
-  <div class="dialog-body">
-    <div class="dialog-head">
-      <h2 id="sourcesTitle">Data sources</h2>
-      <button class="icon-button" data-close type="button" aria-label="Close">✕</button>
-    </div>
-    <div id="sourcesContent"></div>
-  </div>
-</dialog>
-
-<section class="godseye" id="godseye" hidden aria-label="God's Eye 3D site view">
-  <canvas id="geCanvas"></canvas>
-  <header class="ge-top">
-    <div>
-      <p class="eyebrow ge-eyebrow">God's Eye · 3D terrain</p>
-      <h2 id="geTitle"></h2>
-      <p class="ge-sub" id="geSub"></p>
-      <div class="ge-badges" id="geBadges"></div>
-    </div>
-    <div class="ge-top-actions">
-      <button class="ghost small" id="geReset" type="button" title="Reset camera, sun, surface, height, overlays and tools">Reset all</button>
-      <button class="icon-button ge-close" id="geClose" type="button" aria-label="Close 3D view (Esc)">✕</button>
-    </div>
+    <nav class="main-nav" aria-label="Main">
+      <a href="index.html" class="nav-link" aria-current="page">Home</a>
+      <a href="targets.html" class="nav-link">Targets</a>
+      <a href="finder.html" class="nav-link">Finder</a>
+    </nav>
   </header>
-  <aside class="ge-panel">
-    <h3 class="eyebrow">Terrain in the scored cell</h3>
-    <div id="geStats" class="ge-stats"></div>
-    <h3 class="eyebrow">Sun</h3>
-    <div class="segmented ge-presets" role="group" aria-label="Sun presets">
-      <button type="button" data-sun="earth">Midday</button>
-      <button type="button" data-sun="evening">Evening</button>
-      <button type="button" data-sun="lunar">Lunar pole</button>
-    </div>
-    <label class="ge-slider">Elevation <b id="geSunElevValue" class="num"></b>
-      <input type="range" id="geSunElev" min="0.5" max="85" step="0.5" value="55"></label>
-    <label class="ge-slider">Direction <b id="geSunAzValue" class="num"></b>
-      <input type="range" id="geSunAz" min="0" max="359" step="1" value="160"></label>
-    <p class="hint" id="geSunNote"></p>
-    <h3 class="eyebrow">View</h3>
-    <div class="segmented ge-presets" role="group" aria-label="Surface">
-      <button type="button" data-imagery="s2" aria-pressed="true">Satellite</button>
-      <button type="button" data-imagery="relief" aria-pressed="false">Relief</button>
-      <button type="button" data-imagery="slope" aria-pressed="false">Slope</button>
-      <button type="button" data-imagery="elevation" aria-pressed="false">Elevation</button>
-    </div>
-    <div class="ge-slope-legend ge-elev-legend" id="geElevLegend" hidden>
-      <div class="ramp"></div>
-      <div class="scale num"><span id="geElevLo"></span><span id="geElevHi"></span></div>
-    </div>
-    <div class="ge-slope-legend" id="geSlopeLegend" hidden>
-      <div class="ramp"></div>
-      <div class="scale num"><span>0°</span><span>5°</span><span>15° rover limit</span><span>30°+</span></div>
-    </div>
-    <label class="toggle ge-toggle"><input type="checkbox" id="geContours"><span>Contour lines <small id="geContourStep"></small></span></label>
-    <label class="ge-slider">Height exaggeration <b id="geExagValue" class="num">1× true scale</b>
-      <input type="range" id="geExag" min="1" max="6" step="0.5" value="1"></label>
-    <label class="toggle ge-toggle"><input type="checkbox" id="geCell" checked><span>Outline the scored cell</span></label>
-    <h3 class="eyebrow">Explore</h3>
-    <div class="ge-tools">
-      <button class="ghost small" type="button" id="geProfileBtn" aria-pressed="false">Measure a profile</button>
-      <button class="ghost small" type="button" id="geSunPlay" aria-pressed="false">▶ Play sun</button>
-    </div>
-    <p class="hint" id="geToolHint">Click the terrain to probe any point.</p>
-    <div id="geProbe" class="ge-probe" hidden></div>
-    <div id="geProfile" class="ge-profile" hidden></div>
-    <p class="hint ge-status" id="geStatus" role="status"></p>
-  </aside>
-  <div class="ge-hud">
-    <div class="ge-north" aria-hidden="true"><svg id="geNorth" viewBox="0 0 20 20" width="22" height="22"><path d="M10 2 L15 16 L10 13 L5 16 Z" fill="#f08a4b"/><path d="M10 2 L10 13 L5 16 Z" fill="#ffb27d"/></svg><small>N</small></div>
-    <div class="ge-scale"><div class="ge-scale-bar" id="geScaleBar"></div><span id="geScaleLabel" class="num"></span></div>
-    <div class="ge-vscale" id="geVScale">Vertical: true scale</div>
-  </div>
-  <div class="ge-hover" id="geHover" hidden></div>
-  <p class="ge-credit" id="geCredit"></p>
-  <div class="loading ge-loading" id="geLoading"><div class="spinner" aria-hidden="true"></div><p>Descending…</p></div>
-</section>
 
-<dialog id="keysDialog" aria-labelledby="keysTitle">
-  <div class="dialog-body">
-    <div class="dialog-head">
-      <h2 id="keysTitle">Keyboard shortcuts</h2>
-      <button class="icon-button" data-close type="button" aria-label="Close">✕</button>
+  <main id="main" class="home">
+    <div class="home-copy">
+      <h1 class="reveal">Earth analogs for Moon and Mars bases</h1>
+      <p class="lede reveal" style="--d: 1">Every land cell on Earth, scored against real landing sites from NASA climate, terrain and vegetation data.</p>
+      <div class="home-actions reveal" style="--d: 2">
+        <a class="btn btn-primary" href="targets.html">Choose a target
+          <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
+        <a class="btn btn-ghost" href="finder.html">Open the Finder</a>
+      </div>
+      <dl class="home-facts reveal" id="facts" style="--d: 3" hidden></dl>
     </div>
-    <table class="keys">
-      <tr><td><kbd>/</kbd></td><td>Search a place or coordinates</td></tr>
-      <tr><td><kbd>J</kbd> <kbd>K</kbd></td><td>Next / previous ranked site</td></tr>
-      <tr><td><kbd>E</kbd></td><td>God's Eye 3D view of the open site</td></tr>
-      <tr><td><kbd>P</kbd></td><td>Pin the open site to compare</td></tr>
-      <tr><td><kbd>G</kbd> <kbd>M</kbd></td><td>Globe / flat map</td></tr>
-      <tr><td><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></td><td>Zoom in / out / reset</td></tr>
-      <tr><td><kbd>V</kbd></td><td>Validation tab</td></tr>
-      <tr><td><kbd>T</kbd></td><td>Start the guided tour</td></tr>
-      <tr><td><kbd>R</kbd></td><td>Surprise me: fly to a random strong match</td></tr>
-      <tr><td><kbd>Esc</kbd></td><td>Close the 3D view, a dialog or the tour</td></tr>
-    </table>
-  </div>
-</dialog>
+    <div class="home-globe">
+      <canvas id="welcomeGlobeCanvas" role="img" aria-label="Earth, with the Moon and Mars in the background. Drag to look around."></canvas>
+      <p class="globe-hint" id="globeHint" aria-hidden="true"><svg class="i"><use href="icons.svg#i-globe-hemisphere-east"></use></svg>Drag to look around</p>
+    </div>
+  </main>
 
-<div class="toast" id="toast" role="alert" hidden></div>
+  <footer class="site-foot">
+    <span>Built for the NASA Space Apps Challenge 2026.</span>
+    <span>Data: NASA POWER, NASA GIBS (MODIS, Blue Marble), AWS Terrain Tiles, Natural Earth.</span>
+  </footer>
 
-<script type="module" src="app.js"></script>
+  <script type="module" src="welcome.js"></script>
 </body>
 </html>

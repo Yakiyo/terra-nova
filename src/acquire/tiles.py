@@ -68,7 +68,8 @@ def tile(z: int, row: int, col: int, offline: bool | None = None) -> Path:
         filename=f"{row}_{col}.jpg",
         raw_dir=TILE_DIR / str(z),
         offline=offline,
-        timeout=60,
+        timeout=20,
+        max_seconds=30,
     )
     return item.path
 

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TerraNova · Finder</title>
+<meta name="description" content="Find places on Earth that behave like Moon and Mars base sites, scored from NASA data.">
+<meta name="theme-color" content="#06090f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='18' r='10' fill='none' stroke='%23eef0f3' stroke-width='2.4'/%3E%3Ccircle cx='25.5' cy='6.5' r='4.5' fill='%23e03c31'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+  { "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+
+<a class="skip" href="#results">Skip to ranked sites</a>
+<canvas id="starfield" aria-hidden="true"></canvas>
+
+<header class="topbar">
+  <div class="brand">
+    <a href="index.html" aria-label="TerraNova home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+      <span class="wordmark">TerraNova</span>
+    </a>
+  </div>
+  <nav class="main-nav" aria-label="Main">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="targets.html" class="nav-link">Targets</a>
+    <a href="finder.html" class="nav-link" aria-current="page">Finder</a>
+  </nav>
+  <div class="top-right">
+    <div class="menu-wrap">
+      <button class="pill" id="statusPill" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="statusPanel" title="Data and validation status">
+        <span class="dot" id="statusDot"></span><span id="statusMode">Connecting…</span><span class="pill-auc num" id="statusAuc" hidden></span><svg class="i caret" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
+      <div class="menu status-panel" id="statusPanel" role="dialog" aria-label="Data and validation status" hidden>
+        <dl>
+          <div><dt>Data</dt><dd id="statusData">Connecting…</dd></div>
+          <div><dt>Land cells scored</dt><dd class="num" id="statusCells">–</dd></div>
+          <div id="statusValRow" hidden><dt>Validation</dt><dd id="statusVal"></dd></div>
+        </dl>
+        <button class="ghost small" id="statusOpenVal" type="button" hidden><svg class="i" aria-hidden="true"><use href="icons.svg#i-check-circle"></use></svg>Open the Validation tab</button>
+      </div>
+    </div>
+    <div class="menu-wrap">
+      <button class="ghost" id="helpButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="helpMenu"><svg class="i" aria-hidden="true"><use href="icons.svg#i-question"></use></svg><span class="btn-label">Help</span><svg class="i caret" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
+      <div class="menu" id="helpMenu" role="menu" aria-label="Help" hidden>
+        <button role="menuitem" id="startTour" type="button"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg>Guided tour<kbd>T</kbd></button>
+        <button role="menuitem" id="openMethod" type="button"><svg class="i" aria-hidden="true"><use href="icons.svg#i-info"></use></svg>How it works</button>
+        <button role="menuitem" id="openSources" type="button"><svg class="i" aria-hidden="true"><use href="icons.svg#i-stack"></use></svg>Data sources</button>
+        <button role="menuitem" id="openKeys" type="button"><svg class="i" aria-hidden="true"><use href="icons.svg#i-keyboard"></use></svg>Keyboard shortcuts<kbd>?</kbd></button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+  <button class="edge-toggle" id="toggleSidebar" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Hide the sidebar"><svg class="i" aria-hidden="true"><use href="icons.svg#i-caret-left"></use></svg></button>
+  <aside class="panel sidebar" id="sidebar" aria-label="Targets and results">
+    <div class="tabs" role="tablist" aria-label="Sidebar">
+      <button role="tab" id="tabTarget" aria-selected="true" aria-controls="target" type="button">Target</button>
+      <button role="tab" id="tabResults" aria-selected="false" aria-controls="results" type="button">Results</button>
+      <button role="tab" id="tabExplore" aria-selected="false" aria-controls="explore" type="button">Explore</button>
+      <button role="tab" id="tabValidation" aria-selected="false" aria-controls="validation" type="button">Validation</button>
+      <span class="tab-ink" id="tabInk" aria-hidden="true"></span>
+    </div>
+
+    <section id="target" role="tabpanel" aria-labelledby="tabTarget">
+      <div class="block">
+        <h2 class="eyebrow">Target site</h2>
+        <div id="targets" role="radiogroup" aria-label="Target site"></div>
+        <div class="target-detail" id="targetDetail"></div>
+      </div>
+    </section>
+
+    <section id="results" role="tabpanel" aria-labelledby="tabResults" tabindex="-1" hidden>
+      <details class="advanced-settings">
+        <summary>Filters and weights</summary>
+        <div class="block">
+          <div class="block-head">
+            <h3 class="eyebrow">Weights</h3>
+            <button class="link-button" id="resetWeights" type="button">Reset</button>
+          </div>
+          <p class="hint">Drag to change how much each criterion counts.</p>
+          <div class="weights" id="weights"></div>
+        </div>
+        <div class="block discovery">
+          <h3 class="eyebrow">Discovery</h3>
+          <div class="topk">
+            <label for="topK">Show the top <b class="num" id="topKValue">20</b> sites</label>
+            <input type="range" id="topK" min="5" max="100" step="5" value="20">
+          </div>
+          <label class="disc-toggle"><input type="checkbox" id="newOnly" checked>
+            <span>New sites only <small>Hide places within 500 km of a known analog</small></span></label>
+          <div class="topk">
+            <label for="spreadKm">Keep sites at least <b class="num" id="spreadValue">800 km</b> apart</label>
+            <input type="range" id="spreadKm" min="0" max="2000" step="100" value="800">
+          </div>
+          <div class="disc-row">
+            <label for="perCountry">Sites per country</label>
+            <select id="perCountry">
+              <option value="0">No limit</option><option value="1">1</option>
+              <option value="2" selected>2</option><option value="3">3</option><option value="5">5</option>
+            </select>
+          </div>
+          <div class="topk">
+            <label for="tolerance">Permissible error <b class="num" id="toleranceValue">exact</b></label>
+            <input type="range" id="tolerance" min="0" max="3" step="0.25" value="0">
+            <small class="hint">Higher counts anything within a band around the target as a full match.</small>
+          </div>
+        </div>
+      </details>
+      <p class="hint results-head" id="resultsSummary">Scoring…</p>
+      <section class="compare" id="compare" hidden aria-label="Pinned sites"></section>
+      <ol class="site-list" id="siteList"></ol>
+      <div class="results-foot">
+        <span>Download these sites</span>
+        <button class="ghost small" id="exportGeojson" type="button" title="Download the ranked sites as GeoJSON"><svg class="i" aria-hidden="true"><use href="icons.svg#i-download-simple"></use></svg>GeoJSON</button>
+        <button class="ghost small" id="exportCsv" type="button" title="Download the ranked sites as CSV"><svg class="i" aria-hidden="true"><use href="icons.svg#i-download-simple"></use></svg>CSV</button>
+      </div>
+      <article class="detail" id="detail" hidden></article>
+    </section>
+
+    <section id="explore" role="tabpanel" aria-labelledby="tabExplore" tabindex="-1" hidden></section>
+    <section id="validation" role="tabpanel" aria-labelledby="tabValidation" tabindex="-1" hidden></section>
+  </aside>
+
+  <section class="stage" aria-label="Map of Earth analog scores">
+    <div class="view" id="globe" role="img" aria-label="3D globe of analog scores. Click anywhere to inspect a location."></div>
+    <canvas class="view" id="flatmap" hidden aria-label="Flat map of analog scores. Click anywhere to inspect a location."></canvas>
+    <div class="labels" id="labels" role="group" aria-label="Ranked sites on the map"></div>
+    <div class="progress" id="progress" aria-hidden="true"></div>
+
+    <div class="stage-controls">
+      <div class="search" role="search">
+        <svg class="i" aria-hidden="true"><use href="icons.svg#i-magnifying-glass"></use></svg>
+        <label class="visually-hidden" for="search">Search a place or type lat, lon</label>
+        <input id="search" type="search" placeholder="Search a place or lat, lon" autocomplete="off"
+          role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
+        <ul class="search-results" id="searchResults" role="listbox" hidden></ul>
+      </div>
+      <div class="tool-group">
+        <div class="segmented" role="group" aria-label="View">
+          <button type="button" data-view="globe" aria-pressed="true">Globe</button>
+          <button type="button" data-view="map" aria-pressed="false">Map</button>
+        </div>
+        <span class="tool-sep" aria-hidden="true"></span>
+        <label class="select">
+          <span class="visually-hidden">Map layer</span>
+          <select id="layer"></select>
+        </label>
+      </div>
+      <div class="tool-group layers">
+        <label class="toggle"><input type="checkbox" id="showKnown" checked><span>Known analogs</span></label>
+        <label class="toggle opacity" title="Opacity of the data overlay">
+          <span class="tool-label">Overlay</span>
+          <input type="range" id="overlayOpacity" min="0" max="100" step="5" value="100" aria-label="Overlay opacity">
+        </label>
+        <span class="tool-sep" aria-hidden="true"></span>
+        <button class="tool-button" id="surprise" type="button" title="Fly to a random strong match you have not seen (R)" aria-label="Surprise me"><svg class="i" aria-hidden="true"><use href="icons.svg#i-dice-five"></use></svg><span class="tool-label">Surprise me</span></button>
+      </div>
+    </div>
+
+    <div class="zoom-controls" role="group" aria-label="Zoom">
+      <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in (or scroll)"><svg class="i" aria-hidden="true"><use href="icons.svg#i-plus"></use></svg></button>
+      <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><svg class="i" aria-hidden="true"><use href="icons.svg#i-minus"></use></svg></button>
+      <button type="button" id="zoomHome" aria-label="Reset view" title="Reset view"><svg class="i" aria-hidden="true"><use href="icons.svg#i-globe-hemisphere-east"></use></svg></button>
+    </div>
+
+    <div class="legend" id="legend" aria-live="polite"></div>
+
+    <figure class="twin" id="twin">
+      <button class="box-toggle" id="twinToggle" type="button" aria-expanded="true" aria-label="Hide the target globe"><svg class="i" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
+      <canvas id="twinCanvas" width="360" height="360" tabindex="0" role="img"
+        aria-label="Target body globe. Drag or use arrow keys to rotate, scroll to zoom, double-click or Home to return to the site."></canvas>
+      <figcaption id="twinCaption"></figcaption>
+    </figure>
+
+    <div class="tooltip" id="tooltip" role="status" hidden></div>
+    <div class="tour-caption" id="tourCaption" role="status" aria-live="polite" hidden>
+      <div class="tour-step" id="tourStep"></div>
+      <p id="tourText"></p>
+      <div class="tour-actions">
+        <button class="ghost small" id="tourPrev" type="button">Back</button>
+        <button class="primary small" id="tourNext" type="button">Next</button>
+        <button class="link-button" id="tourStop" type="button">End tour</button>
+      </div>
+      <div class="tour-progress"><i id="tourBar"></i></div>
+    </div>
+
+    <div class="loading" id="loading" role="status">
+      <svg class="brand-mark loading-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+      <p id="loadingText">Connecting to the TerraNova server…</p>
+      <div class="load-bar" aria-hidden="true"><i id="loadBar"></i></div>
+      <p class="hint" id="loadingStep">Step 1 of 3</p>
+      <button class="ghost" id="loadingRetry" type="button" hidden>Try again</button>
+    </div>
+  </section>
+</main>
+
+<dialog id="methodDialog" aria-labelledby="methodTitle">
+  <div class="dialog-body">
+    <div class="dialog-head">
+      <h2 id="methodTitle">How it works</h2>
+      <button class="icon-button" data-close type="button" aria-label="Close"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button>
+    </div>
+    <div id="methodContent"></div>
+  </div>
+</dialog>
+
+<dialog id="sourcesDialog" aria-labelledby="sourcesTitle">
+  <div class="dialog-body">
+    <div class="dialog-head">
+      <h2 id="sourcesTitle">Data sources</h2>
+      <button class="icon-button" data-close type="button" aria-label="Close"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button>
+    </div>
+    <div id="sourcesContent"></div>
+  </div>
+</dialog>
+
+<section class="godseye" id="godseye" hidden role="dialog" aria-modal="true" aria-labelledby="geTitle">
+  <canvas id="geCanvas" aria-label="3D terrain. Drag to orbit, right-drag to slide, scroll to zoom, click to probe."></canvas>
+  <header class="ge-top">
+    <div>
+      <h2 id="geTitle"></h2>
+      <p class="ge-sub" id="geSub"></p>
+      <div class="ge-badges" id="geBadges"></div>
+    </div>
+    <div class="ge-top-actions">
+      <button class="icon-button" id="geHelp" type="button" aria-label="Mouse and touch controls" title="Controls"><svg class="i" aria-hidden="true"><use href="icons.svg#i-question"></use></svg></button>
+      <button class="ghost" id="geReset" type="button" title="Reset camera, sun, surface, height, overlays and tools"><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-counter-clockwise"></use></svg>Reset all</button>
+      <button class="icon-button ge-close" id="geClose" type="button" aria-label="Close the 3D view (Esc)"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button>
+    </div>
+  </header>
+  <aside class="ge-panel" aria-label="Terrain, sun, view and climate">
+    <h3>Terrain in the scored cell</h3>
+    <div id="geStats" class="ge-stats"></div>
+
+    <div class="ge-section">
+      <h3>Sun</h3>
+      <div class="segmented ge-presets" role="group" aria-label="Sun presets">
+        <button type="button" data-sun="earth">Midday</button>
+        <button type="button" data-sun="evening">Evening</button>
+        <button type="button" data-sun="lunar">Lunar pole</button>
+      </div>
+      <label class="ge-slider">Height above horizon <b id="geSunElevValue" class="num"></b>
+        <input type="range" id="geSunElev" min="0.5" max="85" step="0.5" value="55"></label>
+      <label class="ge-slider">Direction <b id="geSunAzValue" class="num"></b>
+        <input type="range" id="geSunAz" min="0" max="359" step="1" value="160"></label>
+      <p class="hint" id="geSunNote"></p>
+    </div>
+
+    <div class="ge-section">
+      <h3>Surface</h3>
+      <div class="segmented ge-presets" role="group" aria-label="Surface">
+        <button type="button" data-imagery="s2" aria-pressed="true">Satellite</button>
+        <button type="button" data-imagery="relief" aria-pressed="false">Relief</button>
+        <button type="button" data-imagery="slope" aria-pressed="false">Slope</button>
+        <button type="button" data-imagery="elevation" aria-pressed="false" title="Elevation">Height</button>
+        <button type="button" data-imagery="thermal" aria-pressed="false" title="Illustrative ground temperature at the chosen month and hour">Thermal</button>
+      </div>
+      <div class="ge-slope-legend ge-thermal-legend" id="geThermalLegend" hidden>
+        <div class="ramp" id="geThermalRamp"></div>
+        <div class="scale num"><span>−40 °C</span><span>−15</span><span>10</span><span>35</span><span>60 °C</span></div>
+      </div>
+      <div class="ge-slope-legend ge-elev-legend" id="geElevLegend" hidden>
+        <div class="ramp"></div>
+        <div class="scale num"><span id="geElevLo"></span><span id="geElevHi"></span></div>
+      </div>
+      <div class="ge-slope-legend" id="geSlopeLegend" hidden>
+        <div class="ramp"></div>
+        <div class="scale num"><span>0°</span><span>5°</span><span>15° rover limit</span><span>30°+</span></div>
+      </div>
+      <label class="toggle ge-toggle"><input type="checkbox" id="geContours"><span>Contour lines <small id="geContourStep"></small></span></label>
+      <label class="ge-slider">Height exaggeration <b id="geExagValue" class="num">1× true scale</b>
+        <input type="range" id="geExag" min="1" max="6" step="0.5" value="1"></label>
+      <label class="toggle ge-toggle"><input type="checkbox" id="geCell" checked><span>Outline the scored cell</span></label>
+    </div>
+
+    <div class="ge-section">
+      <h3>Measure</h3>
+      <div class="ge-tools">
+        <button class="ghost small" type="button" id="geProfileBtn" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-ruler"></use></svg>Measure a profile</button>
+        <button class="ghost small" type="button" id="geSunPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-sun"></use></svg><span>Turn the sun</span></button>
+      </div>
+      <p class="hint" id="geToolHint">Click the terrain to probe any point.</p>
+      <div id="geProbe" class="ge-probe" hidden></div>
+      <div id="geProfile" class="ge-profile" hidden></div>
+    </div>
+
+    <div class="ge-section ge-climate-panel" id="geClimatePanel">
+      <h3>Climate simulation</h3>
+      <label class="ge-slider">Month <b id="geMonthValue" class="num"></b>
+        <input type="range" id="geMonth" min="0" max="11" step="1" value="6"></label>
+      <label class="ge-slider">Time of day <b id="geHourValue" class="num"></b>
+        <input type="range" id="geHour" min="0" max="23.75" step="0.25" value="13"></label>
+      <div class="ge-tools">
+        <button class="ghost small" type="button" id="geDayPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg><span>Play a day</span></button>
+        <button class="ghost small" type="button" id="geWeather" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-cloud-rain"></use></svg><span>Weather</span></button>
+      </div>
+      <div class="ge-climate" id="geClimate" aria-live="polite"></div>
+      <p class="hint">Illustrative, not a forecast. Built from this cell's NASA POWER temperatures and rainfall and its
+        MODIS day-night surface swing, with the real sun position for the latitude. Try the Thermal view while a day plays.</p>
+    </div>
+    <p class="hint ge-status" id="geStatus" role="status"></p>
+  </aside>
+  <div class="ge-hud">
+    <div class="ge-north" aria-hidden="true"><svg id="geNorth" viewBox="0 0 20 20" width="22" height="22"><path d="M10 2 L15 16 L10 13 L5 16 Z" fill="#e03c31"/><path d="M10 2 L10 13 L5 16 Z" fill="#f2847c"/></svg><small>N</small></div>
+    <div class="ge-scale"><div class="ge-scale-bar" id="geScaleBar"></div><span id="geScaleLabel" class="num"></span></div>
+    <div class="ge-vscale" id="geVScale">Vertical: true scale</div>
+  </div>
+  <div class="ge-hover" id="geHover" hidden></div>
+  <div class="ge-error" id="geError" role="alert" hidden></div>
+  <div class="ge-guide" id="geGuide" role="dialog" aria-labelledby="geGuideTitle" hidden>
+    <h3 id="geGuideTitle">Getting around in 3D</h3>
+    <ul>
+      <li><svg class="mouse" viewBox="0 0 16 22" aria-hidden="true"><rect x="1" y="1" width="14" height="20" rx="7"/><path class="hl" d="M7.4 1.8A6.2 6.2 0 0 0 1.8 8v.6h5.6z"/><path d="M8 1v8M1 9h14"/></svg>
+        <span><b>Left-drag</b> to orbit around the site</span></li>
+      <li><svg class="mouse" viewBox="0 0 16 22" aria-hidden="true"><rect x="1" y="1" width="14" height="20" rx="7"/><path class="hl" d="M8.6 1.8A6.2 6.2 0 0 1 14.2 8v.6H8.6z"/><path d="M8 1v8M1 9h14"/></svg>
+        <span><b>Right-drag</b> to slide across the ground</span></li>
+      <li><svg class="mouse" viewBox="0 0 16 22" aria-hidden="true"><rect x="1" y="1" width="14" height="20" rx="7"/><path d="M8 1v8M1 9h14"/><rect class="hl" x="6.3" y="3" width="3.4" height="5.6" rx="1.7"/></svg>
+        <span><b>Scroll</b> or <b>middle-drag</b> to zoom</span></li>
+      <li><svg class="mouse" viewBox="0 0 16 22" aria-hidden="true"><rect x="1" y="1" width="14" height="20" rx="7"/><path d="M8 1v8M1 9h14"/><circle class="hl" cx="8" cy="15" r="2.4"/></svg>
+        <span><b>Click</b> the ground to read its height and slope</span></li>
+    </ul>
+    <p class="hint">Touch: one finger orbits, two fingers pinch to zoom and drag to slide.</p>
+    <button class="primary" id="geGuideOk" type="button">Got it</button>
+  </div>
+  <p class="ge-credit" id="geCredit"></p>
+  <div class="loading ge-loading" id="geLoading"><div class="spinner" aria-hidden="true"></div><p>Loading the terrain…</p></div>
+</section>
+
+<dialog id="keysDialog" aria-labelledby="keysTitle">
+  <div class="dialog-body">
+    <div class="dialog-head">
+      <h2 id="keysTitle">Keyboard shortcuts</h2>
+      <button class="icon-button" data-close type="button" aria-label="Close"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button>
+    </div>
+    <table class="keys">
+      <tr><td><kbd>/</kbd></td><td>Search a place or coordinates</td></tr>
+      <tr><td><kbd>J</kbd> <kbd>K</kbd></td><td>Next or previous ranked site</td></tr>
+      <tr><td><kbd>E</kbd></td><td>Open the site in God's Eye 3D</td></tr>
+      <tr><td><kbd>P</kbd></td><td>Pin the open site to compare</td></tr>
+      <tr><td><kbd>G</kbd> <kbd>M</kbd></td><td>Globe or flat map</td></tr>
+      <tr><td><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></td><td>Zoom in, out, reset</td></tr>
+      <tr><td><kbd>V</kbd></td><td>Validation tab</td></tr>
+      <tr><td><kbd>T</kbd></td><td>Start the guided tour</td></tr>
+      <tr><td><kbd>R</kbd></td><td>Surprise me: fly to a random strong match</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close the card, the 3D view, a dialog or the tour</td></tr>
+    </table>
+  </div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

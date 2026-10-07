@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import math
+import os
 import re
 import threading
 from contextlib import asynccontextmanager
@@ -91,7 +92,9 @@ async def _lifespan(_: FastAPI):  # type: ignore[no-untyped-def]
         except Exception:  # warming is best effort
             pass
 
-    threading.Thread(target=warm, daemon=True).start()
+    # EAF_WARM=0 skips this on slow machines (the badges then compute on first use).
+    if os.environ.get("EAF_WARM", "1") != "0":
+        threading.Thread(target=warm, daemon=True).start()
     yield
 
 
@@ -767,8 +770,17 @@ def site3d(
     except sitetiles.SiteTileError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FetchError as exc:
+        if offline_mode():
+            raise HTTPException(
+                status_code=404,
+                detail="Terrain for this site is not cached, and the app is in offline mode. "
+                "Prefetch it (python -m src.acquire.sitetiles) or copy cache/sitetiles "
+                "from a prepared laptop.",
+            ) from exc
         raise HTTPException(
-            status_code=404, detail="Terrain tiles for this site are not cached (offline)."
+            status_code=504,
+            detail="Could not download the terrain tiles in time (the network is slow or "
+            "blocks s3.amazonaws.com). Run: python -m scripts.check_network",
         ) from exc
 
     z, size = sitetiles.DEM_ZOOM, dem.shape[0]

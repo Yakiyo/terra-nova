@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TerraNova · Choose a target site</title>
+  <meta name="description" content="Pick a Moon or Mars base site, or describe your own, and find the places on Earth that behave most like it.">
+  <meta name="theme-color" content="#06090f">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='18' r='10' fill='none' stroke='%23eef0f3' stroke-width='2.4'/%3E%3Ccircle cx='25.5' cy='6.5' r='4.5' fill='%23e03c31'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <canvas id="starfield" aria-hidden="true"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <a href="index.html" aria-label="TerraNova home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+        <span class="wordmark">TerraNova</span>
+      </a>
+    </div>
+    <nav class="main-nav" aria-label="Main">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="targets.html" class="nav-link" aria-current="page">Targets</a>
+      <a href="finder.html" class="nav-link">Finder</a>
+    </nav>
+  </header>
+
+  <main id="main" class="dest">
+    <div class="dest-head">
+      <h1 class="reveal">Choose a target site</h1>
+      <p class="reveal" style="--d: 1">Each site is described by the conditions NASA missions measured there. TerraNova then ranks every
+        land cell on Earth by how closely it matches.</p>
+    </div>
+    <div id="groups" aria-live="polite">
+      <section class="dest-group"><div class="dest-grid">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div></section>
+    </div>
+  </main>
+
+  <footer class="site-foot">
+    <span>Target values cite measurements from LRO (Diviner, LOLA), Chang'e-2, Mars Express (HRSC), Mars Global Surveyor (MOLA), MRO (HiRISE), Curiosity and Perseverance, plus NASA fact sheets. Every value lists its source in the Finder.</span>
+  </footer>
+
+  <script type="module" src="targets.js"></script>
+</body>
+</html>

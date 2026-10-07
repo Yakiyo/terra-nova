@@ -3,9 +3,11 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "./vendor/three/OrbitControls.js";
+import { SpaceScenery } from "./space.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DEG = Math.PI / 180;
+const SUN_OFFSET = new THREE.Vector3(1.5, 1.2, 0);
 
 /* Detail imagery tiles (src/acquire/tiles.py): size in degrees per level. */
 const TILE_SIZE = { 1: 10, 2: 2.5 };
@@ -51,6 +53,21 @@ function stars(count = 1800) {
   return new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x9fb2c8, size: 0.09, sizeAttenuation: true, transparent: true, opacity: 0.8 }));
 }
 
+function graticule(radius) {
+  const pts = [];
+  for (let lat = -60; lat <= 60; lat += 30) {
+    for (let lon = -180; lon < 180; lon += 3) pts.push(toVector(lat, lon, radius), toVector(lat, lon + 3, radius));
+  }
+  for (let lon = -180; lon < 180; lon += 30) {
+    for (let lat = -84; lat < 84; lat += 3) pts.push(toVector(lat, lon, radius), toVector(lat + 3, lon, radius));
+  }
+  return new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 }),
+  );
+}
+
+/* The Finder's atmosphere: a fresnel glow around the globe. */
 function atmosphere(radius, color) {
   return new THREE.Mesh(
     new THREE.SphereGeometry(radius, 64, 32),
@@ -65,20 +82,6 @@ function atmosphere(radius, color) {
           gl_FragColor = vec4(glow, f * 0.9); }`,
       side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
     }),
-  );
-}
-
-function graticule(radius) {
-  const pts = [];
-  for (let lat = -60; lat <= 60; lat += 30) {
-    for (let lon = -180; lon < 180; lon += 3) pts.push(toVector(lat, lon, radius), toVector(lat, lon + 3, radius));
-  }
-  for (let lon = -180; lon < 180; lon += 30) {
-    for (let lat = -84; lat < 84; lat += 3) pts.push(toVector(lat, lon, radius), toVector(lat + 3, lon, radius));
-  }
-  return new THREE.LineSegments(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 }),
   );
 }
 
@@ -132,6 +135,8 @@ export class Globe {
     this.scene.add(this.overlay);
     this.scene.add(graticule(1.004));
     this.scene.add(atmosphere(1.12, 0x4f9dff));
+    this.space = new SpaceScenery(this.scene, this.camera, { pixelRatio: this.renderer.getPixelRatio(), settle: true });
+    this.lastFrame = performance.now();
 
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
@@ -336,7 +341,10 @@ export class Globe {
   }
 
   tick() {
-    if (!this.visible) return;
+    const frame = performance.now();
+    const dt = Math.min(0.1, (frame - this.lastFrame) / 1000);
+    this.lastFrame = frame;
+    if (!this.visible || document.hidden) return;
     if (this.flight) {
       const f = this.flight;
       const t = Math.min(1, (performance.now() - f.start) / f.duration);
@@ -351,7 +359,8 @@ export class Globe {
     const full = (this.fitDistance || 3.6) - 1;
     this.controls.rotateSpeed = Math.min(0.5, Math.max(0.04, 0.5 * altitude / full));
     this.controls.update();
-    this.sun.position.copy(this.camera.position).add(new THREE.Vector3(1.5, 1.2, 0));
+    // Light from over the viewer's shoulder, fixed relative to the view, so the backdrop Moon and Mars keep the same phase.
+    this.sun.position.copy(this.camera.position).add(SUN_OFFSET.clone().applyQuaternion(this.camera.quaternion));
     // Detail tiles follow the view; they fade in once loaded.
     const now = performance.now();
     if (now - this.tileCheck > 300) {
@@ -367,6 +376,7 @@ export class Globe {
     // The data overlay fades as you zoom in, so the imagery underneath stays visible.
     const fade = Math.min(1, Math.max(0.45, altitude / 0.9));
     this.overlay.material.opacity = this.overlayOpacity * fade;
+    this.space.update(dt);
     this.renderer.render(this.scene, this.camera);
     this._placeMarkers();
   }
@@ -385,10 +395,13 @@ export class Globe {
         continue;
       }
       const s = p.project(this.camera);
+      const x = ((s.x + 1) / 2) * w;
+      const y = ((1 - s.y) / 2) * h;
       m.el.style.display = "";
-      m.el.style.left = `${((s.x + 1) / 2) * w}px`;
-      m.el.style.top = `${((1 - s.y) / 2) * h}px`;
+      m.el.style.left = `${x}px`;
+      m.el.style.top = `${y}px`;
       m.el.style.opacity = String(Math.min(1, (margin - 0.02) * 8));
+      m.onPlace?.(x, y, w, h);
     }
   }
 }
@@ -408,8 +421,8 @@ export class Twin {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
     this.light = new THREE.DirectionalLight(0xffffff, 2.2);
     this.scene.add(this.light);
-    this.pin = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 16), new THREE.MeshBasicMaterial({ color: 0xf08a4b }));
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.1, 32), new THREE.MeshBasicMaterial({ color: 0xf08a4b, transparent: true, side: THREE.DoubleSide }));
+    this.pin = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 16), new THREE.MeshBasicMaterial({ color: 0xe03c31 }));
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.1, 32), new THREE.MeshBasicMaterial({ color: 0xe03c31, transparent: true, side: THREE.DoubleSide }));
     this.scene.add(this.pin, this.ring);
     this.textures = {};
     this.home = new THREE.Vector3(0, 0, 4.2);
@@ -441,6 +454,11 @@ export class Twin {
     this.renderer.setAnimationLoop((t) => this.tick(t));
   }
 
+  /* Stop drawing while hidden (collapsed, or under the full-screen 3D view). */
+  setPaused(paused) {
+    this.paused = paused;
+  }
+
   /* Fly back to the view of the target site. */
   reset() {
     const from = this.camera.position.clone();
@@ -467,6 +485,7 @@ export class Twin {
   }
 
   tick(t) {
+    if (this.paused || document.hidden) return;
     if (this.flight) {
       const f = this.flight;
       const k = Math.min(1, (performance.now() - f.start) / f.duration);

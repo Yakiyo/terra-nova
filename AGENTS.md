@@ -10,3 +10,5 @@ Every claim needs a `source_url` and a `dataset_id`. If a fetch fails, say so an
 the cached value with its timestamp. Do not estimate a missing number.
 
 See `DEVELOPMENT.md` for commands and `docs/REVIEW.md` for known problems.
+
+Interface work follows `DESIGN.md` (tokens, type, icons, motion, do and don't).

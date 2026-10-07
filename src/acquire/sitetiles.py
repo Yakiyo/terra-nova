@@ -34,7 +34,7 @@ TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}
 IMAGERY = {
     "s2": {
         "url": "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg",
-        "zoom": DEM_ZOOM + 1,
+        "zoom": DEM_ZOOM,
         "credit": (
             "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH "
             "(Contains modified Copernicus Sentinel data 2020)"
@@ -68,7 +68,8 @@ def dem_tile(x: int, y: int, offline: bool | None = None) -> np.ndarray:
         filename=f"{y}_{x}.png",
         raw_dir=CACHE / "dem" / str(DEM_ZOOM),
         offline=offline,
-        timeout=60,
+        timeout=20,
+        max_seconds=30,
     )
     with Image.open(item.path) as image:
         return terrain.decode_terrarium(np.asarray(image.convert("RGB")))
@@ -97,7 +98,8 @@ def imagery_tile(source: str, z: int, x: int, y: int, offline: bool | None = Non
         filename=f"{y}_{x}.jpg",
         raw_dir=CACHE / source / str(z),
         offline=offline,
-        timeout=60,
+        timeout=20,
+        max_seconds=30,
     )
     return item.path
 

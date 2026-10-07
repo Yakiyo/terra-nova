@@ -19,6 +19,12 @@ Keep this current as you build. Every member adds their own entries.
   comes from `src/compute`; the team should review `data/targets.json` choices
   (terrain percentile classes) and `data/known_analogs.json`.
 
+- 2026-10-03: AI redesigned the web interface to the "Mission control" system in `DESIGN.md`
+  (the team chose the direction, the NASA-red accent and the motion level), applying the rules
+  of the impeccable, taste-skill and ui-ux-pro-max design skills. It also fixed the Finder crash
+  on links without a target, added link aliases, made God's Eye behave as a dialog, carried over
+  the slow-network fix, and restored the offline thumbnail cache.
+
 ## What the AI did not do
 - Scores come from the deterministic code in `src/compute`, never from a model.
 - _(team: record the dataset choices, method decisions and design that are yours)_

@@ -29,7 +29,7 @@ Tags: **[VERIFIED]** means checked against a source or by running the code. **[V
 
 Added since v2: God's Eye 3D view with measured terrain statistics, discovery mode
 (new sites only, spread, per-country cap, tolerance bands), Monte Carlo stability and
-leave-one-out sensitivity, cross-dataset consistency checks, 3D hover previews, the latest
+leave-one-out sensitivity, cross-dataset consistency checks, 3D hover previews (later replaced by God's Eye), the latest
 NASA daily view, the Explore scatter, pin-to-compare, search, tour and keyboard shortcuts.
 
 Fixed in the v3 code review: temperature-swing layers no longer use a hot/cold palette;

@@ -4,6 +4,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -69,11 +70,15 @@ def fetch(
     offline: bool | None = None,
     timeout: int = 180,
     force: bool = False,
+    max_seconds: float | None = None,
 ) -> Fetched:
     """Return a local copy of *url*, caching it under ``cache/raw``.
 
     When ``OFFLINE=1`` no network request is attempted; a missing cache entry
     raises :class:`FetchError` so the build can fall back to bundled fixtures.
+
+    ``timeout`` limits each connect/read; ``max_seconds`` limits the whole
+    download, so a connection that trickles data forever still fails.
     """
     directory = Path(raw_dir) if raw_dir is not None else DEFAULT_RAW_DIR
     directory.mkdir(parents=True, exist_ok=True)
@@ -98,7 +103,16 @@ def fetch(
             urllib.request.urlopen(request, timeout=timeout) as response,
             open(tmp_path, "wb") as handle,
         ):
-            shutil.copyfileobj(response, handle)
+            if max_seconds is None:
+                shutil.copyfileobj(response, handle)
+            else:
+                started = time.monotonic()
+                # read1 returns what has arrived so far, so the deadline is checked
+                # even when a server trickles a few bytes at a time.
+                while chunk := response.read1(64 * 1024):
+                    handle.write(chunk)
+                    if time.monotonic() - started > max_seconds:
+                        raise FetchError(f"took longer than {max_seconds:.0f} s")
         if tmp_path.stat().st_size == 0:
             raise FetchError(f"empty response for {url}")
         tmp_path.replace(dest)

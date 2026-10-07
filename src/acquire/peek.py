@@ -33,7 +33,14 @@ EOX = "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/
 
 
 def _tile_image(url: str, name: str, sub: str, offline: bool | None) -> np.ndarray:
-    item = fetch(url, filename=name, raw_dir=CACHE / "tiles" / sub, offline=offline, timeout=60)
+    item = fetch(
+        url,
+        filename=name,
+        raw_dir=CACHE / "tiles" / sub,
+        offline=offline,
+        timeout=20,
+        max_seconds=30,
+    )
     with Image.open(item.path) as image:
         return np.asarray(image.convert("RGB"))
 

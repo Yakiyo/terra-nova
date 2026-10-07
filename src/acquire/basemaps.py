@@ -1,6 +1,7 @@
 """Build the offline globe textures in ``web/assets/``.
 
-    python -m src.acquire.basemaps
+    python -m src.acquire.basemaps            # everything (needs network)
+    python -m src.acquire.basemaps --small    # only the small copies, from the files above
 
 * Earth: NASA Blue Marble with shaded relief and bathymetry, from NASA GIBS.
   ``earth_hd.jpg`` is 8192 x 4096 (~5 km/px) for the globe on GPUs that allow
@@ -71,12 +72,29 @@ def trek(body: str, offline: bool | None = None) -> Path:
     return out
 
 
-def main() -> int:
+SMALL = (1024, 512)
+
+
+def small() -> list[Path]:
+    """1024 x 512 copies for decoration (background Moon and Mars, target icons): no network."""
+    out = []
+    for body in ("earth", "moon", "mars"):
+        path = OUT / f"{body}_sm.jpg"
+        with Image.open(OUT / f"{body}.jpg") as image:
+            image.convert("RGB").resize(SMALL, Image.Resampling.LANCZOS).save(path, quality=84)
+        out.append(path)
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    for path in (earth(), trek("moon"), trek("mars")):
+    built = small() if argv == ["--small"] else [earth(), trek("moon"), trek("mars"), *small()]
+    for path in built:
         print(f"[basemaps] wrote {path.relative_to(REPO_ROOT)} ({path.stat().st_size // 1024} KB)")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import sys
+
+    raise SystemExit(main(sys.argv[1:]))

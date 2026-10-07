@@ -122,3 +122,34 @@ def test_distance_grid_matches_point_novelty():
         assert grid[row, col] == pytest.approx(
             validation.novelty(clat, clon, catalog)["distance_km"], abs=0.1
         )
+
+
+def test_fetch_gives_up_on_a_trickling_download(tmp_path):
+    """A server that keeps sending tiny chunks must not hang the app."""
+    import http.server
+    import threading
+    import time as _time
+
+    from src.acquire.download import FetchError, fetch
+
+    class Slow(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            for _ in range(40):
+                self.wfile.write(b"x" * 64)
+                self.wfile.flush()
+                _time.sleep(0.1)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}/tile"
+    started = _time.monotonic()
+    with pytest.raises(FetchError, match="longer than"):
+        fetch(url, filename="slow.bin", raw_dir=tmp_path, offline=False, timeout=5, max_seconds=1)
+    assert _time.monotonic() - started < 3.5
+    assert not (tmp_path / "slow.bin").exists(), "a failed download must not be cached"
+    server.shutdown()

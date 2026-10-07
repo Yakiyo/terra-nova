@@ -264,6 +264,7 @@ export class FlatMap {
       m.el.style.opacity = "1";
       m.el.style.left = `${x}px`;
       m.el.style.top = `${y}px`;
+      if (inside) m.onPlace?.(x, y, this.canvas.clientWidth, this.canvas.clientHeight);
     }
   }
 }

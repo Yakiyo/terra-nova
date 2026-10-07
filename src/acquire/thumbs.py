@@ -62,7 +62,8 @@ def thumbnail(lat: float, lon: float, offline: bool | None = None) -> Path:
         filename=filename(clat, clon),
         raw_dir=THUMB_DIR,
         offline=offline,
-        timeout=30,
+        timeout=20,
+        max_seconds=30,
     )
     return item.path
 

@@ -3,9 +3,13 @@
 
 import { Globe, Twin } from "./globe.js";
 import { GodsEye, SUN_PRESETS } from "./godseye.js";
-import { Peek3D } from "./peek3d.js";
+
 import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
+import { initStarfield } from "./starfield.js";
+import { closeMenus, icon, menu, toast } from "./ui.js";
+
+const starfield = initStarfield("starfield");
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -29,6 +33,7 @@ const state = {
   view: "globe",
   selected: null,      // selected result row
   pick: null,          // clicked location
+  card: null,          // result row shown in the small info card on the map
   request: 0,
   topK: 20,
   mode: "target",      // "target" or "custom"
@@ -44,6 +49,8 @@ const state = {
 const MAX_PINS = 3;
 
 const CUSTOM_ID = "__custom__";
+/* Friendly names in links (finder.html#target=moon). */
+const TARGET_ALIASES = { moon: "lunar_south_pole", mars: "jezero_crater" };
 
 /* ----------------------------------------------------------------- helpers */
 
@@ -62,14 +69,6 @@ function decode(field) {
   const bytes = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
   return new Float32Array(bytes.buffer);
-}
-
-function toast(message) {
-  const el = $("toast");
-  el.textContent = message;
-  el.hidden = false;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { el.hidden = true; }, 6000);
 }
 
 function debounce(fn, ms) {
@@ -244,43 +243,11 @@ async function showPeek(lat, lon, x, y, html) {
     box.prepend(img);
     box.insertAdjacentHTML("beforeend", `<span class="src">${esc(thumb.credit)}</span>`);
   }
-  upgradePeek(cell, token);
-}
-
-/* Replace the flat preview with a rotating, relief-shaded 3D block when available. */
-let peek3d = null;
-const peekInfo = new Map();
-async function upgradePeek(cell, token) {
-  if (Math.abs(cell.lat) > 83) return;
-  try {
-    let info = peekInfo.get(cell.key);
-    if (!info) {
-      const box = $("tooltip").querySelector(".peek-img");
-      box?.insertAdjacentHTML("beforeend", `<span class="peek-badge">building 3D…</span>`);
-      info = await api(`/api/peek?lat=${cell.lat}&lon=${cell.lon}`);
-      peekInfo.set(cell.key, info);
-    }
-    if (token !== peekToken) return;
-    peek3d = peek3d || new Peek3D();
-    const canvas = await peek3d.show(info);
-    const box = $("tooltip").querySelector(".peek-img");
-    if (token !== peekToken || !box) return;
-    box.querySelector("img")?.remove();
-    box.querySelector(".peek-badge")?.remove();
-    box.querySelector(".cellbox")?.remove();
-    box.prepend(canvas);
-    const src = box.querySelector(".src");
-    const note = `Sentinel-2 2020 + relief · 3D · ${Math.round(info.relief_m)} m relief`;
-    if (src) src.textContent = note; else box.insertAdjacentHTML("beforeend", `<span class="src">${esc(note)}</span>`);
-  } catch {
-    $("tooltip").querySelector(".peek-badge")?.remove();
-  }
 }
 
 function hidePeek() {
   peekToken++;
   clearTimeout(dwell);
-  peek3d?.stop();
   const tip = $("tooltip");
   tip.hidden = true;
   tip.classList.remove("peek");
@@ -342,7 +309,11 @@ function resultPeekHtml(r) {
 
 const markerEls = new Map();   // result index -> marker element
 
+let cardCache = null;   // {r, marker}: the open card survives marker rebuilds without replaying its entrance
+
 function renderMarkers() {
+  // Markers are rebuilt from state; remember which one had keyboard focus and give it back.
+  const focusKey = document.activeElement?.closest?.("#labels [data-key]")?.dataset.key;
   labels.innerHTML = "";
   markerEls.clear();
   const markers = [];
@@ -351,9 +322,13 @@ function renderMarkers() {
     for (const site of state.analogs.sites) {
       const el = document.createElement("div");
       el.className = "marker known";
+      el.dataset.key = `known-${site.name}`;
+      el.textContent = "🚀";
+      el.setAttribute("role", "img");
       el.setAttribute("aria-label", `Known analog: ${site.name}`);
       el.tabIndex = 0;
-      if (body && !site.bodies.includes(body)) el.style.filter = "brightness(0.6)";
+      // Analogs of the other body are dimmed.
+      if (body && !site.bodies.includes(body)) el.classList.add("other");
       markerPeek(el, site.lat, site.lon, `<div class="t-title">${esc(site.name)}</div>
         <div class="t-sub">Known ${esc(site.bodies.join(" & "))} analog · ${esc(site.kind)}</div>
         <div class="t-sub">${esc(site.use)}</div>`);
@@ -369,6 +344,7 @@ function renderMarkers() {
       const pinned = state.pins.some((x) => x.index === r.index);
       el.className = "marker" + (active ? " active" : "") + (r.rank > 10 && !active ? " minor" : "") + (pinned ? " pinned" : "");
       el.textContent = r.rank;
+      el.dataset.key = `site-${r.index}`;
       el.setAttribute("aria-label", `#${r.rank} ${r.label.text}, ${fmtPct(r.score)} match`);
       el.addEventListener("click", () => { hidePeek(); selectResult(r); });
       markerPeek(el, r.lat, r.lon, resultPeekHtml(r));
@@ -380,11 +356,93 @@ function renderMarkers() {
   if (state.pick) {
     const el = document.createElement("div");
     el.className = "marker pick";
+    el.setAttribute("aria-hidden", "true");
     labels.appendChild(el);
     markers.push({ lat: state.pick.lat, lon: state.pick.lon, el });
   }
+  if (state.card) {
+    const fresh = cardCache?.r !== state.card;
+    if (fresh) cardCache = { r: state.card, marker: infoCard(state.card) };
+    labels.appendChild(cardCache.marker.el);
+    markers.push(cardCache.marker);
+    if (fresh && cardCache.r.index !== cardCache.shown) {
+      cardCache.shown = cardCache.r.index;
+      requestAnimationFrame(() => cardCache?.marker.el.focus({ preventScroll: true }));
+    }
+  } else {
+    cardCache = null;
+  }
   globe.setMarkers(state.view === "globe" ? markers : []);
   flat.setMarkers(state.view === "map" ? markers : []);
+  if (focusKey) labels.querySelector(`[data-key="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
+}
+
+/* A small card pinned to the clicked place: the essentials, and a way into God's Eye. */
+function infoCard(r) {
+  const el = document.createElement("div");
+  el.className = "info-card";
+  el.tabIndex = -1;
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-label", `${r.label.text}: ${fmtPct(r.score)} match`);
+  const t = target();
+  const polar = Math.abs(r.lat) > 84;
+  el.innerHTML = `
+    <button class="icon-button ic-close" type="button" aria-label="Close the card">${icon("x")}</button>
+    <div class="ic-img"><i class="cellbox"></i></div>
+    <div class="ic-body">
+      <div class="ic-title">${r.rank ? `<span class="num">#${r.rank}</span> ` : ""}${esc(r.label.text)}</div>
+      <div class="ic-sub num">${fmtCoord(r.lat, r.lon)}</div>
+      <div class="ic-score"><b class="num">${(r.score * 100).toFixed(0)}%</b>
+        <span>match to ${esc(t?.short_name || "your profile")}, ${topShare(r.percentile)} of land</span></div>
+      <div class="ic-chips">${noveltyChip(r.novelty)}</div>
+    </div>
+    <div class="ic-actions">
+      <button class="godseye-button small" type="button" data-act="eye" ${polar ? "disabled title=\"Elevation tiles stop at about 84 degrees latitude\"" : ""}>
+        ${icon("cube-focus")}God's Eye 3D</button>
+      <button class="ghost small" type="button" data-act="more">Details</button>
+    </div>`;
+  el.querySelector(".ic-close").addEventListener("click", closeCard);
+  el.querySelector("[data-act=eye]").addEventListener("click", () => openGodsEye(r));
+  el.querySelector("[data-act=more]").addEventListener("click", () => {
+    if (ui.sidebar === false) setUi("sidebar", true);
+    selectTab("results");
+    $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  for (const type of ["pointerdown", "wheel", "dblclick"]) el.addEventListener(type, (e) => e.stopPropagation());
+  thumbFor(cellOf(r.lat, r.lon)).then((thumb) => {
+    const box = el.querySelector(".ic-img");
+    if (!thumb || !box) return;
+    const img = new Image();
+    img.alt = `Satellite view around ${fmtCoord(r.lat, r.lon)}`;
+    img.src = thumb.src;
+    box.prepend(img);
+  });
+  // Sit above the point, but stay inside the stage.
+  const onPlace = (x, y, w, h) => {
+    const cw = el.offsetWidth, ch = el.offsetHeight;
+    const tx = Math.min(Math.max(-cw / 2, 8 - x), w - 8 - x - cw);
+    const above = y - ch - 18 > 8;
+    const ty = above ? -ch - 18 : Math.min(18, h - 8 - y - ch);
+    el.style.transform = `translate(${tx}px, ${ty}px)`;
+    el.classList.toggle("below", !above);
+  };
+  return { lat: r.lat, lon: r.lon, el, onPlace };
+}
+
+let cardReturnFocus = null;
+
+function showCard(r) {
+  const fresh = state.card?.index !== r.index;
+  if (fresh && !document.activeElement?.closest?.(".info-card")) cardReturnFocus = document.activeElement;
+  state.card = r;
+  renderMarkers();
+}
+
+function closeCard() {
+  state.card = null;
+  renderMarkers();
+  if (cardReturnFocus?.isConnected) cardReturnFocus.focus({ preventScroll: true });
+  cardReturnFocus = null;
 }
 
 /* ------------------------------------------------------------------ layers */
@@ -402,6 +460,7 @@ function paintLayer() {
       <div class="ramp" style="background:${cssGradient("score")}"></div>
       <div class="scale abs num"><span style="left:0">top 50%</span><span style="left:80%">top 10%</span><span style="left:98%">1%</span></div>
       ${histogram()}
+      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">🚀</i>known analog</span></div>
       <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Bars: how many land cells
         reach each score (orange = top 10%, at least ${fmtPct(q(0.9))}).</div>
       <div class="credit-line">Earth: <a href="${esc(state.sources.basemaps.earth.url)}" target="_blank" rel="noopener">${esc(state.sources.basemaps.earth.credit)}</a></div>`;
@@ -437,7 +496,7 @@ const ui = (() => { try { return JSON.parse(localStorage.getItem("eaf-ui") || "{
 function legendTitle(text) {
   const open = ui.legend !== false;
   return `<div class="title legend-head"><span>${esc(text)}</span>
-    <button class="box-toggle" type="button" aria-expanded="${open}" aria-label="${open ? "Hide" : "Show"} the legend">${open ? "▾" : "▸"}</button></div>`;
+    <button class="box-toggle" type="button" aria-expanded="${open}" aria-label="${open ? "Hide" : "Show"} the legend">${icon("caret-down")}</button></div>`;
 }
 
 function setUi(key, value) {
@@ -447,40 +506,34 @@ function setUi(key, value) {
 }
 
 function applyUi() {
-  const left = ui.left !== false;
-  const right = ui.right !== false;
-  document.body.classList.toggle("hide-left", !left);
-  document.body.classList.toggle("hide-right", !right);
-  const tl = $("toggleLeft");
-  tl.textContent = left ? "‹" : "›";
-  tl.setAttribute("aria-expanded", String(left));
-  tl.setAttribute("aria-label", `${left ? "Hide" : "Show"} the target panel`);
-  const tr = $("toggleRight");
-  tr.textContent = right ? "›" : "‹";
-  tr.setAttribute("aria-expanded", String(right));
-  tr.setAttribute("aria-label", `${right ? "Hide" : "Show"} the results panel`);
+  const sidebar = ui.sidebar !== false;
+  document.body.classList.toggle("hide-sidebar", !sidebar);
+  const ts = $("toggleSidebar");
+  if (ts) {
+    ts.setAttribute("aria-expanded", String(sidebar));
+    ts.setAttribute("aria-label", `${sidebar ? "Hide" : "Show"} the sidebar`);
+  }
   const twinOpen = ui.twin !== false;
   $("twin").classList.toggle("collapsed", !twinOpen);
-  $("twinToggle").textContent = twinOpen ? "▾" : "▸";
   $("twinToggle").setAttribute("aria-expanded", String(twinOpen));
+  $("twinToggle").setAttribute("aria-label", `${twinOpen ? "Hide" : "Show"} the target globe`);
+  twin?.setPaused(!twinOpen || eye?.open);
   const legend = $("legend");
   legend.classList.toggle("collapsed", ui.legend === false);
   const lt = legend.querySelector(".box-toggle");
   if (lt) {
-    lt.textContent = ui.legend === false ? "▸" : "▾";
     lt.setAttribute("aria-expanded", String(ui.legend !== false));
   }
   document.querySelectorAll("[data-fold]").forEach((b) => {
     const open = ui[`fold_${b.dataset.fold}`] !== false;
     b.setAttribute("aria-expanded", String(open));
-    b.querySelector(".chev").textContent = open ? "▾" : "▸";
     b.closest(".block").classList.toggle("collapsed", !open);
   });
 }
 
 function wireUi() {
-  $("toggleLeft").addEventListener("click", () => setUi("left", ui.left === false));
-  $("toggleRight").addEventListener("click", () => setUi("right", ui.right === false));
+  const ts = $("toggleSidebar");
+  if (ts) ts.addEventListener("click", () => setUi("sidebar", ui.sidebar === false));
   $("twinToggle").addEventListener("click", () => setUi("twin", ui.twin === false));
   document.querySelectorAll("[data-fold]").forEach((b) => b.addEventListener("click", () => {
     const key = `fold_${b.dataset.fold}`;
@@ -536,20 +589,21 @@ function renderTargets() {
   }
   const card = (t) => `
     <button class="target-card" role="radio" aria-checked="${state.mode === "target" && t.id === state.targetId}" data-id="${esc(t.id)}" type="button">
-      <span class="planet" style="background-image:url(assets/${esc(t.body.toLowerCase())}.jpg)"></span>
+      <span class="planet" style="background-image:url(assets/${esc(t.body.toLowerCase())}_sm.jpg)"></span>
       <strong>${esc(t.short_name)}</strong>
       <small>${Math.abs(t.latitude).toFixed(1)}°${t.latitude >= 0 ? "N" : "S"} ${Math.abs(t.longitude).toFixed(1)}°${t.longitude >= 0 ? "E" : "W"}</small>
     </button>`;
-  $("targets").innerHTML = groups.map((g) => `
+  const html = groups.map((g) => `
     <p class="group-label">${esc(g.name)}</p>
     <div class="target-grid">${g.items.map(card).join("")}</div>`).join("") + `
     <p class="group-label">Your own</p>
     <div class="target-grid">
       <button class="target-card custom" role="radio" aria-checked="${state.mode === "custom"}" data-id="${CUSTOM_ID}" type="button">
-        <span class="planet planet-custom" aria-hidden="true">✎</span>
-        <strong>Custom target</strong><small>enter values by hand</small>
+        <span class="planet planet-custom" aria-hidden="true">${icon("sliders-horizontal")}</span>
+        <strong>Your own profile</strong><small>type the values</small>
       </button>
     </div>`;
+  $("targets").innerHTML = html;
   $("targets").querySelectorAll(".target-card").forEach((b) => b.addEventListener("click", () => chooseTarget(b.dataset.id)));
 }
 
@@ -578,7 +632,7 @@ function renderTargetDetail() {
     <p>${esc(t.summary)}</p>
     <div class="target-links">
       <a href="${esc(t.source_url)}" target="_blank" rel="noopener">Source: ${esc(t.source_label || "reference")}</a>
-      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ↗</a>` : ""}
+      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
     </div>
     <p class="how">How matching works: every land cell on Earth is compared with <b>this site's
       signature</b>, the numbers below, measured on the ${esc(t.body)} by the cited missions. It is not a
@@ -587,7 +641,7 @@ function renderTargetDetail() {
     <table class="profile"><caption>What Earth is matched against</caption>${rows}</table>`;
   const caption = $("twinCaption");
   caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} target · ${fmtCoord(t.latitude, t.longitude)}
-    <span class="twin-hint">drag to rotate · double-click to reset</span>`;
+    <span class="twin-hint">Drag to rotate, double-click to reset</span>`;
   $("twin").hidden = !twin;
   if (twin) twin.show(t.body, t.latitude, t.longitude).catch(() => {});
 }
@@ -740,6 +794,7 @@ function renderWeights() {
 async function runScore() {
   const ticket = ++state.request;
   $("resultsSummary").textContent = "Scoring…";
+  $("progress").classList.add("on");
   try {
     const data = await api("/api/score", {
       method: "POST",
@@ -750,8 +805,10 @@ async function runScore() {
     state.data = data;
     state.field = decode(data.field);
     state.sorted = sortedFinite(state.field);
+    // Keep the info card on the same place with its new score, or drop it if that site left the list.
+    if (state.card && !state.pick) state.card = data.results.find((r) => r.index === state.card.index) || null;
     if (state.layer === "score") paintLayer();
-    renderResults();
+    renderResults(true);
     renderValidation();
     renderMarkers();
     if (state.selected) {
@@ -764,6 +821,8 @@ async function runScore() {
     if (!$("explore").hidden) renderExplore();
   } catch (err) {
     if (ticket === state.request) toast(`Scoring failed: ${err.message}`);
+  } finally {
+    if (ticket === state.request) $("progress").classList.remove("on");
   }
 }
 const scoreSoon = debounce(runScore, 220);
@@ -780,7 +839,10 @@ const robustSoon = debounce(async (ticket) => {
     renderResults();
     if (state.selected) renderDetail(state.data.results.find((x) => x.index === state.selected.index) || state.selected);
     renderValidation();
-  } catch { /* robustness is optional */ }
+  } catch {
+    // Optional, but say so rather than leaving "loading" on screen.
+    if (ticket === state.request) { state.robust = { failed: true }; renderValidation(); }
+  }
 }, 500);
 
 function stabilityOf(r) {
@@ -789,21 +851,23 @@ function stabilityOf(r) {
 }
 const topKSoon = debounce(() => { if (!state.selected) showList(); runScore(); }, 250);
 
-function renderResults() {
+/* fresh: a new ranking (stagger the rows in); otherwise an in-place refresh. */
+function renderResults(fresh = false) {
   const d = state.data;
   const bits = [];
   if (d.filters?.new_only) bits.push("new sites only");
-  if (d.filters?.min_distance_km) bits.push(`≥ ${fmtInt(d.filters.min_distance_km)} km apart`);
-  if (d.filters?.max_per_country) bits.push(`≤ ${d.filters.max_per_country} per country`);
+  if (d.filters?.min_distance_km) bits.push(`at least ${fmtInt(d.filters.min_distance_km)} km apart`);
+  if (d.filters?.max_per_country) bits.push(`up to ${d.filters.max_per_country} per country`);
   if (d.filters?.tolerance) bits.push(`error band ×${d.filters.tolerance}`);
   $("resultsSummary").innerHTML = `Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.`
-    + (d.shortfall ? `<br><span class="shortfall">${esc(d.shortfall)} Loosen a setting above to see more.</span>` : "");
-  $("siteList").innerHTML = d.results.map((r) => `
-    <li><button class="site ${state.selected?.index === r.index ? "active" : ""}" data-index="${r.index}" type="button">
+    + (d.shortfall ? `<br><span class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</span>` : "");
+  $("siteList").classList.toggle("fresh", fresh);
+  $("siteList").innerHTML = d.results.map((r, n) => `
+    <li style="--n: ${n}"><button class="site ${state.selected?.index === r.index ? "active" : ""}" data-index="${r.index}" type="button">
       <span class="rank num">${r.rank}</span>
       <span class="name">${esc(r.label.text)}</span>
       <span class="score"><b>${fmtPct(r.score)}</b><small>match</small></span>
-      <span class="meta"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(r.novelty)}${state.pins.some((x) => x.index === r.index) ? `<span class="pin-star" title="Pinned">● pinned</span>` : ""}${stabilityOf(r) !== null ? `<span class="stable" title="Stays in the top 1% of land in ${fmtPct(stabilityOf(r))} of ${state.robust.runs} simulated runs">stable ${fmtPct(stabilityOf(r))}</span>` : ""}</span>
+      <span class="meta"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(r.novelty)}${state.pins.some((x) => x.index === r.index) ? `<span class="pin-star" title="Pinned">pinned</span>` : ""}${stabilityOf(r) !== null ? `<span class="stable" title="Stays in the top 1% of land in ${fmtPct(stabilityOf(r))} of ${state.robust.runs} simulated runs">stable ${fmtPct(stabilityOf(r))}</span>` : ""}</span>
       <span class="bar" aria-hidden="true"><i style="width:${(r.score * 100).toFixed(1)}%"></i></span>
     </button></li>`).join("");
   $("siteList").querySelectorAll(".site").forEach((b) => {
@@ -824,6 +888,7 @@ function renderResults() {
 function selectResult(r) {
   state.selected = r;
   state.pick = null;
+  state.card = r;
   selectTab("results");
   renderDetail(r);
   renderMarkers();
@@ -834,12 +899,14 @@ function selectResult(r) {
 async function pickLocation(lat, lon) {
   state.pick = { lat, lon };
   state.selected = null;
+  state.card = null;
   renderMarkers();
   selectTab("results");
-  await refreshPick();
+  await refreshPick(true);
 }
 
-async function refreshPick() {
+/* fresh: a new click (open the info card); otherwise a rescore of the same place. */
+async function refreshPick(fresh = false) {
   const { lat, lon } = state.pick;
   try {
     const r = await api(`/api/explain?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, {
@@ -851,7 +918,7 @@ async function refreshPick() {
       $("siteList").hidden = true;
       const det = $("detail");
       det.hidden = false;
-      det.innerHTML = `<button class="ghost small back" type="button">← All ranked sites</button>
+      det.innerHTML = `<button class="ghost small back" type="button">${icon("arrow-left")}All ranked sites</button>
         <h3>${esc(r.label.text)}</h3>
         <div class="coords num">${fmtCoord(r.lat, r.lon)}</div>
         <p class="notice">${esc(r.reason)}</p>`;
@@ -859,6 +926,7 @@ async function refreshPick() {
       return;
     }
     renderDetail(r);
+    if (fresh || state.card) showCard(r);
   } catch (err) {
     toast(`Could not inspect that location: ${err.message}`);
   }
@@ -867,6 +935,7 @@ async function refreshPick() {
 function showList() {
   state.selected = null;
   state.pick = null;
+  state.card = null;
   $("detail").hidden = true;
   $("siteList").hidden = false;
   $("siteList").querySelectorAll(".site").forEach((b) => b.classList.remove("active"));
@@ -906,7 +975,7 @@ function renderDetail(r) {
   const det = $("detail");
   det.hidden = false;
   det.innerHTML = `
-    <button class="ghost small back" type="button">← All ranked sites</button>
+    <button class="ghost small back" type="button">${icon("arrow-left")}All ranked sites</button>
     <h3>${title}</h3>
     <div class="coords"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(nov)}
       <button class="link-button" type="button" data-copy="${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}">Copy coordinates</button></div>
@@ -917,7 +986,7 @@ function renderDetail(r) {
     </div>
     <div class="detail-actions">
       <button class="godseye-button" type="button" id="openEye" ${Math.abs(r.lat) > 84 ? "disabled title=\"Elevation tiles stop at about 84 degrees latitude\"" : ""}>
-        <span aria-hidden="true">◉</span> God's Eye 3D view</button>
+        ${icon("cube-focus")}Open in God's Eye 3D</button>
       <button class="ghost small" type="button" id="pinSite">${state.pins.some((x) => x.index === r.index) ? "Unpin" : "Pin to compare"}</button>
     </div>
     <p class="notice">${novText}</p>
@@ -929,10 +998,10 @@ function renderDetail(r) {
     ${crits}
     <h4 class="section-title">Verify it yourself</h4>
     <div class="verify">
-      <a href="${esc(worldview)}" target="_blank" rel="noopener">NASA Worldview ↗<small>MODIS true colour here</small></a>
-      <a href="${esc(gmaps)}" target="_blank" rel="noopener">Satellite view ↗<small>Google Maps imagery</small></a>
-      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">NASA ${esc(t.body)} Trek ↗<small>the target site</small></a>` : ""}
-      ${t.source_url ? `<a href="${esc(t.source_url)}" target="_blank" rel="noopener">Target reference ↗<small>${esc(t.source_label || "")}</small></a>` : ""}
+      <a href="${esc(worldview)}" target="_blank" rel="noopener">NASA Worldview ${icon("arrow-square-out")}<small>MODIS true colour here</small></a>
+      <a href="${esc(gmaps)}" target="_blank" rel="noopener">Satellite view ${icon("arrow-square-out")}<small>Google Maps imagery</small></a>
+      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}<small>the target site</small></a>` : ""}
+      ${t.source_url ? `<a href="${esc(t.source_url)}" target="_blank" rel="noopener">Target reference ${icon("arrow-square-out")}<small>${esc(t.source_label || "")}</small></a>` : ""}
     </div>
     <details class="drawer"><summary>Why, in words (with sources)</summary><div><ul>${claims}</ul></div></details>
     <details class="drawer"><summary>Caveats</summary><div><ul>${caveats}</ul></div></details>
@@ -946,16 +1015,39 @@ function renderDetail(r) {
   });
   det.closest(".panel").scrollTop = 0;
   if (window.innerWidth <= 1020) det.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Count the big score up when a new site opens (not on every refresh of the same one).
+  if (lastCounted !== `${r.lat},${r.lon}`) {
+    lastCounted = `${r.lat},${r.lon}`;
+    countUp(det.querySelector(".hero .big"), Math.round(r.score * 100));
+  }
+}
+
+let lastCounted = null;
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function countUp(el, to) {
+  if (!el || REDUCED_MOTION) return;
+  const node = el.firstChild;   // the number; the "%" sits in a <small> after it
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / 600);
+    node.nodeValue = String(Math.round(to * (1 - Math.pow(1 - k, 3))));
+    if (k < 1 && el.isConnected) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 /* -------------------------------------------------------------- validation */
 
 function renderValidation() {
   const v = state.data.validation;
-  const chip = $("chipAuc");
-  if (!v || v.auc === null) { chip.hidden = true; $("validation").innerHTML = `<p class="hint">No validation for a custom profile.</p>`; return; }
-  chip.hidden = false;
-  chip.innerHTML = `<span class="dot on"></span>Validated · AUC ${v.auc.toFixed(2)}`;
+  const hasAuc = !!v && v.auc !== null;
+  $("statusAuc").hidden = !hasAuc;
+  $("statusValRow").hidden = !hasAuc;
+  $("statusOpenVal").hidden = !hasAuc;
+  if (!hasAuc) { $("validation").innerHTML = `<p class="hint">No validation for a custom profile.</p>`; return; }
+  $("statusAuc").textContent = `AUC ${v.auc.toFixed(2)}`;
+  $("statusVal").innerHTML = `<span class="num">AUC ${v.auc.toFixed(2)}</span> on ${v.positives} known sites`;
   const body = v.tag === "cold_polar" ? "cold polar-desert" : v.body.charAt(0).toUpperCase() + v.body.slice(1);
   const share = v.auc >= 0.999 ? "every" : `${fmtPct(v.auc)} of`;
   const rows = v.controls.map((c) => `
@@ -975,7 +1067,7 @@ function renderValidation() {
       <tbody>${rows}</tbody></table>
     ${sensitivityTable()}
     ${dataChecksTable()}
-    <p class="hint" style="margin-top:10px">${esc(v.method)} "Geology only" sites were chosen for rocks this
+    <p class="hint">${esc(v.method)} "Geology only" sites were chosen for rocks this
       model does not measure and are not counted. Known analogs span very different environments, so no single
       target should rank all of them at the top.</p>`;
 }
@@ -996,7 +1088,8 @@ function dataChecksTable() {
 
 function sensitivityTable() {
   const rows = state.robust?.sensitivity;
-  if (!rows?.length) return `<p class="hint">Sensitivity analysis loading…</p>`;
+  if (state.robust?.failed) return `<p class="hint">Couldn't run the leave-one-out check. It runs again with the next change of weights or target.</p>`;
+  if (!rows?.length) return `<p class="hint">Running the leave-one-out check…</p>`;
   return `<h4 class="section-title">Leave one criterion out</h4>
     <p class="hint">Does the result hinge on a single dataset? Each row drops one criterion and re-scores the whole Earth.</p>
     <table class="controls"><thead><tr><th>Without</th><th class="n">AUC</th><th>New #1 site</th></tr></thead><tbody>
@@ -1057,7 +1150,7 @@ function viewsStrip(r) {
       <figcaption>Latest NASA view · VIIRS NOAA-20 · ${day}<br><small>daily, 250 m, may show clouds · needs internet</small></figcaption></figure>
     <figure><img src="${esc(relief)}" alt="Relief-shaded Sentinel-2 image" loading="lazy"
       onerror="this.closest('figure').classList.add('missing')">
-      <figcaption>Terrain relief · Sentinel-2 2020<br><small>hillshade from elevation · hover the site for 3D</small></figcaption></figure>
+      <figcaption>Terrain relief · Sentinel-2 2020<br><small>3D terrain available in God's Eye</small></figcaption></figure>
   </div>`;
 }
 
@@ -1078,6 +1171,9 @@ async function renderExplore() {
   const active = state.criteria.filter((c) => (d.weights[c.key] ?? 0) > 0);
   const xKey = box.dataset.x && state.criteria.some((c) => c.key === box.dataset.x) ? box.dataset.x : (active.find((c) => c.key === "lst_diurnal_range") || active[0]).key;
   const yKey = box.dataset.y && state.criteria.some((c) => c.key === box.dataset.y) ? box.dataset.y : (active.find((c) => c.key === "precipitation" && c.key !== xKey) || active.find((c) => c.key !== xKey) || active[0]).key;
+  if (!state.analogValues) {
+    box.innerHTML = `<p class="hint">Reading the known analog sites…</p>${'<div class="skeleton skel-row"></div>'.repeat(6)}`;
+  }
   const analogs = await loadAnalogValues();
   const opts = (sel) => state.criteria.map((c) => `<option value="${c.key}" ${c.key === sel ? "selected" : ""}>${esc(c.label)}</option>`).join("");
   const X = spec(xKey), Y = spec(yKey);
@@ -1111,10 +1207,10 @@ async function renderExplore() {
        <circle cx="${sx(tx)}" cy="${sy(ty)}" r="8" class="target"/><text x="${sx(tx) + 11}" y="${sy(ty) - 8}" class="tl">target</text>` : "";
   const marks = pts.map((p, i) => p.kind === "site"
     ? `<circle data-i="${i}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
-    : `<rect data-i="${i}" x="${sx(p.x) - 5}" y="${sy(p.y) - 5}" width="10" height="10" transform="rotate(45 ${sx(p.x)} ${sy(p.y)})" class="analog"/>`).join("");
+    : `<text data-i="${i}" x="${sx(p.x)}" y="${sy(p.y)}" class="analog-rocket" text-anchor="middle" dominant-baseline="central">🚀</text>`).join("");
   box.innerHTML = `
     <p class="hint">Where do the top sites sit on two criteria at once? Each dot is a ranked site, each diamond a
-      known analog; the crosshair is the target. Hover for details, click to open.</p>
+      known analog (rocket); the crosshair is the target. Hover for details, click to open.</p>
     <div class="axes">
       <label>X <select id="exX">${opts(xKey)}</select></label>
       <label>Y <select id="exY">${opts(yKey)}</select></label>
@@ -1122,14 +1218,14 @@ async function renderExplore() {
     <div class="scatter-wrap">
       <svg class="scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter of ${esc(X.label)} against ${esc(Y.label)} for ranked sites and known analogs">
         ${grid}${target}${marks}
-        <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" class="axis">${esc(X.label + unitOf(X))} →</text>
-        <text x="${L}" y="${T - 8}" class="axis">↑ ${esc(Y.label + unitOf(Y))}</text>
+        <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" class="axis">${esc(X.label + unitOf(X))}</text>
+        <text x="${L}" y="${T - 8}" class="axis">${esc(Y.label + unitOf(Y))}</text>
       </svg>
       <div class="scatter-tip" id="exTip" hidden></div>
     </div>
     <div class="scatter-legend">
       <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site</span>
-      <span><svg width="12" height="12"><rect x="2" y="2" width="8" height="8" transform="rotate(45 6 6)" class="analog"/></svg> known analog</span>
+      <span><span aria-hidden="true">🚀</span> known analog</span>
       <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" class="target"/></svg> target</span>
     </div>
     <p class="hint">${pts.filter((p) => p.kind === "site").length} ranked sites · ${pts.filter((p) => p.kind === "analog").length} known analogs with data.
@@ -1144,8 +1240,8 @@ async function renderExplore() {
       tip.hidden = false;
       const rect = svg.getBoundingClientRect();
       const k = rect.width / W;
-      tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || Number(el.getAttribute("x")) + 5) * k + 10)}px`;
-      tip.style.top = `${Number(el.getAttribute("cy") || Number(el.getAttribute("y")) + 5) * k - 10}px`;
+      tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || el.getAttribute("x")) * k + 10)}px`;
+      tip.style.top = `${Number(el.getAttribute("cy") || el.getAttribute("y")) * k - 10}px`;
     });
     el.addEventListener("mouseleave", () => { tip.hidden = true; });
     el.addEventListener("click", () => {
@@ -1161,10 +1257,15 @@ async function renderExplore() {
 
 const eye = new GodsEye($("godseye"));
 let eyeReturnFocus = null;
-eye.onClose = () => { eyeReturnFocus?.focus?.(); };
+eye.onClose = () => {
+  globe.visible = state.view === "globe";
+  twin?.setPaused(ui.twin === false);
+  starfield.resume();
+  eyeReturnFocus?.focus?.();
+};
 
 function openGodsEye(r, preset = null) {
-  if (!r || Math.abs(r.lat) > 84) { toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude."); return Promise.resolve(); }
+  if (!r || Math.abs(r.lat) > 84) { toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude.", "info"); return Promise.resolve(); }
   hidePeek();
   eyeReturnFocus = document.activeElement;
   const t = target();
@@ -1173,8 +1274,14 @@ function openGodsEye(r, preset = null) {
     targetName: t.short_name,
     subtitle: `${fmtCoord(r.lat, r.lon)} · ${fmtPct(r.score)} match to ${t.short_name}`,
     badges: `${r.rank ? `<span class="chip">#${r.rank} of ${state.data.results.length}</span>` : ""}${noveltyChip(r.novelty)}`,
+    values: r.values,   // the cell's climate, for the climate simulation
   };
   if (preset) eye.sun = { ...SUN_PRESETS[preset] };
+  // The full-screen 3D view covers everything: stop drawing what is underneath.
+  globe.visible = false;
+  twin?.setPaused(true);
+  starfield.pause();
+  state.eyeSite = r;
   return eye.show(r, context);
 }
 
@@ -1184,7 +1291,7 @@ function togglePin(r) {
   const i = state.pins.findIndex((x) => x.index === r.index);
   if (i >= 0) state.pins.splice(i, 1);
   else {
-    if (state.pins.length >= MAX_PINS) { toast(`You can compare up to ${MAX_PINS} sites. Unpin one first.`); return; }
+    if (state.pins.length >= MAX_PINS) { toast(`You can compare up to ${MAX_PINS} sites. Unpin one first.`, "info"); return; }
     state.pins.push(r);
   }
   renderCompare();
@@ -1224,7 +1331,7 @@ function renderCompare() {
     <div class="compare-head"><h4>Compare pinned sites</h4><button class="link-button" type="button" id="clearPins">Clear</button></div>
     <table>
       <thead><tr><th></th>${pins.map((r) => `<th title="${esc(r.label.text)}">${r.rank ? `#${r.rank} ` : ""}${esc(r.label.text)}
-        <button class="unpin" type="button" data-unpin="${r.index}" aria-label="Unpin ${esc(r.label.text)}">✕</button></th>`).join("")}</tr></thead>
+        <button class="unpin" type="button" data-unpin="${r.index}" aria-label="Unpin ${esc(r.label.text)}">${icon("x")}</button></th>`).join("")}</tr></thead>
       <tbody>
         ${row("Match score", pins.map((r) => r.score), (v) => fmtPct(v))}
         ${active.map((c) => row(c.label, pins.map((r) => r.similarities[c.key]), (v) => fmtPct(v))).join("")}
@@ -1341,8 +1448,8 @@ const TOUR = [
   },
   {
     title: "The target",
-    text: "Target: the lunar south pole, where Artemis crews will land. Its signature, on the left, comes from NASA missions: no rain, no plants, huge temperature swings, rugged ground.",
-    run: async () => { document.querySelector(".panel-left").scrollTo({ top: 0, behavior: "smooth" }); },
+    text: "Target: the lunar south pole, where Artemis crews will land. Its signature, in the Target tab, comes from NASA missions: no rain, no plants, huge temperature swings, rugged ground.",
+    run: async () => { selectTab("target"); $("sidebar").scrollTo({ top: 0, behavior: "smooth" }); },
   },
   {
     title: "Where Earth matches",
@@ -1351,7 +1458,7 @@ const TOUR = [
   },
   {
     title: "Why it matches",
-    text: "Every score is explained criterion by criterion, with the dataset behind each number. Hover any numbered site to preview it from orbit.",
+    text: "Every score is explained criterion by criterion, with the dataset behind each number. Rest the pointer on a numbered site to preview it from orbit.",
     run: async () => { if (!state.selected) selectResult(state.data.results[0]); },
   },
   {
@@ -1390,9 +1497,9 @@ async function tourGo(i) {
   const step = TOUR[tourIndex];
   document.body.classList.add("touring");
   $("tourCaption").hidden = false;
-  $("tourStep").textContent = `${tourIndex + 1} / ${TOUR.length} · ${step.title}`;
+  $("tourStep").textContent = `${tourIndex + 1} of ${TOUR.length} · ${step.title}`;
   $("tourText").textContent = typeof step.text === "function" ? step.text() : step.text;
-  $("tourBar").style.width = `${((tourIndex + 1) / TOUR.length) * 100}%`;
+  $("tourBar").style.transform = `scaleX(${(tourIndex + 1) / TOUR.length})`;
   $("tourPrev").disabled = tourIndex === 0;
   $("tourNext").textContent = tourIndex === TOUR.length - 1 ? "Finish" : "Next";
   try { await step.run(); } catch (err) { toast(err.message); }
@@ -1426,8 +1533,10 @@ function wireKeys() {
     const typing = e.target.closest("input, select, textarea, [contenteditable]");
     const dialogOpen = document.querySelector("dialog[open]");
     if (e.key === "Escape") {
-      if (eye.open) { eye.close(); e.preventDefault(); return; }
+      if (closeMenus()) { e.preventDefault(); return; }
+      if (eye.open) { eye.escape(); e.preventDefault(); return; }
       if (tourIndex >= 0) { tourStop(); return; }
+      if (!dialogOpen && state.card) { closeCard(); return; }
       if (!dialogOpen && !typing && !$("detail").hidden) { showList(); return; }
       return;
     }
@@ -1438,8 +1547,8 @@ function wireKeys() {
       "/": () => $("search").focus(),
       j: () => stepSite(1),
       k: () => stepSite(-1),
-      e: () => openGodsEye(state.selected || (state.pick && null) || state.data?.results[0]),
-      p: () => state.selected && togglePin(state.selected),
+      e: () => openGodsEye(state.card || state.selected || state.data?.results[0]),
+      p: () => { const r = state.card || state.selected; if (r?.index !== undefined) togglePin(r); },
       g: () => setView("globe"),
       m: () => setView("map"),
       "+": () => $("zoomIn").click(),
@@ -1457,11 +1566,30 @@ function wireKeys() {
 
 /* ------------------------------------------------------------ tabs, dialogs */
 
+const TABS = [["tabTarget", "target"], ["tabResults", "results"], ["tabExplore", "explore"], ["tabValidation", "validation"]];
+
+function moveTabInk() {
+  const on = TABS.find(([tab]) => $(tab).getAttribute("aria-selected") === "true");
+  const btn = on && $(on[0]);
+  if (!btn || !btn.offsetWidth) return;
+  const ink = $("tabInk");
+  ink.style.transform = `translateX(${btn.offsetLeft}px) scaleX(${btn.offsetWidth / 100})`;
+}
+
 function selectTab(name) {
-  for (const [tab, panel] of [["tabResults", "results"], ["tabExplore", "explore"], ["tabValidation", "validation"]]) {
-    $(tab).setAttribute("aria-selected", String(panel === name));
-    $(panel).hidden = panel !== name;
+  for (const [tab, panel] of TABS) {
+    const on = panel === name;
+    const was = $(tab).getAttribute("aria-selected") === "true";
+    $(tab).setAttribute("aria-selected", String(on));
+    $(tab).tabIndex = on ? 0 : -1;
+    $(panel).hidden = !on;
+    if (on && !was) {
+      $(panel).classList.remove("panel-enter");
+      void $(panel).offsetWidth;   // restart the entrance animation
+      $(panel).classList.add("panel-enter");
+    }
   }
+  moveTabInk();
   if (name === "explore") renderExplore();
 }
 
@@ -1474,23 +1602,23 @@ function renderMethod() {
       conditions for every half-degree cell of Earth's land (${fmtInt(state.health.candidate_cells)} cells) from NASA and
       partner data, and rank the cells by how closely they match. There is no AI in the scoring: it is plain,
       tested arithmetic, and every number links to its source.</p>
-    <h3>1 · Target signature</h3>
+    <h3>Target signature</h3>
     <p>Each target criterion comes from a published measurement (LRO Diviner, LOLA, Chang'E-2, HiRISE, Mars 2020 MEDA),
       cited on the target card. Two adjustments keep the comparison honest:</p>
     <ul><li><b>Beyond Earth:</b> the Moon's 120 K day-night swing exists nowhere on Earth, so it is matched against Earth's
       most extreme value (99.5th percentile) instead of penalising every cell equally.</li>
       <li><b>Different scale:</b> slopes measured over 20–50 m cannot be compared with 55 km Earth cells, so terrain targets
       are expressed as Earth terrain classes (for example "rugged" = Earth's 85th percentile), with the original measurement shown.</li></ul>
-    <h3>2 · Score</h3>
+    <h3>Score</h3>
     <div class="formula">similarity<sub>k</sub> = clip(1 − |earth<sub>k</sub> − target<sub>k</sub>| / range<sub>k</sub>, 0, 1)<br>
       score = ∏<sub>k</sub> similarity<sub>k</sub><sup>w<sub>k</sub> / Σw</sup> &nbsp;&nbsp;(weighted geometric mean)</div>
     <p>A geometric mean lets one completely mismatched criterion veto a site: a rainforest cannot become a lunar analog by having the right slope.</p>
     <p>Some criteria are left out for some targets ("not used"), and a target can set its own default weights: the Haworth
       cold trap switches on <b>mean temperature</b>, because "cold" is what defines a cold trap.</p>
-    <h3>3 · Validate</h3>
+    <h3>Validate</h3>
     <p>Known analog sites (Haughton Crater, McMurdo Dry Valleys, Atacama, Apollo training sites and others, each cited) should
       outscore densely vegetated reference points. The Validation tab reports ROC-AUC for the current target and weights.</p>
-    <h3>4 · Look closer: God's Eye</h3>
+    <h3>Look closer in God's Eye</h3>
     <p>Open any site in 3D. Its terrain comes from AWS Terrain Tiles at about 150 m, draped with Sentinel-2 cloud-free
       imagery (ESA Copernicus data processed by EOX). The panel measures relief and slope inside the scored cell at that
       finer scale, including the share of ground a rover could drive (slopes under 15°). You can light it with a lunar polar sun.</p>
@@ -1501,7 +1629,7 @@ function renderMethod() {
       <li>Cells are 0.5° (~55 km). A small feature (a summit, a crater floor) is averaged with its surroundings; Mauna Kea's cell includes its forested slopes.</li>
       <li>Where MODIS has no land-surface-temperature data (mainly Antarctica) the day-night swing is predicted from NASA POWER skin temperature${fit ? ` (linear fit, r = ${fit.r})` : ""}.</li>
       <li>NASA POWER precipitation is a reanalysis (MERRA-2) and can overestimate polar deserts.</li>
-      <li>Terrain beyond ±85° latitude is not covered by the elevation tiles, so the far polar interiors are not scored.</li>
+      <li>The elevation tiles stop near ±85° latitude, so the far polar interiors are not scored, and God's Eye opens sites up to 84°.</li>
       <li>This is a screening tool for choosing where to look, not a site survey.</li>
     </ul>`;
 }
@@ -1533,7 +1661,8 @@ function wireDialogs() {
   $("openSources").addEventListener("click", open("sourcesDialog", renderSources));
   $("openKeys").addEventListener("click", () => $("keysDialog").showModal());
   document.querySelectorAll("dialog").forEach((d) => {
-    d.querySelector("[data-close]").addEventListener("click", () => d.close());
+    const btn = d.querySelector("[data-close]");
+    if (btn) btn.addEventListener("click", () => d.close());
     d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
   });
 }
@@ -1558,8 +1687,13 @@ function writeHash() {
   if (state.tolerance) parts.push(`tol=${state.tolerance}`);
   if (state.view !== "globe") parts.push(`view=${state.view}`);
   if (state.layer !== "score") parts.push(`layer=${state.layer}`);
-  if (state.selected?.rank) parts.push(`site=${state.selected.rank}`);
+  if ((state.eyeSite && eye.open ? state.eyeSite : state.selected)?.rank) parts.push(`site=${(state.eyeSite && eye.open ? state.eyeSite : state.selected).rank}`);
   if ($("tabValidation").getAttribute("aria-selected") === "true") parts.push("tab=validation");
+  if (eye.open && state.eyeSite?.rank) {
+    parts.push("eye=1");
+    const preset = Object.entries(SUN_PRESETS).find(([, p]) => p.elevation === Number(eye.sun.elevation) && p.azimuth === Number(eye.sun.azimuth));
+    if (preset) parts.push(`sun=${preset[0]}`);
+  }
   history.replaceState(null, "", `#${parts.join("&")}`);
 }
 
@@ -1573,6 +1707,7 @@ async function init() {
   wireTour();
   wireKeys();
   document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+  $("tabTarget").addEventListener("click", () => selectTab("target"));
   $("tabResults").addEventListener("click", () => selectTab("results"));
   $("tabValidation").addEventListener("click", () => selectTab("validation"));
   $("tabExplore").addEventListener("click", () => selectTab("explore"));
@@ -1588,7 +1723,12 @@ async function init() {
     $("toleranceValue").textContent = state.tolerance ? `×${state.tolerance.toFixed(2)}` : "exact";
     scoreSoon();
   });
-  $("chipAuc").addEventListener("click", () => selectTab("validation"));
+  menu($("statusPill"), $("statusPanel"));
+  menu($("helpButton"), $("helpMenu"));
+  $("statusOpenVal").addEventListener("click", () => {
+    if (ui.sidebar === false) setUi("sidebar", true);
+    selectTab("validation");
+  });
   $("showKnown").addEventListener("change", renderMarkers);
   $("exportGeojson").addEventListener("click", exportGeojson);
   $("exportCsv").addEventListener("click", exportCsv);
@@ -1613,6 +1753,7 @@ async function init() {
   });
   $("layer").addEventListener("change", (e) => setLayer(e.target.value).catch((err) => toast(err.message)));
 
+  loadingStep(1, "Connecting to the TerraNova server…");
   try {
     const [health, targets, criteria, sources, analogs] = await Promise.all([
       api("/api/health"), api("/api/targets"), api("/api/criteria"), api("/api/sources"), api("/api/analogs"),
@@ -1621,7 +1762,8 @@ async function init() {
     Object.assign(state, { health, targets: targets.targets, criteria: criteria.criteria, sources, analogs });
     for (const w of criteria.weights) state.defaults[w.key] = w.weight;
     const hash = readHash();
-    state.targetId = state.targets.some((t) => t.id === hash.target) ? hash.target : state.targets[0].id;
+    const wanted = TARGET_ALIASES[hash.target] || hash.target;
+    state.targetId = state.targets.some((t) => t.id === wanted) ? wanted : state.targets[0].id;
     state.weights = { ...target().default_weights };
     if (hash.top && Number(hash.top) >= 5) state.topK = Math.min(100, Number(hash.top));
     if (hash.new === "0") state.newOnly = false;
@@ -1637,18 +1779,26 @@ async function init() {
     $("topK").value = state.topK;
     $("topKValue").textContent = state.topK;
 
-    $("chipMode").innerHTML = health.offline ? `<span class="dot on"></span>Offline mode · local data` : `<span class="dot"></span>Online`;
-    $("chipCells").textContent = `${fmtInt(health.candidate_cells)} land cells`;
+    $("statusDot").className = "dot on";
+    $("statusMode").textContent = health.offline ? "Offline" : "Online";
+    $("statusData").textContent = health.offline ? "Offline, local data" : "Online, NASA services";
+    $("statusCells").textContent = fmtInt(health.candidate_cells);
     const layer = $("layer");
     layer.appendChild(new Option("Analog score", "score"));
-    for (const c of state.criteria) layer.appendChild(new Option(`Data: ${c.label}`, c.key));
+    for (const c of state.criteria) layer.appendChild(new Option(c.label, c.key));
 
     renderTargets();
     renderTargetDetail();
     renderWeights();
 
-    $("loadingText").textContent = "Loading NASA Blue Marble…";
-    await Promise.all([globe.setEarth("assets/earth_hd.jpg", "assets/earth.jpg"), flat.setBase("assets/earth_hd.jpg"), runScore()]);
+    loadingStep(2, "Loading the NASA Blue Marble Earth…");
+    // One after the other: the flat map then reuses the globe's download from the browser cache.
+    await globe.setEarth("assets/earth_hd.jpg", "assets/earth.jpg");
+    await flat.setBase("assets/earth_hd.jpg");
+
+    if (hash.target === "custom") chooseTarget(CUSTOM_ID);
+    loadingStep(3, `Scoring ${fmtInt(health.candidate_cells)} land cells…`);
+    await runScore();
     if (hash.view === "map") setView("map");
     if (hash.layer && state.criteria.some((c) => c.key === hash.layer)) {
       layer.value = hash.layer;
@@ -1663,11 +1813,32 @@ async function init() {
     if (hash.dialog === "sources") $("openSources").click();
     $("loading").classList.add("done");
     ["click", "change"].forEach((ev) => document.addEventListener(ev, () => setTimeout(writeHash, 0)));
+    selectTab(hash.target === "custom" ? "target" : "results");
   } catch (err) {
-    $("loadingText").textContent = `Could not start: ${err.message}`;
-    $("chipMode").textContent = "backend error";
-    toast(err.message);
+    $("loading").classList.add("failed");
+    $("loadingText").textContent = `Could not start: ${err.message}. Check that the TerraNova server is running.`;
+    $("loadingRetry").hidden = false;
+    $("statusDot").className = "dot off";
+    $("statusMode").textContent = "Server not reachable";
+    $("statusData").textContent = "Server not reachable";
+    toast(`Could not start: ${err.message}`);
   }
 }
+
+$("loadingRetry").addEventListener("click", () => location.reload());
+
+/* The start-up screen names what it is doing: three real steps, not a spinner. */
+function loadingStep(n, text) {
+  $("loadingText").textContent = text;
+  $("loadingStep").textContent = `Step ${n} of 3`;
+  $("loadBar").style.transform = `scaleX(${n / 3})`;
+}
+// A link to another target (typed, pasted, or Back) only changes the hash: start over for it.
+window.addEventListener("hashchange", () => {
+  const wanted = readHash().target;
+  const now = state.mode === "custom" ? "custom" : state.targetId;
+  if (wanted && (TARGET_ALIASES[wanted] || wanted) !== now) location.reload();
+});
+window.addEventListener("resize", debounce(moveTabInk, 100));
 
 init();

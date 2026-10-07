@@ -267,3 +267,10 @@ def test_site3d_rejects_polar_and_bad_imagery(monkeypatch):
     monkeypatch.setenv("OFFLINE", "1")
     uncached = client.get("/api/site3d", params={"lat": 5.25, "lon": -150.25})
     assert uncached.status_code in (404, 422)
+
+
+def test_site3d_offline_miss_explains_the_fix(monkeypatch):
+    monkeypatch.setenv("OFFLINE", "1")
+    res = client.get("/api/site3d", params={"lat": -33.25, "lon": 140.25})
+    if res.status_code == 404:
+        assert "cache/sitetiles" in res.json()["detail"]
