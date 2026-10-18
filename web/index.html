@@ -1,26 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>TerraNova · Earth analogs for Moon and Mars bases</title>
   <meta name="description" content="TerraNova scores every land cell on Earth against Moon and Mars base sites using NASA data, and ranks the closest analogs.">
-  <meta name="theme-color" content="#06090f">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='18' r='10' fill='none' stroke='%23eef0f3' stroke-width='2.4'/%3E%3Ccircle cx='25.5' cy='6.5' r='4.5' fill='%23e03c31'/%3E%3C/svg%3E">
-  <link rel="preload" href="vendor/fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <meta name="theme-color" content="#050507">
+  <link rel="icon" href="brand.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/lenis/lenis.css">
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/three.module.min.js" } }
   </script>
 </head>
-<body>
+<body class="page-home">
   <a class="skip" href="#main">Skip to content</a>
   <canvas id="starfield" aria-hidden="true"></canvas>
 
   <header class="topbar">
     <div class="brand">
       <a href="index.html" aria-label="TerraNova home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+        <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
         <span class="wordmark">TerraNova</span>
       </a>
     </div>
@@ -33,20 +34,36 @@
 
   <main id="main" class="home">
     <div class="home-copy">
-      <h1 class="reveal">Earth analogs for Moon and Mars bases</h1>
-      <p class="lede reveal" style="--d: 1">Every land cell on Earth, scored against real landing sites from NASA climate, terrain and vegetation data.</p>
+      <h1 class="reveal">The next frontier.<br><em>Here on Earth.</em></h1>
+      <p class="lede reveal" style="--d: 1">Find Earth analogs for Moon and Mars bases. Explore the terrain. Follow the evidence.</p>
       <div class="home-actions reveal" style="--d: 2">
         <a class="btn btn-primary" href="targets.html">Choose a target
           <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
         <a class="btn btn-ghost" href="finder.html">Open the Finder</a>
       </div>
-      <dl class="home-facts reveal" id="facts" style="--d: 3" hidden></dl>
     </div>
     <div class="home-globe">
       <canvas id="welcomeGlobeCanvas" role="img" aria-label="Earth, with the Moon and Mars in the background. Drag to look around."></canvas>
       <p class="globe-hint" id="globeHint" aria-hidden="true"><svg class="i"><use href="icons.svg#i-globe-hemisphere-east"></use></svg>Drag to look around</p>
     </div>
+    <a class="scroll-cue" href="#mission">Explore the mission <svg class="i" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></a>
   </main>
+
+  <section class="mission-section" id="mission" aria-labelledby="missionTitle">
+    <div class="mission-intro"><h2 id="missionTitle">Distant worlds.<br>Common ground.</h2><p>Start with a place beyond Earth. Find the terrestrial landscapes that share its conditions, then look closer at what makes them a match.</p></div>
+    <div class="mission-destinations">
+      <a class="mission-world moon" href="targets.html?body=moon"><img src="assets/moon.jpg" alt="" loading="lazy"><div><h3>The Moon</h3><p>Explore lunar target profiles</p></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
+      <a class="mission-world mars" href="targets.html?body=mars"><img src="assets/mars.jpg" alt="" loading="lazy"><div><h3>Mars</h3><p>Explore Martian target profiles</p></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
+    </div>
+    <dl class="home-facts" id="facts" hidden></dl>
+  </section>
+
+  <section class="evidence-section" aria-labelledby="evidenceTitle">
+    <div class="evidence-copy"><h2 id="evidenceTitle">A match is more<br>than a number.</h2><p>Climate, terrain and vegetation tell different parts of the story. Compare each criterion, adjust what matters, and trace the result to its dataset.</p><a class="btn btn-ghost" href="finder.html#target=jezero_crater">Explore the evidence <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a></div>
+    <div class="evidence-chart" id="missionEvidence" aria-live="polite"><p class="hint">Loading a Jezero analog from the local data…</p></div>
+  </section>
+
+  <section class="terrain-story" aria-labelledby="terrainTitle"><div><h2 id="terrainTitle">From a whole planet<br>to the ground beneath you.</h2><p>Open God’s Eye from any supported result to inspect its terrain, explore lighting and compare measured slopes.</p><a class="btn btn-primary" href="finder.html">Find your next field site <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a></div><img src="assets/earth.jpg" alt="NASA Blue Marble Earth texture" loading="lazy"><p class="image-credit">Imagery: <a href="https://trek.nasa.gov/" data-dataset-id="NASA_TREK">NASA Trek</a> · <a href="https://nasa-gibs.github.io/gibs-api-docs/available-visualizations/" data-dataset-id="BlueMarble_ShadedRelief_Bathymetry">NASA GIBS Blue Marble</a></p></section>
 
   <footer class="site-foot">
     <span>Built for the NASA Space Apps Challenge 2026.</span>
@@ -54,5 +71,7 @@
   </footer>
 
   <script type="module" src="welcome.js"></script>
+  <script type="module" src="experience.js"></script>
+<script type="module" src="controls.js"></script>
 </body>
 </html>

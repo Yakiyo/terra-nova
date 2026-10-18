@@ -1,22 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>TerraNova · Choose a target site</title>
   <meta name="description" content="Pick a Moon or Mars base site, or describe your own, and find the places on Earth that behave most like it.">
-  <meta name="theme-color" content="#06090f">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='18' r='10' fill='none' stroke='%23eef0f3' stroke-width='2.4'/%3E%3Ccircle cx='25.5' cy='6.5' r='4.5' fill='%23e03c31'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#050507">
+  <link rel="icon" href="brand.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/lenis/lenis.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="page-targets">
   <a class="skip" href="#main">Skip to content</a>
   <canvas id="starfield" aria-hidden="true"></canvas>
 
   <header class="topbar">
     <div class="brand">
       <a href="index.html" aria-label="TerraNova home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+        <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
         <span class="wordmark">TerraNova</span>
       </a>
     </div>
@@ -28,11 +30,18 @@
   </header>
 
   <main id="main" class="dest">
+    <nav class="breadcrumbs" id="targetBreadcrumbs" aria-label="Breadcrumb"></nav>
     <div class="dest-head">
-      <h1 class="reveal">Choose a target site</h1>
+      <h1 class="reveal">Where do we<br><em>go next?</em></h1>
       <p class="reveal" style="--d: 1">Each site is described by the conditions NASA missions measured there. TerraNova then ranks every
         land cell on Earth by how closely it matches.</p>
     </div>
+    <nav class="body-switch" aria-label="Target destinations">
+      <span class="body-switch-indicator" aria-hidden="true"></span>
+      <a href="targets.html" data-body="">All</a>
+      <a href="targets.html?body=moon" data-body="moon">Moon</a>
+      <a href="targets.html?body=mars" data-body="mars">Mars</a>
+    </nav>
     <div id="groups" aria-live="polite">
       <section class="dest-group"><div class="dest-grid">
         <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
@@ -45,5 +54,7 @@
   </footer>
 
   <script type="module" src="targets.js"></script>
+  <script type="module" src="experience.js"></script>
+<script type="module" src="controls.js"></script>
 </body>
 </html>

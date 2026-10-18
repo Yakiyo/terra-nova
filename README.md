@@ -259,12 +259,25 @@ git clone -b feature/v2-nasa-data-globe https://github.com/Yakiyo/terra-nova.git
 cd terra-nova
 powershell -File scripts/setup.ps1
 $env:OFFLINE = "1"
-.venv\Scripts\uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload
+.venv\Scripts\python.exe -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Open **http://127.0.0.1:8000/**
 
-Alternative launcher (if present locally): `powershell -File start-app.ps1` with `OFFLINE=0` to fetch missing God's Eye tiles live.
+Run commands from the repository root. Keep the server terminal open while using the app.
+
+### Git Bash on Windows
+
+Git Bash uses the Windows virtual environment layout (`.venv/Scripts`), even though
+the shell accepts Bash syntax. From the repository root, with `uv` installed:
+
+```bash
+uv venv --python 3.12 .venv
+uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+OFFLINE=1 .venv/Scripts/python.exe -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+Open **http://127.0.0.1:8000/**. No environment activation is needed for these commands.
 
 ### Linux / macOS
 
@@ -273,8 +286,25 @@ git clone -b feature/v2-nasa-data-globe https://github.com/Yakiyo/terra-nova.git
 cd terra-nova
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -r requirements.txt
-OFFLINE=1 .venv/bin/uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+OFFLINE=1 .venv/bin/python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
+
+These paths also apply inside WSL; create the environment inside WSL rather than
+reusing a Windows `.venv`.
+
+### Troubleshooting startup
+
+- `.venv/bin/uvicorn: No such file or directory` in Git Bash: use the Windows
+  commands above with `.venv/Scripts/python.exe`.
+- `No module named uvicorn`: install `requirements.txt` using the same environment
+  Python path used to start the server. Creating a virtual environment alone does
+  not install dependencies.
+- `OFFLINE=1` is Bash syntax. In PowerShell, set `$env:OFFLINE = "1"` before
+  starting the server.
+- For the `python` commands below, first activate the project environment:
+  `source .venv/Scripts/activate` in Git Bash, `source .venv/bin/activate` on
+  Linux/macOS, or `.\.venv\Scripts\Activate.ps1` in PowerShell. Alternatively,
+  replace `python` with the explicit environment Python path shown above.
 
 ### God's Eye offline prefetch
 

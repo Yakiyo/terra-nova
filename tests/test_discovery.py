@@ -91,6 +91,20 @@ def test_region_footprint_covers_the_whole_atacama():
     assert validation.novelty(-18.25, -70.25)["status"] != "new"
 
 
-def test_relief_image_is_built_on_request():
+def test_relief_image_is_built_on_request(monkeypatch, tmp_path):
+    from src.acquire import peek
+
+    monkeypatch.setattr(peek, "CACHE", tmp_path)
+    calls = []
+
+    def tile(kind, x0, x1, y0, y1, offline):
+        calls.append(kind)
+        # Synthetic image and Terrarium tiles isolate composition from local downloads.
+        return np.full(((y1 - y0 + 1) * 256, (x1 - x0 + 1) * 256, 3), 128, dtype=np.uint8)
+
+    monkeypatch.setattr(peek, "_mosaic", tile)
     res = client.get("/api/peek.jpg", params={"lat": 40.75, "lon": 91.75})
     assert res.status_code == 200 and res.headers["content-type"] == "image/jpeg"
+    assert calls == ["img", "dem"]
+    assert client.get("/api/peek.jpg", params={"lat": 40.75, "lon": 91.75}).content == res.content
+    assert calls == ["img", "dem"]

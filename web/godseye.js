@@ -8,6 +8,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "./vendor/three/OrbitControls.js";
 import { ClimateSim, thermalGradient } from "./climate.js";
+import { terrainData } from "./terrain-data.js";
+import { breadcrumbs } from "./navigation.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DEG = Math.PI / 180;
@@ -123,6 +125,7 @@ export class GodsEye {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x050507);
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.05, 2000);
     this.controls = new OrbitControls(this.camera, this.canvas);
     Object.assign(this.controls, { enableDamping: true, dampingFactor: 0.08, maxPolarAngle: 84 * DEG, screenSpacePanning: false });
@@ -303,7 +306,10 @@ export class GodsEye {
   /* --------------------------------------------------------------- open */
 
   async show(site, context) {
+    const generation = this.generation = (this.generation || 0) + 1;
     this.open = true;
+    this.root.dataset.status = "loading";
+    this.root.querySelector(".ge-panel").inert = true;
     const wasOpen = !this.root.hidden && !this.root.classList.contains("leaving");
     this.root.classList.remove("leaving");
     this.root.hidden = false;
@@ -315,6 +321,12 @@ export class GodsEye {
     }
     this.context = context;
     $("geTitle").textContent = site.label?.text || "Selected site";
+    const trail = [...document.querySelectorAll("#finderBreadcrumbs li")].map(item => {
+      const link = item.querySelector("a");
+      return link ? { label: link.textContent, href: link.getAttribute("href") } : { label: item.textContent, href: location.href, action: "finder" };
+    });
+    breadcrumbs($("terrainBreadcrumbs"), [...trail, { label: `God’s Eye · ${site.label?.text || "Selected site"}` }]);
+    $("terrainBreadcrumbs").querySelector('[data-crumb-action="finder"]')?.addEventListener("click", event => { event.preventDefault(); this.close(); });
     $("geSub").textContent = context.subtitle || "";
     $("geBadges").innerHTML = context.badges || "";
     $("geStats").innerHTML = "";
@@ -323,28 +335,11 @@ export class GodsEye {
     $("geError").hidden = true;
     this._resize();
     try {
-      const qs = new URLSearchParams({ lat: site.lat, lon: site.lon });
-      if (context.targetId) qs.set("target_id", context.targetId);
-      // Never wait forever: a stalled download ends in a clear message and a Retry button.
-      const abort = new AbortController();
-      const timer = setTimeout(() => abort.abort(), 120000);
-      let res;
-      try {
-        res = await fetch(`/api/site3d?${qs}`, { signal: abort.signal });
-      } catch (err) {
-        throw new Error(err.name === "AbortError"
-          ? "The terrain did not arrive within 2 minutes. The network may be slow or blocking the tile servers."
-          : err.message);
-      } finally {
-        clearTimeout(timer);
-      }
-      if (!res.ok) {
-        let detail = res.statusText;
-        try { detail = (await res.json()).detail || detail; } catch { /* not json */ }
-        throw new Error(detail);
-      }
-      const data = await res.json();
-      if (!this.open) return;
+      // Let the dialog paint before terrain parsing, geometry and shader work.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const data = await terrainData(site, context.targetId);
+      if (!this.open || generation !== this.generation) return;
+      const reuse = this.data === data;
       this.data = data;
       this.profilePoints = [];
       this._clearProfile();
@@ -352,16 +347,23 @@ export class GodsEye {
       $("geProbe").hidden = true;
       this._toggleProfileMode(false);
       this._showExaggeration();
-      this._build(data);
+      if (!reuse) this._build(data);
+      if (reuse && this.imagerySettled && !this.imageryAvailable) {
+        this.imagery = "relief";
+        this._applyMaterial();
+      }
       this.climate.setSite(site, context.values);
       this._renderStats(data);
+      this.root.dataset.status = "ready";
+      this.root.querySelector(".ge-panel").inert = false;
       $("geCredit").innerHTML = `Terrain: ${esc(data.credits.elevation)} · Imagery: ${esc(data.credits.imagery)} (${esc(data.imagery.s2.licence)})`;
       $("geLoading").hidden = true;
-      $("geStatus").textContent = "Loading satellite imagery…";
+      $("geStatus").textContent = reuse ? (this.imageryMessage || "") : "Terrain ready. Loading satellite imagery…";
       this._introFlight(true);
       this._guide();
-      await this._loadImagery(data);
+      if (!reuse || !this.imagerySettled) await this._loadImagery(data, generation);
     } catch (err) {
+      if (!this.open || generation !== this.generation) return;
       $("geLoading").hidden = true;
       $("geStatus").textContent = "";
       this._showError(err.message, () => this.show(site, context));
@@ -370,11 +372,11 @@ export class GodsEye {
 
   /* A visible explanation in the middle of the screen while there is no terrain to show. */
   _showError(message, retry) {
+    this.root.dataset.status = "error";
     const box = $("geError");
     box.hidden = false;
-    box.innerHTML = `<h3>Terrain unavailable</h3><p>${esc(message)}</p>
-      <p class="hint">Fastest fix: copy the <code>cache/sitetiles</code> folder from a laptop where this site
-        already opened, or run <code>python -m src.acquire.sitetiles --top 5</code> on a good connection.</p>
+    box.innerHTML = `<h3>Terrain unavailable</h3><p>The terrain data for this site could not be loaded. Retry, or return to the map to explore another location.</p>
+      <details class="terrain-error-details"><summary>Data preparation details</summary><p>${esc(message)}</p></details>
       <div class="ge-error-actions"><button class="primary" type="button" id="geRetry">Try again</button>
         <button class="ghost" type="button" id="geErrorClose">Back to the map</button></div>`;
     $("geRetry").addEventListener("click", retry);
@@ -385,6 +387,7 @@ export class GodsEye {
   close() {
     if (!this.open) return;
     this.open = false;
+    this.generation = (this.generation || 0) + 1;
     $("geGuide").hidden = true;
     this.climate.setPlaying(false);
     this.flight = null;
@@ -420,6 +423,9 @@ export class GodsEye {
   /* -------------------------------------------------------------- build */
 
   _build(data) {
+    this.imagerySettled = false;
+    this.imageryMessage = "";
+    this.imageTexture?.dispose();
     for (const obj of [this.mesh, this.cellLine]) {
       if (!obj) continue;
       this.scene.remove(obj);
@@ -441,16 +447,8 @@ export class GodsEye {
     const spacing = (this.sizeKm * 1000) / (cols - 1);
     this.slopes = new Float32Array(rows * cols);
     const colours = new Float32Array(rows * cols * 3);
-    const H = (r, c) => this.heights[Math.min(rows - 1, Math.max(0, r)) * cols + Math.min(cols - 1, Math.max(0, c))];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const gx = (H(r, c + 1) - H(r, c - 1)) / (2 * spacing);
-        const gy = (H(r + 1, c) - H(r - 1, c)) / (2 * spacing);
-        const deg = Math.atan(Math.hypot(gx, gy)) / DEG;
-        this.slopes[r * cols + c] = deg;
-        colours.set(slopeColour(deg), (r * cols + c) * 3);
-      }
-    }
+    this.slopes = decode(data.display_slopes);
+    for (let i = 0; i < this.slopes.length; i++) colours.set(slopeColour(this.slopes[i]), i * 3);
     this.slopeColours = colours;
     let hi = -Infinity;
     for (const h of this.heights) hi = Math.max(hi, h);
@@ -672,9 +670,11 @@ export class GodsEye {
     this.climate?.afterSun();
   }
 
-  async _loadImagery(data) {
+  async _loadImagery(data, generation) {
     const s2 = data.imagery.s2;
-    const ctx = this.imageCanvas.getContext("2d");
+    const canvas = this.imageCanvas;
+    const texture = this.imageTexture;
+    const ctx = canvas.getContext("2d");
     let loaded = 0;
     let failed = 0;
     const jobs = [];
@@ -682,25 +682,38 @@ export class GodsEye {
       for (let i = 0; i < s2.tiles; i++) {
         jobs.push(new Promise((resolve) => {
           const img = new Image();
+          const timeout = setTimeout(() => {
+            img.onload = img.onerror = null;
+            img.src = "";
+            failed++;
+            resolve();
+          }, 15000);
           img.onload = () => {
+            clearTimeout(timeout);
+            if (this.data !== data || canvas !== this.imageCanvas) { resolve(); return; }
             ctx.drawImage(img, i * 256, j * 256);
             loaded++;
-            this.imageTexture.needsUpdate = true;
+            texture.needsUpdate = true;
             resolve();
           };
-          img.onerror = () => { failed++; resolve(); };
+          img.onerror = () => { clearTimeout(timeout); failed++; resolve(); };
           img.src = `/api/imagery/s2/${s2.zoom}/${s2.x0 + i}/${s2.y0 + j}.jpg`;
         }));
       }
     }
     await Promise.all(jobs);
+    if (this.data !== data) return;
+    this.imagerySettled = true;
     this.imageryAvailable = loaded > 0;
+    if (generation !== this.generation || !this.open) return;
     if (!loaded && this.open) {
       this.imagery = "relief";
       this._applyMaterial();
-      $("geStatus").textContent = "Satellite imagery is not cached for this site (offline), so the terrain is shown as shaded relief.";
+      this.imageryMessage = "Satellite imagery is unavailable for this site. Showing the measured terrain as shaded relief.";
+      $("geStatus").textContent = this.imageryMessage;
     } else {
-      $("geStatus").textContent = failed ? `${failed} imagery tiles missing (offline cache).` : "";
+      this.imageryMessage = failed ? `${failed} imagery tiles could not be loaded.` : "";
+      $("geStatus").textContent = this.imageryMessage;
     }
   }
 
@@ -726,7 +739,7 @@ export class GodsEye {
         <div class="bar" role="img" aria-label="${pct(c.share_under_15)} trafficable"><i style="width:${(c.share_under_15 * 100).toFixed(1)}%"></i></div></div>
       <p class="hint">Measured on ${data.stats.slope_baseline_m} m elevation pixels inside the scored 0.5° cell (red outline).
         The probe, profile and Slope colours use the ${Math.round(data.ground_size_m / 255)} m display grid, so they read a little gentler.</p>
-      ${compare}`;
+      ${compare}<a class="ge-stats-source" href="${esc(data.provenance.source_url)}" data-dataset-id="${esc(data.provenance.dataset_id)}" target="_blank" rel="noopener">${esc(data.provenance.dataset_id)} · terrain source</a>`;
   }
 
   /* --------------------------------------------------- probe + profile */

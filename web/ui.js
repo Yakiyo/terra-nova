@@ -13,6 +13,23 @@ const openMenus = new Set();
 /* menu(button, panel): a drop-down that opens from a button. Closes on outside click,
  * Esc, Tab or choosing an item; arrows, Home and End move between its controls. */
 export function menu(button, panel) {
+  if (button.classList.contains("wm-disclosure-trigger")) {
+    panel.classList.add("disclosure-panel");
+    const header = document.createElement("div");
+    header.className = "disclosure-panel-head";
+    header.setAttribute("role", "presentation");
+    const title = document.createElement("span");
+    title.textContent = button.id === "statusPill" ? "Data & validation" : "Help";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "disclosure-close";
+    close.setAttribute("aria-label", `Close ${title.textContent}`);
+    if (panel.getAttribute("role") === "menu") close.setAttribute("role", "menuitem");
+    close.innerHTML = icon("x");
+    close.addEventListener("click", () => api.close(true));
+    header.append(title, close);
+    panel.prepend(header);
+  }
   const items = () => [...panel.querySelectorAll("button, a[href]")].filter((el) => !el.disabled && !el.hidden);
   const api = {
     close(focusButton = false) {
@@ -27,6 +44,13 @@ export function menu(button, panel) {
       panel.hidden = false;
       button.setAttribute("aria-expanded", "true");
       openMenus.add(api);
+      if (panel.classList.contains("disclosure-panel")) {
+        const bounds = button.getBoundingClientRect();
+        panel.style.position = "fixed";
+        panel.style.right = "auto";
+        panel.style.left = `${Math.max(12, Math.min(bounds.right - panel.offsetWidth, innerWidth - panel.offsetWidth - 12))}px`;
+        panel.style.top = `${Math.max(12, Math.min(bounds.bottom + 8, innerHeight - panel.offsetHeight - 12))}px`;
+      }
       if (focusFirst) items()[0]?.focus();
     },
   };

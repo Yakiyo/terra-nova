@@ -37,6 +37,15 @@ def test_pixel_size_shrinks_with_latitude():
     assert sizes[1] == pytest.approx(sizes[0] * math.cos(math.radians(60)))
 
 
+def test_display_slopes_match_mesh_central_differences():
+    # Interior is a one-to-one ramp; boundary uses a clamped neighbour.
+    heights = np.tile(np.arange(5, dtype=float), (5, 1))
+    slopes = terrain.display_slopes(heights, ground_size_m=4.0)
+    np.testing.assert_allclose(slopes[:, 1:-1], 45.0)
+    np.testing.assert_allclose(slopes[:, [0, -1]], math.degrees(math.atan(0.5)))
+    np.testing.assert_array_equal(terrain.display_slopes(np.zeros((5, 5)), 4.0), 0.0)
+
+
 def test_stats_and_cell_mask():
     dem = np.array([[0.0, 10.0], [20.0, 30.0]])
     slope = np.array([[1.0, 4.0], [10.0, 20.0]])

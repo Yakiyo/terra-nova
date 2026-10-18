@@ -20,6 +20,38 @@ from src.compute.similarity import CRITERIA
 client = TestClient(app)
 
 
+def test_site3d_cache_invalidates_when_source_tiles_change(monkeypatch, tmp_path):
+    from src.api import main
+
+    main._site3d_payload.cache_clear()
+    monkeypatch.setenv("OFFLINE", "1")
+    monkeypatch.setattr(main.sitetiles, "CACHE", tmp_path)
+    calls = []
+
+    def mosaic(x, y, offline):
+        calls.append((x, y, offline))
+        return np.zeros((16, 16))
+
+    monkeypatch.setattr(main.sitetiles, "dem_mosaic", mosaic)
+    try:
+        params = {"lat": 28.25, "lon": 63.25}
+        first = client.get("/api/site3d", params=params)
+        assert first.status_code == 200
+        body = first.json()
+        assert body["display_slopes"]["shape"] == body["heightmap"]["shape"]
+        assert body["provenance"]["dataset_id"] == "AWS_TERRAIN_TILES"
+        assert client.get("/api/site3d", params=params).json() == body
+        assert len(calls) == 1
+        x, y = main.sitetiles.mosaic_origin(**params)
+        tile = tmp_path / "dem" / str(main.sitetiles.DEM_ZOOM) / f"{y}_{x}.png"
+        tile.parent.mkdir(parents=True)
+        tile.write_bytes(b"updated source")
+        assert client.get("/api/site3d", params=params).status_code == 200
+        assert len(calls) == 2
+    finally:
+        main._site3d_payload.cache_clear()
+
+
 def _decode(payload: dict) -> np.ndarray:
     raw = base64.b64decode(payload["data"])
     return np.frombuffer(raw, dtype="<f4").reshape(payload["shape"])

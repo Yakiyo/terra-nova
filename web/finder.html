@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TerraNova · Finder</title>
 <meta name="description" content="Find places on Earth that behave like Moon and Mars base sites, scored from NASA data.">
-<meta name="theme-color" content="#06090f">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='18' r='10' fill='none' stroke='%23eef0f3' stroke-width='2.4'/%3E%3Ccircle cx='25.5' cy='6.5' r='4.5' fill='%23e03c31'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#050507">
+<link rel="icon" href="brand.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
 <script type="importmap">
   { "imports": { "three": "./vendor/three/three.module.min.js" } }
@@ -20,7 +21,7 @@
 <header class="topbar">
   <div class="brand">
     <a href="index.html" aria-label="TerraNova home">
-      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="10" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="25.5" cy="6.5" r="4" fill="#e03c31"/></svg>
+      <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
       <span class="wordmark">TerraNova</span>
     </a>
   </div>
@@ -31,8 +32,8 @@
   </nav>
   <div class="top-right">
     <div class="menu-wrap">
-      <button class="pill" id="statusPill" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="statusPanel" title="Data and validation status">
-        <span class="dot" id="statusDot"></span><span id="statusMode">Connecting…</span><span class="pill-auc num" id="statusAuc" hidden></span><svg class="i caret" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
+      <button class="pill wm-disclosure-trigger" id="statusPill" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="statusPanel" title="Data and validation status">
+        <span class="disclosure-leading" aria-hidden="true"><svg class="i"><use href="icons.svg#i-stack"></use></svg><span class="dot" id="statusDot"></span></span><span id="statusMode">Connecting…</span><span class="pill-auc" id="statusAuc" hidden></span><svg class="i caret" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
       <div class="menu status-panel" id="statusPanel" role="dialog" aria-label="Data and validation status" hidden>
         <dl>
           <div><dt>Data</dt><dd id="statusData">Connecting…</dd></div>
@@ -43,7 +44,7 @@
       </div>
     </div>
     <div class="menu-wrap">
-      <button class="ghost" id="helpButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="helpMenu"><svg class="i" aria-hidden="true"><use href="icons.svg#i-question"></use></svg><span class="btn-label">Help</span><svg class="i caret" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
+      <button class="ghost wm-disclosure-trigger" id="helpButton" type="button" aria-label="Help" aria-haspopup="menu" aria-expanded="false" aria-controls="helpMenu"><span class="disclosure-leading" aria-hidden="true"><svg class="i"><use href="icons.svg#i-question"></use></svg></span><span class="btn-label">Help</span><svg class="i caret" aria-hidden="true"><use href="icons.svg#i-caret-down"></use></svg></button>
       <div class="menu" id="helpMenu" role="menu" aria-label="Help" hidden>
         <button role="menuitem" id="startTour" type="button"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg>Guided tour<kbd>T</kbd></button>
         <button role="menuitem" id="openMethod" type="button"><svg class="i" aria-hidden="true"><use href="icons.svg#i-info"></use></svg>How it works</button>
@@ -57,6 +58,7 @@
 <main class="layout">
   <button class="edge-toggle" id="toggleSidebar" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Hide the sidebar"><svg class="i" aria-hidden="true"><use href="icons.svg#i-caret-left"></use></svg></button>
   <aside class="panel sidebar" id="sidebar" aria-label="Targets and results">
+    <nav class="breadcrumbs finder-breadcrumbs" id="finderBreadcrumbs" aria-label="Breadcrumb"></nav>
     <div class="tabs" role="tablist" aria-label="Sidebar">
       <button role="tab" id="tabTarget" aria-selected="true" aria-controls="target" type="button">Target</button>
       <button role="tab" id="tabResults" aria-selected="false" aria-controls="results" type="button">Results</button>
@@ -129,6 +131,7 @@
     <div class="view" id="globe" role="img" aria-label="3D globe of analog scores. Click anywhere to inspect a location."></div>
     <canvas class="view" id="flatmap" hidden aria-label="Flat map of analog scores. Click anywhere to inspect a location."></canvas>
     <div class="labels" id="labels" role="group" aria-label="Ranked sites on the map"></div>
+    <div class="labels card-labels" id="cardLabels"></div>
     <div class="progress" id="progress" aria-hidden="true"></div>
 
     <div class="stage-controls">
@@ -151,7 +154,7 @@
         </label>
       </div>
       <div class="tool-group layers">
-        <label class="toggle"><input type="checkbox" id="showKnown" checked><span>Known analogs</span></label>
+        <div class="known-save-control"><input type="checkbox" id="showKnown" checked hidden><button class="save-toggle" id="knownToggle" type="button" aria-pressed="true" aria-label="Show known analogs"><span class="save-icon" aria-hidden="true"></span><span class="save-label">Known analogs</span><span class="save-state">Shown</span></button></div>
         <label class="toggle opacity" title="Opacity of the data overlay">
           <span class="tool-label">Overlay</span>
           <input type="range" id="overlayOpacity" min="0" max="100" step="5" value="100" aria-label="Overlay opacity">
@@ -161,7 +164,7 @@
       </div>
     </div>
 
-    <div class="zoom-controls" role="group" aria-label="Zoom">
+    <div class="zoom-controls wm-map-controls" role="group" aria-label="Zoom">
       <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in (or scroll)"><svg class="i" aria-hidden="true"><use href="icons.svg#i-plus"></use></svg></button>
       <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><svg class="i" aria-hidden="true"><use href="icons.svg#i-minus"></use></svg></button>
       <button type="button" id="zoomHome" aria-label="Reset view" title="Reset view"><svg class="i" aria-hidden="true"><use href="icons.svg#i-globe-hemisphere-east"></use></svg></button>
@@ -222,6 +225,7 @@
   <canvas id="geCanvas" aria-label="3D terrain. Drag to orbit, right-drag to slide, scroll to zoom, click to probe."></canvas>
   <header class="ge-top">
     <div>
+      <nav class="breadcrumbs" id="terrainBreadcrumbs" aria-label="Breadcrumb"></nav>
       <h2 id="geTitle"></h2>
       <p class="ge-sub" id="geSub"></p>
       <div class="ge-badges" id="geBadges"></div>
@@ -236,8 +240,8 @@
     <h3>Terrain in the scored cell</h3>
     <div id="geStats" class="ge-stats"></div>
 
-    <div class="ge-section">
-      <h3>Sun</h3>
+    <details class="ge-section">
+      <summary>Sun and lighting</summary>
       <div class="segmented ge-presets" role="group" aria-label="Sun presets">
         <button type="button" data-sun="earth">Midday</button>
         <button type="button" data-sun="evening">Evening</button>
@@ -248,7 +252,7 @@
       <label class="ge-slider">Direction <b id="geSunAzValue" class="num"></b>
         <input type="range" id="geSunAz" min="0" max="359" step="1" value="160"></label>
       <p class="hint" id="geSunNote"></p>
-    </div>
+    </details>
 
     <div class="ge-section">
       <h3>Surface</h3>
@@ -288,8 +292,8 @@
       <div id="geProfile" class="ge-profile" hidden></div>
     </div>
 
-    <div class="ge-section ge-climate-panel" id="geClimatePanel">
-      <h3>Climate simulation</h3>
+    <details class="ge-section ge-climate-panel" id="geClimatePanel">
+      <summary>Climate simulation</summary>
       <label class="ge-slider">Month <b id="geMonthValue" class="num"></b>
         <input type="range" id="geMonth" min="0" max="11" step="1" value="6"></label>
       <label class="ge-slider">Time of day <b id="geHourValue" class="num"></b>
@@ -301,7 +305,7 @@
       <div class="ge-climate" id="geClimate" aria-live="polite"></div>
       <p class="hint">Illustrative, not a forecast. Built from this cell's NASA POWER temperatures and rainfall and its
         MODIS day-night surface swing, with the real sun position for the latitude. Try the Thermal view while a day plays.</p>
-    </div>
+    </details>
     <p class="hint ge-status" id="geStatus" role="status"></p>
   </aside>
   <div class="ge-hud">
@@ -352,5 +356,6 @@
 </dialog>
 
 <script type="module" src="app.js"></script>
+<script type="module" src="controls.js"></script>
 </body>
 </html>

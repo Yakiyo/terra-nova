@@ -5,12 +5,14 @@ import * as THREE from "three";
 import { OrbitControls } from "./vendor/three/OrbitControls.js";
 import { initStarfield } from "./starfield.js";
 import { SpaceScenery, atmosphere } from "./space.js";
+import { counterMarkup, revealOnce, revealOnEntry } from "./reveal.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 initStarfield("starfield");
 
 /* ------------------------------------------------------------------ globe */
 
+function initScene() {
 const canvas = document.getElementById("welcomeGlobeCanvas");
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -66,13 +68,18 @@ resize();
 let last = performance.now();
 renderer.setAnimationLoop(() => {
   const now = performance.now();
-  if (document.hidden) { last = now; return; }
+  if (document.hidden || canvas.getBoundingClientRect().bottom < 0) { last = now; return; }
   controls.update();
   sun.position.copy(camera.position).add(SUN_OFFSET.clone().applyQuaternion(camera.quaternion));
   space.update(Math.min(0.1, (now - last) / 1000));
   last = now;
   renderer.render(scene, camera);
 });
+}
+try { initScene(); } catch {
+  document.querySelector(".home-globe").classList.add("globe-fallback");
+  document.getElementById("globeHint").textContent = "Earth · NASA Blue Marble";
+}
 
 /* ------------------------------------------------------------------ facts */
 
@@ -82,15 +89,49 @@ async function facts() {
       ["/api/health", "/api/targets", "/api/analogs"].map((u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject()))),
     );
     const items = [
-      [Number(health.candidate_cells).toLocaleString("en-US"), "land cells scored"],
-      [String(targets.targets.length), "Moon and Mars targets"],
-      [String(analogs.sites.length), "known analogs checked"],
+      [Number(health.candidate_cells).toLocaleString("en-US"), "land cells scored", "/api/health", "terra_nova_predictor_stack"],
+      [String(targets.targets.length), "Moon and Mars targets", "/api/targets", "terra_nova_target_catalog"],
+      [String(analogs.sites.length), "known analogs checked", "/api/analogs", "terra_nova_known_analogs"],
     ];
     const box = document.getElementById("facts");
-    box.innerHTML = items.map(([n, label]) => `<div><dt>${label}</dt><dd>${n}</dd></div>`).join("");
+    box.innerHTML = items.map(([n, label, url, dataset]) => `<div data-source-url="${url}" data-dataset-id="${dataset}"><dt><a href="${url}">${label}</a></dt><dd>${counterMarkup(n)}</dd></div>`).join("");
     box.hidden = false;
+    revealOnEntry(box);
   } catch {
-    /* the page reads fine without them */
+    const box = document.getElementById("facts");
+    box.innerHTML = '<div class="facts-error"><dt>Mission data unavailable. Check the local server and try again.</dt><dd><button type="button" class="btn btn-ghost" id="factsRetry">Retry mission data</button></dd></div>';
+    box.hidden = false;
+    document.getElementById("factsRetry").addEventListener("click", facts, { once: true });
   }
 }
 facts();
+
+/* Render only API-supplied similarities. No statistics are calculated here. */
+async function evidence() {
+  const box = document.getElementById("missionEvidence");
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  try {
+    const [result, criteria] = await Promise.all([
+      fetch("/api/score", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target_id: "jezero_crater", top_k: 5 }) }),
+      fetch("/api/criteria"),
+    ]);
+    if (!result.ok || !criteria.ok) throw new Error("Local data unavailable");
+    const data = await result.json();
+    const specs = (await criteria.json()).criteria;
+    const site = data.results[0];
+    if (!site) throw new Error("No analog returned");
+    box.innerHTML = `<h3>${esc(site.label.text)}</h3><p class="chart-caption">Criterion similarity to Jezero Crater</p>` + specs.filter(c => data.weights[c.key] > 0 && site.similarities[c.key] != null).map(c => {
+      const source = site.sources?.[c.key] || c;
+      return `<div class="evidence-row"><div><span>${esc(c.label)}</span><b class="num">${(site.similarities[c.key] * 100).toFixed(0)}%</b></div><div class="bar"><i style="width:${site.similarities[c.key] * 100}%"></i></div><a href="${esc(source.source_url || c.source_url)}" data-dataset-id="${esc(source.dataset_id || c.dataset_id)}">${esc(source.dataset_id || c.dataset_id || "Dataset source")}</a></div>`;
+    }).join("") + `<a class="chart-link" href="finder.html#target=jezero_crater">Inspect this ranking and its sources</a>`;
+    revealOnce(box);
+  } catch {
+    box.innerHTML = '<p>Evidence preview unavailable. <a href="finder.html#target=jezero_crater">Open the Finder to retry.</a></p>';
+  }
+}
+const evidenceObserver = new IntersectionObserver(entries => {
+  if (!entries.some(entry => entry.isIntersecting)) return;
+  evidenceObserver.disconnect();
+  evidence();
+}, { rootMargin: "200px" });
+evidenceObserver.observe(document.getElementById("missionEvidence"));

@@ -131,6 +131,20 @@ def block_mean(a: np.ndarray, k: int) -> np.ndarray:
     return a.reshape(h // k, k, w // k, k).mean(axis=(1, 3))
 
 
+def display_slopes(heights: np.ndarray, ground_size_m: float) -> np.ndarray:
+    """Display-grid slopes, matching the mesh spacing and clamped edge differences.
+
+    Kept here so the browser only renders measurements, including probe values.
+    Native-resolution terrain statistics continue to use slope_degrees.
+    """
+    rows, cols = heights.shape
+    spacing = ground_size_m / (cols - 1)
+    padded = np.pad(heights, 1, mode="edge")
+    dx = (padded[1 : rows + 1, 2 : cols + 2] - padded[1 : rows + 1, :cols]) / (2 * spacing)
+    dy = (padded[2 : rows + 2, 1 : cols + 1] - padded[:rows, 1 : cols + 1]) / (2 * spacing)
+    return np.degrees(np.arctan(np.hypot(dx, dy)))
+
+
 def cell_mask(
     row_lat: np.ndarray,
     col_lon: np.ndarray,

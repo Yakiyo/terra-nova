@@ -8,6 +8,7 @@ import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
 import { initStarfield } from "./starfield.js";
 import { closeMenus, icon, menu, toast } from "./ui.js";
+import { breadcrumbs, targetTrail } from "./navigation.js";
 
 const starfield = initStarfield("starfield");
 
@@ -151,6 +152,7 @@ function noveltyChip(n) {
 /* --------------------------------------------------------------- the views */
 
 const labels = $("labels");
+const cardLabels = $("cardLabels");
 const globe = new Globe($("globe"), { onPick: pickLocation, onHover: hover });
 const flat = new FlatMap($("flatmap"), { onPick: pickLocation, onHover: hover });
 let twin = null;
@@ -323,7 +325,7 @@ function renderMarkers() {
       const el = document.createElement("div");
       el.className = "marker known";
       el.dataset.key = `known-${site.name}`;
-      el.textContent = "🚀";
+      el.innerHTML = icon("rocket");
       el.setAttribute("role", "img");
       el.setAttribute("aria-label", `Known analog: ${site.name}`);
       el.tabIndex = 0;
@@ -363,7 +365,7 @@ function renderMarkers() {
   if (state.card) {
     const fresh = cardCache?.r !== state.card;
     if (fresh) cardCache = { r: state.card, marker: infoCard(state.card) };
-    labels.appendChild(cardCache.marker.el);
+    cardLabels.replaceChildren(cardCache.marker.el);
     markers.push(cardCache.marker);
     if (fresh && cardCache.r.index !== cardCache.shown) {
       cardCache.shown = cardCache.r.index;
@@ -371,6 +373,7 @@ function renderMarkers() {
     }
   } else {
     cardCache = null;
+    cardLabels.replaceChildren();
   }
   globe.setMarkers(state.view === "globe" ? markers : []);
   flat.setMarkers(state.view === "map" ? markers : []);
@@ -392,7 +395,7 @@ function infoCard(r) {
     <div class="ic-body">
       <div class="ic-title">${r.rank ? `<span class="num">#${r.rank}</span> ` : ""}${esc(r.label.text)}</div>
       <div class="ic-sub num">${fmtCoord(r.lat, r.lon)}</div>
-      <div class="ic-score"><b class="num">${(r.score * 100).toFixed(0)}%</b>
+      <div class="ic-score"><span class="score-meter" style="--score-value:${r.score}" role="img" aria-label="${fmtPct(r.score)} match" data-source-url="/api/score" data-dataset-id="terra_nova_predictor_stack"><b aria-hidden="true">${fmtPct(r.score)}</b></span>
         <span>match to ${esc(t?.short_name || "your profile")}, ${topShare(r.percentile)} of land</span></div>
       <div class="ic-chips">${noveltyChip(r.novelty)}</div>
     </div>
@@ -460,9 +463,9 @@ function paintLayer() {
       <div class="ramp" style="background:${cssGradient("score")}"></div>
       <div class="scale abs num"><span style="left:0">top 50%</span><span style="left:80%">top 10%</span><span style="left:98%">1%</span></div>
       ${histogram()}
-      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">🚀</i>known analog</span></div>
+      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span></div>
       <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Bars: how many land cells
-        reach each score (orange = top 10%, at least ${fmtPct(q(0.9))}).</div>
+        reach each score (red = top 10%, at least ${fmtPct(q(0.9))}).</div>
       <div class="credit-line">Earth: <a href="${esc(state.sources.basemaps.earth.url)}" target="_blank" rel="noopener">${esc(state.sources.basemaps.earth.credit)}</a></div>`;
   } else {
     const f = state.layerField;
@@ -608,6 +611,8 @@ function renderTargets() {
 }
 
 function renderTargetDetail() {
+  const selectedTarget = target();
+  breadcrumbs($("finderBreadcrumbs"), [...targetTrail(selectedTarget), { label: state.mode === "custom" ? "Custom profile · Finder" : `${selectedTarget?.short_name || "Target"} · Finder` }]);
   if (state.mode === "custom") { renderCustomForm(); return; }
   const t = target();
   const rows = state.criteria.map((c) => {
@@ -866,7 +871,7 @@ function renderResults(fresh = false) {
     <li style="--n: ${n}"><button class="site ${state.selected?.index === r.index ? "active" : ""}" data-index="${r.index}" type="button">
       <span class="rank num">${r.rank}</span>
       <span class="name">${esc(r.label.text)}</span>
-      <span class="score"><b>${fmtPct(r.score)}</b><small>match</small></span>
+      <span class="score"><span class="score-meter" style="--score-value:${r.score}" role="img" aria-label="${fmtPct(r.score)} match" data-source-url="/api/score" data-dataset-id="terra_nova_predictor_stack"><b aria-hidden="true">${fmtPct(r.score)}</b></span><small>match</small></span>
       <span class="meta"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(r.novelty)}${state.pins.some((x) => x.index === r.index) ? `<span class="pin-star" title="Pinned">pinned</span>` : ""}${stabilityOf(r) !== null ? `<span class="stable" title="Stays in the top 1% of land in ${fmtPct(stabilityOf(r))} of ${state.robust.runs} simulated runs">stable ${fmtPct(stabilityOf(r))}</span>` : ""}</span>
       <span class="bar" aria-hidden="true"><i style="width:${(r.score * 100).toFixed(1)}%"></i></span>
     </button></li>`).join("");
@@ -956,7 +961,8 @@ function renderDetail(r) {
     }
     return `<div class="crit"><div class="row"><span>${esc(c.label)}</span><span class="pct">${fmtPct(sim)}</span></div>
       <div class="vs">Here ${esc(fmtValue(val, c.unit))} · target ${esc(fmtValue(eff[c.key], c.unit))}</div>
-      <div class="bar" role="img" aria-label="${esc(c.label)} similarity ${fmtPct(sim)}"><i style="width:${(sim * 100).toFixed(1)}%"></i></div></div>`;
+      <div class="bar" role="img" aria-label="${esc(c.label)} similarity ${fmtPct(sim)}"><i style="width:${(sim * 100).toFixed(1)}%"></i></div>
+      <a class="criterion-source" href="${esc(c.source_url)}" data-dataset-id="${esc(c.dataset_id)}" target="_blank" rel="noopener">${esc(c.dataset_id)} ${icon("arrow-square-out")}</a></div>`;
   }).join("");
 
   const nov = r.novelty;
@@ -1015,26 +1021,6 @@ function renderDetail(r) {
   });
   det.closest(".panel").scrollTop = 0;
   if (window.innerWidth <= 1020) det.scrollIntoView({ behavior: "smooth", block: "start" });
-  // Count the big score up when a new site opens (not on every refresh of the same one).
-  if (lastCounted !== `${r.lat},${r.lon}`) {
-    lastCounted = `${r.lat},${r.lon}`;
-    countUp(det.querySelector(".hero .big"), Math.round(r.score * 100));
-  }
-}
-
-let lastCounted = null;
-const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-function countUp(el, to) {
-  if (!el || REDUCED_MOTION) return;
-  const node = el.firstChild;   // the number; the "%" sits in a <small> after it
-  const t0 = performance.now();
-  const step = (now) => {
-    const k = Math.min(1, (now - t0) / 600);
-    node.nodeValue = String(Math.round(to * (1 - Math.pow(1 - k, 3))));
-    if (k < 1 && el.isConnected) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
 }
 
 /* -------------------------------------------------------------- validation */
@@ -1046,7 +1032,7 @@ function renderValidation() {
   $("statusValRow").hidden = !hasAuc;
   $("statusOpenVal").hidden = !hasAuc;
   if (!hasAuc) { $("validation").innerHTML = `<p class="hint">No validation for a custom profile.</p>`; return; }
-  $("statusAuc").textContent = `AUC ${v.auc.toFixed(2)}`;
+  $("statusAuc").innerHTML = `<span class="auc-label">AUC </span><span class="auc-value">${v.auc.toFixed(2)}</span>`;
   $("statusVal").innerHTML = `<span class="num">AUC ${v.auc.toFixed(2)}</span> on ${v.positives} known sites`;
   const body = v.tag === "cold_polar" ? "cold polar-desert" : v.body.charAt(0).toUpperCase() + v.body.slice(1);
   const share = v.auc >= 0.999 ? "every" : `${fmtPct(v.auc)} of`;
@@ -1207,9 +1193,9 @@ async function renderExplore() {
        <circle cx="${sx(tx)}" cy="${sy(ty)}" r="8" class="target"/><text x="${sx(tx) + 11}" y="${sy(ty) - 8}" class="tl">target</text>` : "";
   const marks = pts.map((p, i) => p.kind === "site"
     ? `<circle data-i="${i}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
-    : `<text data-i="${i}" x="${sx(p.x)}" y="${sy(p.y)}" class="analog-rocket" text-anchor="middle" dominant-baseline="central">🚀</text>`).join("");
+    : `<svg data-i="${i}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-rocket"></use></svg>`).join("");
   box.innerHTML = `
-    <p class="hint">Where do the top sites sit on two criteria at once? Each dot is a ranked site, each diamond a
+    <p class="hint">Where do the top sites sit on two criteria at once? Each dot is a ranked site, each rocket a
       known analog (rocket); the crosshair is the target. Hover for details, click to open.</p>
     <div class="axes">
       <label>X <select id="exX">${opts(xKey)}</select></label>
@@ -1225,7 +1211,7 @@ async function renderExplore() {
     </div>
     <div class="scatter-legend">
       <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site</span>
-      <span><span aria-hidden="true">🚀</span> known analog</span>
+      <span>${icon("rocket")} known analog</span>
       <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" class="target"/></svg> target</span>
     </div>
     <p class="hint">${pts.filter((p) => p.kind === "site").length} ranked sites · ${pts.filter((p) => p.kind === "analog").length} known analogs with data.
@@ -1255,9 +1241,9 @@ async function renderExplore() {
 
 /* --------------------------------------------------------------- God's Eye */
 
-const eye = new GodsEye($("godseye"));
+let eye = { open: false };
 let eyeReturnFocus = null;
-eye.onClose = () => {
+const restoreMap = () => {
   globe.visible = state.view === "globe";
   twin?.setPaused(ui.twin === false);
   starfield.resume();
@@ -1267,6 +1253,15 @@ eye.onClose = () => {
 function openGodsEye(r, preset = null) {
   if (!r || Math.abs(r.lat) > 84) { toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude.", "info"); return Promise.resolve(); }
   hidePeek();
+  if (!(eye instanceof GodsEye)) {
+    try {
+      eye = new GodsEye($("godseye"));
+      eye.onClose = restoreMap;
+    } catch {
+      toast("God’s Eye could not start WebGL. Try a browser with hardware acceleration enabled.", "error");
+      return Promise.resolve();
+    }
+  }
   eyeReturnFocus = document.activeElement;
   const t = target();
   const context = {

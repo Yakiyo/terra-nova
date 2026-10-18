@@ -30,3 +30,9 @@ cache/sitetiles/
 
 # Relief-shaded hover previews (built on demand from EOX + AWS tiles)
 cache/peek/
+
+# Reproducible frontend review evidence and downloaded vendor staging.
+artifacts/frontend/
+cache/vendor/
+# Panchang permits self-hosting, but not redistribution via a public repository.
+web/vendor/fonts/panchang-*.woff2

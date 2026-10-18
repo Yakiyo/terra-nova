@@ -1,7 +1,7 @@
 /* Colour ramps for the data overlays.
  *
  * Each ramp is a list of stops: [t, r, g, b, alpha], t in 0..1.
- *   score        single-hue orange, coloured by rank percentile of land cells;
+ *   score        single-hue red, coloured by rank percentile of land cells;
  *                low scores fade to transparent so the NASA imagery shows through
  *   precipitation  teal, dry (dark) to wet (light)
  *   vegetation   bare tan to deep green: brown and green are the familiar
@@ -17,12 +17,12 @@
 
 export const RAMPS = {
   score: [
-    [0.0, 74, 26, 8, 0.0],
-    [0.25, 128, 44, 14, 0.38],
-    [0.5, 196, 73, 26, 0.58],
-    [0.75, 240, 138, 75, 0.78],
-    [0.92, 255, 196, 150, 0.9],
-    [1.0, 255, 235, 214, 0.96],
+    [0.0, 65, 5, 17, 0.0],
+    [0.25, 125, 9, 33, 0.38],
+    [0.5, 190, 16, 44, 0.58],
+    [0.75, 242, 29, 56, 0.78],
+    [0.92, 255, 106, 126, 0.9],
+    [1.0, 255, 220, 225, 0.96],
   ],
   precipitation: [
     [0.0, 8, 44, 48, 0.55],

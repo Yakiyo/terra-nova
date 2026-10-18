@@ -20,6 +20,7 @@ import os
 import re
 import threading
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -764,9 +765,37 @@ def site3d(
     """
     clat, clon = thumbs.cell_centre(lat, lon)
     try:
+        x0, y0 = sitetiles.mosaic_origin(clat, clon)
+    except sitetiles.SiteTileError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Invalidate whenever a source tile is added or replaced, including after prefetch.
+    revision = []
+    for j in range(sitetiles.MOSAIC):
+        for i in range(sitetiles.MOSAIC):
+            path = (
+                sitetiles.CACHE
+                / "dem"
+                / str(sitetiles.DEM_ZOOM)
+                / (f"{y0 + j}_{(x0 + i) % (2**sitetiles.DEM_ZOOM)}.png")
+            )
+            try:
+                stat = path.stat()
+                revision.append((stat.st_mtime_ns, stat.st_size))
+            except FileNotFoundError:
+                revision.append(None)
+    return _site3d_payload(lat, lon, target_id, offline_mode(), tuple(revision))
+
+
+@lru_cache(maxsize=8)
+def _site3d_payload(
+    lat: float, lon: float, target_id: str | None, offline: bool, revision: tuple
+) -> dict[str, Any]:
+    """Bounded terrain-response cache; errors never enter functools' cache."""
+    clat, clon = thumbs.cell_centre(lat, lon)
+    try:
         # Centre the mosaic on the scored cell, so the whole cell is in view.
         x0, y0 = sitetiles.mosaic_origin(clat, clon)
-        dem = sitetiles.dem_mosaic(x0, y0, offline=offline_mode())
+        dem = sitetiles.dem_mosaic(x0, y0, offline=offline)
     except sitetiles.SiteTileError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FetchError as exc:
@@ -811,6 +840,7 @@ def site3d(
         }
     img = sitetiles.IMAGERY["s2"]
     factor = 2 ** (img["zoom"] - z)
+    display_heights = terrain.block_mean(dem, 4)
     return {
         "lat": lat,
         "lon": lon,
@@ -828,7 +858,16 @@ def site3d(
         "heightmap": {
             "shape": [size // 4, size // 4],
             "encoding": "float32-le-base64",
-            "data": _encode(terrain.block_mean(dem, 4)),
+            "data": _encode(display_heights),
+        },
+        "display_slopes": {
+            "shape": list(display_heights.shape),
+            "encoding": "float32-le-base64",
+            "data": _encode(terrain.display_slopes(display_heights, round(metres * size, 1))),
+        },
+        "provenance": {
+            "dataset_id": "AWS_TERRAIN_TILES",
+            "source_url": "https://registry.opendata.aws/terrain-tiles/",
         },
         "stats": {
             "area": area_stats.as_dict(),
