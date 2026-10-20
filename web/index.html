@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="vendor/fonts/roboto-variable.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="vendor/fonts/panchang-600.woff2" as="font" type="font/woff2" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>TerraNova · Earth analogs for Moon and Mars bases</title>
@@ -10,15 +12,18 @@
   <link rel="icon" href="brand.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/lenis/lenis.css">
   <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="shared-controls.css">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/three.module.min.js" } }
   </script>
+  <script type="module" src="controls.js"></script>
 </head>
 <body class="page-home">
   <a class="skip" href="#main">Skip to content</a>
   <canvas id="starfield" aria-hidden="true"></canvas>
 
-  <header class="topbar">
+  <header class="topbar site-header">
+    <button class="site-menu-trigger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="siteNavigation"><svg class="i" aria-hidden="true"><use href="icons.svg#i-list"></use></svg><span>Menu</span></button>
     <div class="brand">
       <a href="index.html" aria-label="TerraNova home">
         <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
@@ -38,8 +43,8 @@
       <p class="lede reveal" style="--d: 1">Find Earth analogs for Moon and Mars bases. Explore the terrain. Follow the evidence.</p>
       <div class="home-actions reveal" style="--d: 2">
         <a class="btn btn-primary" href="targets.html">Choose a target
-          <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
-        <a class="btn btn-ghost" href="finder.html">Open the Finder</a>
+          <span class="button-orb" aria-hidden="true"><svg class="i"><use href="icons.svg#i-arrow-right"></use></svg></span></a>
+        <a class="btn btn-ghost" href="finder.html">Open the Finder<span class="button-orb" aria-hidden="true"><svg class="i"><use href="icons.svg#i-arrow-right"></use></svg></span></a>
       </div>
     </div>
     <div class="home-globe">
@@ -50,7 +55,7 @@
   </main>
 
   <section class="mission-section" id="mission" aria-labelledby="missionTitle">
-    <div class="mission-intro"><h2 id="missionTitle">Distant worlds.<br>Common ground.</h2><p>Start with a place beyond Earth. Find the terrestrial landscapes that share its conditions, then look closer at what makes them a match.</p></div>
+    <div class="mission-intro"><h2 id="missionTitle">Distant worlds.<br>Common ground.</h2><p>Choose a planetary site. Find Earth landscapes with similar conditions, then explore the evidence.</p></div>
     <div class="mission-destinations">
       <a class="mission-world moon" href="targets.html?body=moon"><img src="assets/moon.jpg" alt="" loading="lazy"><div><h3>The Moon</h3><p>Explore lunar target profiles</p></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
       <a class="mission-world mars" href="targets.html?body=mars"><img src="assets/mars.jpg" alt="" loading="lazy"><div><h3>Mars</h3><p>Explore Martian target profiles</p></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
@@ -59,7 +64,7 @@
   </section>
 
   <section class="evidence-section" aria-labelledby="evidenceTitle">
-    <div class="evidence-copy"><h2 id="evidenceTitle">A match is more<br>than a number.</h2><p>Climate, terrain and vegetation tell different parts of the story. Compare each criterion, adjust what matters, and trace the result to its dataset.</p><a class="btn btn-ghost" href="finder.html#target=jezero_crater">Explore the evidence <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a></div>
+    <div class="evidence-copy"><h2 id="evidenceTitle">A match is more<br>than a number.</h2><p>Compare climate, terrain and vegetation. Adjust what matters and trace each result to its dataset.</p><a class="btn btn-ghost" href="finder.html#target=jezero_crater">Explore the evidence <svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a></div>
     <div class="evidence-chart" id="missionEvidence" aria-live="polite"><p class="hint">Loading a Jezero analog from the local data…</p></div>
   </section>
 
@@ -72,6 +77,5 @@
 
   <script type="module" src="welcome.js"></script>
   <script type="module" src="experience.js"></script>
-<script type="module" src="controls.js"></script>
 </body>
 </html>

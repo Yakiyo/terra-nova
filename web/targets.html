@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="vendor/fonts/roboto-variable.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="vendor/fonts/panchang-600.woff2" as="font" type="font/woff2" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>TerraNova · Choose a target site</title>
@@ -10,12 +12,15 @@
   <link rel="icon" href="brand.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/lenis/lenis.css">
   <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="shared-controls.css">
+  <script type="module" src="controls.js"></script>
 </head>
 <body class="page-targets">
   <a class="skip" href="#main">Skip to content</a>
   <canvas id="starfield" aria-hidden="true"></canvas>
 
-  <header class="topbar">
+  <header class="topbar site-header">
+    <button class="site-menu-trigger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="siteNavigation"><svg class="i" aria-hidden="true"><use href="icons.svg#i-list"></use></svg><span>Menu</span></button>
     <div class="brand">
       <a href="index.html" aria-label="TerraNova home">
         <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
@@ -33,8 +38,7 @@
     <nav class="breadcrumbs" id="targetBreadcrumbs" aria-label="Breadcrumb"></nav>
     <div class="dest-head">
       <h1 class="reveal">Where do we<br><em>go next?</em></h1>
-      <p class="reveal" style="--d: 1">Each site is described by the conditions NASA missions measured there. TerraNova then ranks every
-        land cell on Earth by how closely it matches.</p>
+      <p class="reveal" style="--d: 1">Choose a Moon or Mars profile to find Earth landscapes with similar conditions.</p>
     </div>
     <nav class="body-switch" aria-label="Target destinations">
       <span class="body-switch-indicator" aria-hidden="true"></span>
@@ -43,9 +47,10 @@
       <a href="targets.html?body=mars" data-body="mars">Mars</a>
     </nav>
     <div id="groups" aria-live="polite">
-      <section class="dest-group"><div class="dest-grid">
-        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-      </div></section>
+      <section class="dest-group planet-group" aria-label="Loading targets">
+        <div class="planet-intro skeleton" aria-hidden="true"></div>
+        <div class="dest-grid" aria-hidden="true"><div class="dest-card skeleton"></div><div class="dest-card skeleton"></div></div>
+      </section>
     </div>
   </main>
 
@@ -55,6 +60,5 @@
 
   <script type="module" src="targets.js"></script>
   <script type="module" src="experience.js"></script>
-<script type="module" src="controls.js"></script>
 </body>
 </html>

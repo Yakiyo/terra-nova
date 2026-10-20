@@ -14,7 +14,7 @@ export function terrainData(site, targetId) {
       return value.request;
     }
   }
-  const request = (async () => {
+  const request = Promise.resolve().then(async () => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
     try {
@@ -25,10 +25,10 @@ export function terrainData(site, targetId) {
       }
       return await response.json();
     } catch (error) {
-      requests.delete(key);
+      if (requests.get(key)?.request === request) requests.delete(key);
       throw new Error(error.name === "AbortError" ? "Terrain loading timed out. Try again when the data is available." : error.message);
     } finally { clearTimeout(timer); }
-  })();
+  });
   requests.set(key, { request, createdAt: Date.now() });
   while (requests.size > LIMIT) requests.delete(requests.keys().next().value);
   return request;

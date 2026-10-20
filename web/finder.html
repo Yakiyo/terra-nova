@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="vendor/fonts/roboto-variable.ttf" as="font" type="font/ttf" crossorigin>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TerraNova · Finder</title>
@@ -9,16 +10,19 @@
 <meta name="theme-color" content="#050507">
 <link rel="icon" href="brand.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="shared-controls.css">
 <script type="importmap">
   { "imports": { "three": "./vendor/three/three.module.min.js" } }
 </script>
+<script type="module" src="controls.js"></script>
 </head>
 <body>
 
 <a class="skip" href="#results">Skip to ranked sites</a>
 <canvas id="starfield" aria-hidden="true"></canvas>
 
-<header class="topbar">
+<header class="topbar site-header">
+  <button class="site-menu-trigger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="siteNavigation"><svg class="i" aria-hidden="true"><use href="icons.svg#i-list"></use></svg><span>Menu</span></button>
   <div class="brand">
     <a href="index.html" aria-label="TerraNova home">
       <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
@@ -83,7 +87,7 @@
             <h3 class="eyebrow">Weights</h3>
             <button class="link-button" id="resetWeights" type="button">Reset</button>
           </div>
-          <p class="hint">Drag to change how much each criterion counts.</p>
+          <p class="hint">Adjust each criterion’s influence.</p>
           <div class="weights" id="weights"></div>
         </div>
         <div class="block discovery">
@@ -108,7 +112,7 @@
           <div class="topk">
             <label for="tolerance">Permissible error <b class="num" id="toleranceValue">exact</b></label>
             <input type="range" id="tolerance" min="0" max="3" step="0.25" value="0">
-            <small class="hint">Higher counts anything within a band around the target as a full match.</small>
+            <small class="hint">Widen the band that counts as a full match.</small>
           </div>
         </div>
       </details>
@@ -160,7 +164,7 @@
           <input type="range" id="overlayOpacity" min="0" max="100" step="5" value="100" aria-label="Overlay opacity">
         </label>
         <span class="tool-sep" aria-hidden="true"></span>
-        <button class="tool-button" id="surprise" type="button" title="Fly to a random strong match you have not seen (R)" aria-label="Surprise me"><svg class="i" aria-hidden="true"><use href="icons.svg#i-dice-five"></use></svg><span class="tool-label">Surprise me</span></button>
+        <button class="tool-button" id="surprise" type="button" title="Fly to a random strong match you have not seen" aria-label="Surprise me"><svg class="i" aria-hidden="true"><use href="icons.svg#i-dice-five"></use></svg><span class="tool-label">Surprise me</span></button>
       </div>
     </div>
 
@@ -232,7 +236,7 @@
     </div>
     <div class="ge-top-actions">
       <button class="icon-button" id="geHelp" type="button" aria-label="Mouse and touch controls" title="Controls"><svg class="i" aria-hidden="true"><use href="icons.svg#i-question"></use></svg></button>
-      <button class="ghost" id="geReset" type="button" title="Reset camera, sun, surface, height, overlays and tools"><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-counter-clockwise"></use></svg>Reset all</button>
+      <button class="ghost" id="geReset" type="button" aria-label="Reset all terrain controls" title="Reset camera, sun, surface, height, overlays and tools"><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-counter-clockwise"></use></svg>Reset all</button>
       <button class="icon-button ge-close" id="geClose" type="button" aria-label="Close the 3D view (Esc)"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button>
     </div>
   </header>
@@ -303,8 +307,7 @@
         <button class="ghost small" type="button" id="geWeather" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-cloud-rain"></use></svg><span>Weather</span></button>
       </div>
       <div class="ge-climate" id="geClimate" aria-live="polite"></div>
-      <p class="hint">Illustrative, not a forecast. Built from this cell's NASA POWER temperatures and rainfall and its
-        MODIS day-night surface swing, with the real sun position for the latitude. Try the Thermal view while a day plays.</p>
+      <p class="hint">Illustrative, not a forecast. Uses this cell’s NASA POWER climate, MODIS surface swing and local sun position. Play a day in Thermal view.</p>
     </details>
     <p class="hint ge-status" id="geStatus" role="status"></p>
   </aside>
@@ -356,6 +359,5 @@
 </dialog>
 
 <script type="module" src="app.js"></script>
-<script type="module" src="controls.js"></script>
 </body>
 </html>

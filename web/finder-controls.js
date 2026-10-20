@@ -1,6 +1,9 @@
 /* Watermelon Dropdown Disclosure, Adaptive Slider and Save Toggle adaptations.
  * Native inputs retain application state, semantics and existing event handlers. */
 import { icon, closeMenus } from "./ui.js";
+import { animateDisclosure, cancelDisclosure, enhanceInlineDisclosure } from './disclosure-motion.js';
+import { enhanceRange } from './range-control.js';
+import { onDisconnect, within } from './dom-lifecycle.js';
 
 const selects = new WeakMap();
 const segments = new WeakMap();
@@ -42,8 +45,12 @@ function enhanceSelect(select) {
   select.hidden = true;
   let signature = "";
   function close(focus = false) {
+    if (!details.open) return;
     details.open = false;
-    if (panel.matches(":popover-open")) panel.hidePopover();
+    panel.inert = true;
+    animateDisclosure(summary, panel, false, () => {
+      if (panel.matches(':popover-open')) panel.hidePopover();
+    });
     summary.setAttribute("aria-expanded", "false");
     openSelects.delete(control);
     if (focus && details.isConnected) summary.focus({ preventScroll: true });
@@ -52,8 +59,11 @@ function enhanceSelect(select) {
     if (!select.isConnected) { close(); return; }
     const value = select.selectedOptions[0]?.textContent || "Choose";
     if (text.textContent !== value) text.textContent = value;
-    summary.setAttribute("aria-disabled", String(select.disabled));
-    const next = JSON.stringify([...select.options].map(option => [option.value, option.textContent, option.disabled]));
+    summary.setAttribute('aria-label', `${name}: ${value}`);
+    const disabled = select.matches(':disabled');
+    summary.setAttribute("aria-disabled", String(disabled));
+    if (disabled) close();
+    const next = JSON.stringify([...select.options].map(option => [option.value, option.textContent, option.disabled || option.parentElement.disabled]));
     if (signature !== next) {
       signature = next;
       panel.replaceChildren(header);
@@ -62,7 +72,7 @@ function enhanceSelect(select) {
         button.type = "button";
         button.role = "menuitemradio";
         button.dataset.value = option.value;
-        button.disabled = option.disabled;
+        button.disabled = option.disabled || !!option.parentElement.disabled;
         const symbol = document.createElement("span");
         symbol.className = "disclosure-option-icon";
         symbol.setAttribute("aria-hidden", "true");
@@ -84,11 +94,13 @@ function enhanceSelect(select) {
     panel.querySelectorAll("button[data-value]").forEach(button => button.setAttribute("aria-checked", String(button.dataset.value === select.value)));
   }
   function show(focus = false) {
-    if (select.disabled) return;
+    if (select.matches(':disabled')) return;
     closeSelects(control);
     closeMenus();
+    cancelDisclosure(panel);
     sync();
     details.open = true;
+    panel.inert = false;
     summary.setAttribute("aria-expanded", "true");
     panel.showPopover();
     const bounds = summary.getBoundingClientRect();
@@ -101,6 +113,7 @@ function enhanceSelect(select) {
     panel.style.maxHeight = `${height}px`;
     panel.style.top = `${below >= 160 || below >= above ? bounds.bottom + 8 : Math.max(8, bounds.top - Math.min(panel.scrollHeight, height) - 8)}px`;
     openSelects.add(control);
+    animateDisclosure(summary, panel, true);
     if (focus) (panel.querySelector('[aria-checked="true"]:not(:disabled)') || panel.querySelector("button:not(:disabled)"))?.focus();
   }
   const control = { close, sync, details };
@@ -108,8 +121,12 @@ function enhanceSelect(select) {
   select.addEventListener("change", sync);
   summary.addEventListener("click", event => { event.preventDefault(); details.open ? close() : show(); });
   summary.addEventListener("keydown", event => {
+    if (event.key === 'Tab') close();
     if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); event.stopPropagation(); show(true); }
   });
+  details.addEventListener('focusout', () => requestAnimationFrame(() => {
+    if (!details.contains(document.activeElement)) close();
+  }));
   let typed = "", typeTimer;
   panel.addEventListener("keydown", event => {
     event.stopPropagation();
@@ -128,6 +145,18 @@ function enhanceSelect(select) {
       items.find(item => item.textContent.toLowerCase().startsWith(typed))?.focus();
     }
     if (event.key === "Tab") close(true);
+  });
+  const observer = new MutationObserver(sync);
+  observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'selected', 'label', 'value'] });
+  onDisconnect(select, () => {
+    clearTimeout(typeTimer);
+    close();
+    cancelDisclosure(panel);
+    observer.disconnect();
+    select.removeEventListener('change', sync);
+    details.remove();
+    select.hidden = false;
+    selects.delete(select);
   });
   sync();
 }
@@ -149,13 +178,15 @@ function enhanceSegment(group) {
     slider.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
   }
   segments.set(group, update);
-  new MutationObserver(update).observe(group, { attributes: true, subtree: true, attributeFilter: ["aria-pressed", "aria-selected"] });
-  new ResizeObserver(update).observe(group);
+  const mutations = new MutationObserver(update), resize = new ResizeObserver(update);
+  mutations.observe(group, { attributes: true, subtree: true, attributeFilter: ["aria-pressed", "aria-selected"] });
+  resize.observe(group);
+  onDisconnect(group, () => { mutations.disconnect(); resize.disconnect(); slider.remove(); segments.delete(group); });
   document.fonts.ready.then(update);
   update();
 }
 
-export function enhanceFinderControls() {
+export function enhanceFinderControls(root = document) {
   const known = document.getElementById("showKnown"), toggle = document.getElementById("knownToggle");
   if (known && toggle && !knownToggles.has(toggle)) {
     knownToggles.add(toggle);
@@ -185,32 +216,14 @@ export function enhanceFinderControls() {
     });
     sync();
   }
-  document.querySelectorAll("select").forEach(enhanceSelect);
-  document.querySelectorAll('.segmented[aria-label="View"], .tabs').forEach(enhanceSegment);
-  document.querySelectorAll("details:not(.wm-select)").forEach(details => details.classList.add("wm-disclosure"));
-  const overlay = document.getElementById("overlayOpacity");
-  if (overlay && !overlay.dataset.adaptive) {
-    overlay.dataset.adaptive = "true";
-    const label = overlay.closest("label");
-    label.classList.add("adaptive-overlay");
-    const track = document.createElement("span");
-    track.className = "adaptive-track";
-    track.innerHTML = '<span class="adaptive-fill"></span><span class="adaptive-knob"></span>';
-    track.setAttribute("aria-hidden", "true");
-    overlay.before(track);
-    const value = document.createElement("output");
-    value.htmlFor = overlay.id;
-    value.className = "adaptive-value";
-    label.append(value);
-    const update = () => {
-      label.style.setProperty("--overlay-position", `${overlay.value}%`);
-      label.style.setProperty("--overlay-ratio", Number(overlay.value) / 100);
-      value.value = `${overlay.value}%`;
-    };
-    overlay.addEventListener("input", update);
-    update();
-  }
+  within(root, "select").forEach(enhanceSelect);
+  within(root, '.segmented[aria-label="View"], .tabs').forEach(enhanceSegment);
+  within(root, "details:not(.wm-select)").forEach(enhanceInlineDisclosure);
+  within(root, 'input[type=range]').forEach(enhanceRange);
 }
+
+document.addEventListener('navigation-open', () => closeSelects());
+document.addEventListener('menu-open', () => closeSelects());
 
 document.addEventListener("pointerdown", event => {
   openSelects.forEach(control => { if (!control.details.contains(event.target)) control.close(); });

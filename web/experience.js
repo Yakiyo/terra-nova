@@ -16,6 +16,9 @@ function configure() {
   });
 }
 configure();
+document.addEventListener('navigation-state', event => {
+  if (event.detail.open) lenis?.stop(); else lenis?.start();
+});
 reduced.addEventListener("change", configure);
 window.addEventListener("pagehide", () => lenis?.destroy());
 window.addEventListener("pageshow", event => { if (event.persisted) configure(); });

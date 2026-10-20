@@ -7,13 +7,14 @@ import { GodsEye, SUN_PRESETS } from "./godseye.js";
 import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
 import { initStarfield } from "./starfield.js";
-import { closeMenus, icon, menu, toast } from "./ui.js";
+import { closeMenus, icon, menu, toast, ANALOG_ROLES, analogRoleBadge, catalogRole } from "./ui.js";
 import { breadcrumbs, targetTrail } from "./navigation.js";
+import { escapeHtml as esc, decodeFloat32 as decode } from './format.js';
+import { BoundedCache } from './bounded-cache.js';
 
 const starfield = initStarfield("starfield");
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const fmtPct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
 const fmtInt = (n) => Number(n).toLocaleString("en-US");
 
@@ -63,13 +64,6 @@ async function api(path, options = {}) {
     throw new Error(`${res.status} ${detail}`);
   }
   return res.json();
-}
-
-function decode(field) {
-  const raw = atob(field.data);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return new Float32Array(bytes.buffer);
 }
 
 function debounce(fn, ms) {
@@ -158,8 +152,6 @@ const flat = new FlatMap($("flatmap"), { onPick: pickLocation, onHover: hover })
 let twin = null;
 try { twin = new Twin($("twinCanvas")); } catch { $("twin").hidden = true; }
 
-function activeView() { return state.view === "globe" ? globe : flat; }
-
 function setView(view) {
   hidePeek();
   state.view = view;
@@ -178,7 +170,11 @@ function setView(view) {
 /* ------------------------------------------------------------ hover + peek */
 
 const stageEl = $("globe").parentElement;
-const thumbCache = new Map();   // cell key -> {src, credit}
+const thumbCache = new BoundedCache(48, value => {
+  if (value.src.startsWith('blob:')) URL.revokeObjectURL(value.src);
+});
+const pendingThumbs = new Map();
+window.addEventListener('pagehide', event => { if (!event.persisted) thumbCache.clear(); });
 let dwell = null;
 let peekToken = 0;
 
@@ -205,15 +201,24 @@ function localCrop(lat, lon) {
 
 async function thumbFor(cell) {
   if (thumbCache.has(cell.key)) return thumbCache.get(cell.key);
+  if (pendingThumbs.has(cell.key)) return pendingThumbs.get(cell.key);
+  const request = loadThumb(cell);
+  pendingThumbs.set(cell.key, request);
+  try { return await request; } finally { pendingThumbs.delete(cell.key); }
+}
+
+async function loadThumb(cell) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
   let out;
   try {
-    const res = await fetch(`/api/thumb?lat=${cell.lat}&lon=${cell.lon}`);
+    const res = await fetch(`/api/thumb?lat=${cell.lat}&lon=${cell.lon}`, {signal:controller.signal});
     if (!res.ok) throw new Error(String(res.status));
     out = { src: URL.createObjectURL(await res.blob()), credit: "NASA Blue Marble NG · GIBS · 2°×2°" };
   } catch {
     const src = localCrop(cell.lat, cell.lon);
     out = src ? { src, credit: "Offline preview · Blue Marble 10 km" } : null;
-  }
+  } finally { clearTimeout(timer); }
   if (out) thumbCache.set(cell.key, out);
   return out;
 }
@@ -325,14 +330,16 @@ function renderMarkers() {
       const el = document.createElement("div");
       el.className = "marker known";
       el.dataset.key = `known-${site.name}`;
-      el.innerHTML = icon("rocket");
+      const role = catalogRole(site);
+      el.dataset.analogRole = role || '';
+      el.innerHTML = icon(ANALOG_ROLES[role]?.icon || 'rocket');
       el.setAttribute("role", "img");
-      el.setAttribute("aria-label", `Known analog: ${site.name}`);
+      el.setAttribute("aria-label", `${ANALOG_ROLES[role]?.label || 'Catalogued analog'}: ${site.name}`);
       el.tabIndex = 0;
       // Analogs of the other body are dimmed.
       if (body && !site.bodies.includes(body)) el.classList.add("other");
       markerPeek(el, site.lat, site.lon, `<div class="t-title">${esc(site.name)}</div>
-        <div class="t-sub">Known ${esc(site.bodies.join(" & "))} analog · ${esc(site.kind)}</div>
+        <div class="t-sub">${analogRoleBadge(role)} · ${esc(site.bodies.join(" & "))}</div>
         <div class="t-sub">${esc(site.use)}</div>`);
       labels.appendChild(el);
       markers.push({ lat: site.lat, lon: site.lon, el });
@@ -463,7 +470,7 @@ function paintLayer() {
       <div class="ramp" style="background:${cssGradient("score")}"></div>
       <div class="scale abs num"><span style="left:0">top 50%</span><span style="left:80%">top 10%</span><span style="left:98%">1%</span></div>
       ${histogram()}
-      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span></div>
+      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span><span><i class="mk known" aria-hidden="true">${icon("mountains")}</i>geology only</span></div>
       <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Bars: how many land cells
         reach each score (red = top 10%, at least ${fmtPct(q(0.9))}).</div>
       <div class="credit-line">Earth: <a href="${esc(state.sources.basemaps.earth.url)}" target="_blank" rel="noopener">${esc(state.sources.basemaps.earth.credit)}</a></div>`;
@@ -861,8 +868,8 @@ function renderResults(fresh = false) {
   const d = state.data;
   const bits = [];
   if (d.filters?.new_only) bits.push("new sites only");
-  if (d.filters?.min_distance_km) bits.push(`at least ${fmtInt(d.filters.min_distance_km)} km apart`);
-  if (d.filters?.max_per_country) bits.push(`up to ${d.filters.max_per_country} per country`);
+  if (d.filters?.min_distance_km) bits.push(`${fmtInt(d.filters.min_distance_km)} km minimum spacing`);
+  if (d.filters?.max_per_country) bits.push(`${d.filters.max_per_country} per country maximum`);
   if (d.filters?.tolerance) bits.push(`error band ×${d.filters.tolerance}`);
   $("resultsSummary").innerHTML = `Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.`
     + (d.shortfall ? `<br><span class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</span>` : "");
@@ -1034,28 +1041,23 @@ function renderValidation() {
   if (!hasAuc) { $("validation").innerHTML = `<p class="hint">No validation for a custom profile.</p>`; return; }
   $("statusAuc").innerHTML = `<span class="auc-label">AUC </span><span class="auc-value">${v.auc.toFixed(2)}</span>`;
   $("statusVal").innerHTML = `<span class="num">AUC ${v.auc.toFixed(2)}</span> on ${v.positives} known sites`;
-  const body = v.tag === "cold_polar" ? "cold polar-desert" : v.body.charAt(0).toUpperCase() + v.body.slice(1);
-  const share = v.auc >= 0.999 ? "every" : `${fmtPct(v.auc)} of`;
   const rows = v.controls.map((c) => `
-    <tr><td><span class="role ${c.role}">${{ positive: "known analog", negative: "non-analog", geology: "geology only" }[c.role]}</span></td>
-      <td>${c.source_url ? `<a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.name)}</a>` : esc(c.name)}</td>
+    <tr><td>${c.source_url ? `<a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.name)}</a>` : esc(c.name)}<br>${analogRoleBadge(c.role)}</td>
       <td class="n">${c.score === null ? "–" : fmtPct(c.score)}</td>
       <td class="pbar">${c.percentile === null ? "" : `<div class="bar" role="img" aria-label="percentile ${c.percentile}"><i style="width:${c.percentile}%"></i></div>`}</td>
       <td class="n">${c.percentile === null ? "–" : `p${c.percentile.toFixed(0)}`}</td></tr>`).join("");
   $("validation").innerHTML = `
     <div class="auc-hero"><div class="big num">${v.auc.toFixed(2)}</div>
-      <p><b>ROC-AUC.</b> In ${share} pairing, a known ${esc(body)} analog site outscores a vegetated or humid
-      reference point (${v.positives} analogs × ${v.negatives} references = ${v.positives * v.negatives} pairs). 1.00 is perfect
-      separation; 0.50 is chance. A small, easy test: it shows the score separates analog-like land from green land,
-      not that every top site is a proven analog.</p></div>
+      <p><b>ROC-AUC</b> measures how well scores separate environmental analogs from reference sites. It does not prove that ranked sites are analogs.</p></div>
+    <div class="analog-role-guide" aria-label="Validation roles">${Object.entries(ANALOG_ROLES).map(([role, definition]) => `<div>${analogRoleBadge(role)}<p>${definition.description}</p></div>`).join('')}</div>
     <h4 class="section-title">Control sites under the current weights</h4>
-    <table class="controls"><thead><tr><th>Role</th><th>Site</th><th class="n">Score</th><th colspan="2">Percentile of land</th></tr></thead>
+    <table class="controls validation-controls"><thead><tr><th>Site & role</th><th class="n">Score</th><th colspan="2">Percentile of land</th></tr></thead>
       <tbody>${rows}</tbody></table>
     ${sensitivityTable()}
     ${dataChecksTable()}
-    <p class="hint">${esc(v.method)} "Geology only" sites were chosen for rocks this
-      model does not measure and are not counted. Known analogs span very different environments, so no single
-      target should rank all of them at the top.</p>`;
+    <details class="validation-method"><summary>How validation works</summary><div>
+      <p class="hint">${esc(v.method)}</p><p class="hint">Known analogs span different environments. No single target should rank all of them at the top. Geology-only sites are excluded from the validation score.</p>
+    </div></details>`;
 }
 
 let dataChecks = null;
@@ -1068,7 +1070,7 @@ function dataChecksTable() {
     <p class="hint">Independent datasets must agree where physics says they should. Spearman rank correlation over land cells:</p>
     <table class="controls"><thead><tr><th>Check</th><th class="n">ρ</th><th></th></tr></thead><tbody>
     ${dataChecks.map((c) => `<tr><td title="${esc(c.why)}">${esc(c.title)}<br><small class="hint">${fmtInt(c.cells)} cells</small></td>
-      <td class="n">${c.rho.toFixed(2)}</td><td>${c.passed ? '<span class="role positive">agrees</span>' : '<span class="role negative">check</span>'}</td></tr>`).join("")}
+      <td class="n">${c.rho.toFixed(2)}</td><td>${c.passed ? `<span class="role positive">${icon('check-circle')}agrees</span>` : '<span class="role negative">check</span>'}</td></tr>`).join("")}
     </tbody></table>`;
 }
 
@@ -1193,10 +1195,9 @@ async function renderExplore() {
        <circle cx="${sx(tx)}" cy="${sy(ty)}" r="8" class="target"/><text x="${sx(tx) + 11}" y="${sy(ty) - 8}" class="tl">target</text>` : "";
   const marks = pts.map((p, i) => p.kind === "site"
     ? `<circle data-i="${i}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
-    : `<svg data-i="${i}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-rocket"></use></svg>`).join("");
+    : `<svg data-i="${i}" data-analog-role="${catalogRole(p.a.site) || ''}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-${ANALOG_ROLES[catalogRole(p.a.site)]?.icon || 'rocket'}"></use></svg>`).join("");
   box.innerHTML = `
-    <p class="hint">Where do the top sites sit on two criteria at once? Each dot is a ranked site, each rocket a
-      known analog (rocket); the crosshair is the target. Hover for details, click to open.</p>
+    <p class="hint">Compare two criteria. Dots are ranked sites; icons are catalogued analogs. Hover for details or click to explore.</p>
     <div class="axes">
       <label>X <select id="exX">${opts(xKey)}</select></label>
       <label>Y <select id="exY">${opts(yKey)}</select></label>
@@ -1211,7 +1212,7 @@ async function renderExplore() {
     </div>
     <div class="scatter-legend">
       <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site</span>
-      <span>${icon("rocket")} known analog</span>
+      <span>${icon("rocket")} known analog</span><span>${icon("mountains")} geology only</span>
       <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" class="target"/></svg> target</span>
     </div>
     <p class="hint">${pts.filter((p) => p.kind === "site").length} ranked sites · ${pts.filter((p) => p.kind === "analog").length} known analogs with data.
@@ -1221,7 +1222,7 @@ async function renderExplore() {
   svg.querySelectorAll("[data-i]").forEach((el) => {
     const p = pts[Number(el.dataset.i)];
     el.addEventListener("mouseenter", () => {
-      const title = p.kind === "site" ? `#${p.r.rank} ${p.r.label.text} · ${fmtPct(p.r.score)}` : `${p.a.site.name} (known analog)`;
+      const title = p.kind === "site" ? `#${p.r.rank} ${p.r.label.text} · ${fmtPct(p.r.score)}` : `${p.a.site.name} (${ANALOG_ROLES[catalogRole(p.a.site)]?.label || 'Catalogued analog'})`;
       tip.innerHTML = `<b>${esc(title)}</b><br>${esc(X.label)}: ${esc(fmtValue(p.x, X.unit))}<br>${esc(Y.label)}: ${esc(fmtValue(p.y, Y.unit))}`;
       tip.hidden = false;
       const rect = svg.getBoundingClientRect();

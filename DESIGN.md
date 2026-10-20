@@ -113,7 +113,7 @@ Narrative pages use `--page-gutter`, shared sticky navigation and generous secti
 
 Finder uses a sidebar and full-height map. Below the stacking breakpoint, the map precedes the sidebar. God's Eye uses a desktop side panel and mobile bottom sheet. Sun and climate controls use native disclosures.
 
-Responsive breakpoints: 1280px, 1020px and 720px, with additional narrow navigation adaptations. Navigation is 76px on desktop and 68px on mobile. Finder navigation may wrap on narrow screens.
+Responsive breakpoints: 1280px, 1020px and 720px, with additional narrow navigation adaptations. Navigation is 76px on desktop and 68px on mobile. Its centered identity and compact utilities remain on one row on narrow screens.
 
 ## Elevation & Depth
 
@@ -127,7 +127,7 @@ Actions and selections have compact corners; tool panels/dialogs use shared radi
 
 ## Components
 
-- **Navigation:** temporary SVG mark, wordmark, Home/Targets/Finder links, red active underline.
+- **Navigation:** left menu trigger, centered temporary SVG mark and wordmark, contextual utilities. The shared menu exposes Home/Targets/Finder and Moon/Mars destinations with a red active-route indicator.
 - **Actions:** red primary, hairline secondary, visible hover/pressed/disabled/focus states. Use Phosphor icons from `web/icons.svg` via `icon()`.
 - **Destinations:** attributed planetary imagery and keyboard-accessible target-specific links.
 - **Evidence:** horizontal bars with API similarities, values and direct dataset links. Retain units and caveats.
@@ -152,10 +152,10 @@ select planet-only views. The full index retains custom profiles. Breadcrumbs
 connect Home, Targets, body, Finder target, and God's Eye location. Native anchor
 filters adapt Watermelon Continuous Tabs; breadcrumb semantics adapt Breadcrumb 1.
 
-Home counters reveal their exact API digits on downward viewport re-entry; evidence bars grow to
-their API-supplied width once on entry. The final text stays accessible throughout.
+Home summary counters count from zero to their API values over 1.2 seconds on downward
+viewport re-entry; evidence bars grow to their API-supplied width once on entry. The exact final text stays accessible throughout.
 Reduced motion renders the final state immediately, including live preference
-changes. No scientific values are interpolated or generated for animation.
+changes. Intermediate counter digits are decorative and aria-hidden; scientific measurements and evidence values remain steady.
 
 Font/component provenance and license information: web/vendor/fonts/INTERFACE-FONTS.md.
 Panchang binaries are acquired locally, not redistributed through this repository.
@@ -166,8 +166,7 @@ Panchang binaries are acquired locally, not redistributed through this repositor
 Primary and secondary narrative actions adapt Watermelon Button 12's pill form
 with a decorative, circular orb containing the existing arrow icon. Finder zoom
 controls adapt Watermelon's grouped-button and circular map-control patterns,
-retaining native buttons and existing zoom/reset handlers. The main navigation
-uses a sliding white selection pill on route, hover and keyboard focus. Destination
+retaining native buttons and existing zoom/reset handlers. The main navigation uses the shared expanding menu described below. Destination
 filters never underline on hover. AUC separates its label from the API value.
 
 Narrative headings and supporting copy reveal with a bounded mask on downward viewport
@@ -187,7 +186,7 @@ and a sliding knob. Overlay keeps its native range input with an adaptive white-
 red fill and an explicit percentage. Score gauges render API scores alongside the
 same numerical labels; no scoring is performed in the frontend.
 
-Dataset/source labels use locally hosted Anton at 16px. Home evidence bars have
+Dataset/source labels use locally hosted Roboto at 14px. Home evidence bars have
 fully rounded tracks and fills. Text and number reveals use a slower cadence and
 are suppressed (and canceled) while scrolling upward; reduced motion stays static.
 
@@ -200,8 +199,89 @@ checkbox. It changes visibility immediately and does not imply saved data.
 Reduced motion renders the final state without the morph. Offline/AUC, Help and
 layer selection use Dropdown Disclosure shells with circular icons, close controls
 and highlighted rows. Header panels are clamped inside the viewport. Planet preview
-captions and interaction hints use locally hosted Anton at readable sizes.
+captions and interaction hints use locally hosted Roboto at readable sizes.
 
-Shared hint copy, including the ranked-results summary, uses Anton; API measurement
+Shared hint copy, including the ranked-results summary, uses Roboto; API measurement
 spans retain their measurement typeface. Map previews occupy a separate overlay
 above the floating toolbar so their close and action controls remain reachable.
+
+
+## Shared navigation and controls (October 2026)
+
+Omega ClearSpace is the behavioral reference for the left menu trigger, centered
+identity, expanding desktop navigation band and full-height mobile menu. Narrative
+headers hide on downward scrolling and return on upward scrolling or keyboard
+focus; Finder stays visible. God's Eye has the same header and a Back to Finder
+action above its existing terrain controls. Navigation uses a native modal dialog,
+locks background scrolling (including Lenis), and restores focus on dismissal.
+
+Lenis demo typography was checked directly: Roboto for body and navigation, Anton
+for display, Panchang for selected narrative accents. Supporting text, hints,
+legends, preview captions, source links and validation explanations use Roboto.
+Measurements retain IBM Plex Mono. Validation role labels use neutral theme ink;
+passed checks include a check icon and explicit wording, not green-only meaning.
+Scientific data ramps are unchanged.
+
+All native range inputs share the Overlay track, white-to-red fill, knob and focus
+ring. Native min/max/step/disabled state and application event handlers remain the
+source of truth. Presentation follows input events and programmatic value changes;
+existing formatted units/readouts remain, and only Overlay adds a percentage.
+
+Dropdown Disclosure motion adapts Watermelon's measured container spring into
+native Web Animations. Header panels and selection menus use the same shell
+transition, content reveal and reversible close, with top-layer positioning.
+Inline details share its timing while preserving disclosure semantics. Reduced
+motion changes settle active transitions immediately. Controls are enhanced once,
+including controls rendered after API responses.
+
+Implementation: shared-controls.css, site-navigation.js, disclosure-motion.js and
+range-control.js. Existing tokens, native input state and Phosphor icons are reused.
+Reference sources: https://www.omegawatches.com/world-of-omega/sustainability/clearspace,
+https://lenis.dev/, https://ui.watermelon.sh/animated-components/dropdown-disclosure.
+These are UI references, not scientific datasets.
+
+## Consistency and clarity (October 2026)
+
+All selects use the shared Dropdown Disclosure adapter, including custom profiles,
+country limits, map layers and Explore axes. Native selects remain the fallback
+when popovers are unavailable. Shared control styling owns borders, focus states,
+disabled states, menu shells, sliders and disclosures; use existing tokens and icons.
+
+Home summary counters use a presentation-only 1.2-second count-up, replayed only
+after fully leaving the viewport and returning while scrolling down. Exact API text
+remains accessible throughout. Cancellation, hidden pages and reduced motion settle
+to the final value immediately; evidence measurements never count up.
+
+Text links animate one native underline’s offset and color on hover and keyboard focus, with no background-drawn duplicate. Planet navigation links have no underline. Linked actions move
+their existing arrow subtly. Tabs, destination filters and brand links keep their
+own interaction treatment. Reduced motion disables decorative transitions.
+
+Validation roles use shared text, icons and explanations: rocket for Known analog,
+mountains and a dashed outline for Geology only, crosshair for Non-analog reference.
+Only environmental analogs are positive validation controls; geology-only sites are
+excluded. Reference controls do not establish universal geological non-analogy.
+Catalog markers and Explore reuse catalog kind; ranked results retain proximity
+badges without inferred roles. Keep these meanings separate from dataset agreement
+and pass/fail indicators. Validation method details use the shared disclosure.
+
+Headers ship the final grid and menu trigger in HTML before enhancement. Home hero
+actions include their orb markup at first paint; shared controls initialize ahead
+of the scene modules. Preload narrative fonts and keep target loading placeholders
+in the final planet/row layout. Document navigation has no full-page fade; interaction
+and scroll motion respect reduced motion. The Home scene has no opaque title scrim,
+so the Moon and Mars remain visible behind the headline area.
+
+Document scrolling reserves a stable scrollbar gutter. Navigation dialogs match
+their header width when opened and resized, keeping content and brand alignment
+fixed while background scrolling is locked and restored.
+
+Arrival text that is already in the viewport never starts a late reveal: it stays
+visible while scripts initialize. Scroll reveals still run for below-fold content
+and downward re-entry. Full-document view transitions are disabled so cold loads
+and rapid page switches cannot fade through an empty page snapshot.
+
+Dynamic component enhancements are scoped to added subtrees. Removed controls
+release their observers, media-query listeners and animations through
+dom-lifecycle.js. Shared presentation codecs live in format.js; preview resource
+ownership uses bounded-cache.js. Keep reusable renderer resources and offline
+assets rather than treating intentionally cached resources as unused.

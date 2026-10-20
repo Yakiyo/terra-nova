@@ -36,7 +36,7 @@ try {
   });
   const js = async expression => (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result?.value;
   const ready = async expression => {
-    for (let i = 0; i < 100; i++) { if (await js(expression)) return; await sleep(300); }
+    for (let i = 0; i < 100; i++) { if (await js(expression)) return; await sleep(450); }
     throw new Error(`Page did not become ready: ${expression}`);
   };
   const screenshot = async name => writeFileSync(join(out, `${name}.png`), Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
@@ -72,29 +72,36 @@ try {
         report.push({ name: `${device}-map-controls`, zoomClearOfToolbar: clear });
         if (!clear) throw new Error("Map toolbar overlaps zoom controls");
       }
-      const navigation = await js(`(() => {
-        const link = document.querySelector('.main-nav a:not([aria-current])');
-        link.focus();
-        const followsFocus = link.hasAttribute('data-indicator');
-        link.blur();
-        return { followsFocus, restored: document.querySelector('.main-nav [aria-current]').hasAttribute('data-indicator'), slider: !!document.querySelector('.nav-slider'), documentFocus: document.hasFocus(), transition: CSS.supports('selector(:active-view-transition)') && document.documentElement.matches(':active-view-transition') };
-      })()`);
-      if (!navigation.followsFocus || !navigation.restored) throw new Error(`Navigation slider focus failed: ${JSON.stringify(navigation)}`);
+      const beforeMenu = await js(`(() => {const content=document.querySelector('.home,.dest,.layout').getBoundingClientRect(); const brand=document.querySelector('body > .topbar .brand').getBoundingClientRect(); return {left:content.left,width:content.width,brand:brand.left,y:scrollY}})()`);
+      await js("document.querySelector('body > .topbar .site-menu-trigger').click()");
+      await sleep(450);
+      const navigation = await js(`({open:document.getElementById('siteNavigation').open, focused:document.getElementById('siteNavigation').contains(document.activeElement), links:document.querySelectorAll('#siteNavigation a').length})`);
+      if (!navigation.open || !navigation.focused) throw new Error(`Navigation failed: ${JSON.stringify(navigation)}`);
+      const menuShift = await js(`(() => {const content=document.querySelector('.home,.dest,.layout').getBoundingClientRect(); const brand=document.querySelector('#siteNavigation .brand').getBoundingClientRect(); const before=${JSON.stringify(beforeMenu)}; return {content:Math.abs(content.left-before.left),width:Math.abs(content.width-before.width),brand:Math.abs(brand.left-before.brand),scroll:Math.abs(scrollY-before.y)}})()`);
+      report.push({name:`${device}-${name}-navigation-shift`,...menuShift});
+      if (Object.values(menuShift).some(shift=>shift>1)) throw new Error(`Menu shifts layout: ${JSON.stringify(menuShift)}`);
+      await measure(`${device}-${name}-navigation`);
+      await screenshot(`${device}-${name}-navigation`);
+      await js("document.querySelector('#siteNavigation .site-menu-close').click()");
+      await ready("!document.getElementById('siteNavigation').open");
+      const closeShift = await js(`(() => {const content=document.querySelector('.home,.dest,.layout').getBoundingClientRect(); const before=${JSON.stringify(beforeMenu)}; return Math.abs(content.left-before.left)>1 || Math.abs(content.width-before.width)>1 || Math.abs(scrollY-before.y)>1})()`);
+      if (closeShift) throw new Error('Closing navigation shifts the page');
       await sleep(350);
       await screenshot(`${device}-${name}`);
       if (name === "finder") {
         for (const [trigger, panel, label] of [["statusPill", "statusPanel", "status"], ["helpButton", "helpMenu", "help"]]) {
           await js(`document.getElementById('${trigger}').click()`);
           await ready(`!document.getElementById('${panel}').hidden`);
-          await sleep(300);
+          await ready(`document.getElementById('${panel}').getAnimations().length === 0`);
           const inside = await js(`(() => {const r=document.getElementById('${panel}').getBoundingClientRect(); return r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight})()`);
-          if (!inside) throw new Error(`${device} ${label} disclosure escapes viewport`);
+          if (!inside) throw new Error(`${device} ${label} disclosure escapes viewport: ${JSON.stringify(await js("({rect:document.getElementById('helpMenu').getBoundingClientRect().toJSON(),style:document.getElementById('helpMenu').getAttribute('style'),width:innerWidth,height:innerHeight})"))}`);
           await screenshot(`${device}-${label}-disclosure`);
           await js(`document.querySelector('#${panel} .disclosure-close').click()`);
+          await ready(`document.getElementById('${panel}').hidden`);
         }
         await js("document.querySelector('#layer + .wm-select summary').click()");
         await ready("document.querySelector('#layer + .wm-select .disclosure-options').matches(':popover-open')");
-        await sleep(300);
+        await sleep(450);
         await screenshot(`${device}-layer-disclosure`);
         await js("document.querySelector('#layer + .wm-select .disclosure-close').click()");
         await js("document.getElementById('knownToggle').click()");
@@ -115,6 +122,10 @@ try {
         await js("scrollTo(0,0)");
       }
       if (name === "finder") {
+        await js("document.getElementById('tabValidation').click()");
+        await sleep(400);
+        await screenshot(`${device}-validation`);
+        await js("document.getElementById('tabResults').click()");
         await js("document.querySelector('.site').click()");
         await ready("document.querySelector('#detail h3')");
         await sleep(1200);

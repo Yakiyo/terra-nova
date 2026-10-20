@@ -6,6 +6,7 @@ import { OrbitControls } from "./vendor/three/OrbitControls.js";
 import { initStarfield } from "./starfield.js";
 import { SpaceScenery, atmosphere } from "./space.js";
 import { counterMarkup, revealOnce, revealOnEntry } from "./reveal.js";
+import { escapeHtml as esc } from './format.js';
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 initStarfield("starfield");
@@ -89,9 +90,9 @@ async function facts() {
       ["/api/health", "/api/targets", "/api/analogs"].map((u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject()))),
     );
     const items = [
-      [Number(health.candidate_cells).toLocaleString("en-US"), "land cells scored", "/api/health", "terra_nova_predictor_stack"],
+      [Number(health.candidate_cells).toLocaleString("en-US"), "Land cells scored", "/api/health", "terra_nova_predictor_stack"],
       [String(targets.targets.length), "Moon and Mars targets", "/api/targets", "terra_nova_target_catalog"],
-      [String(analogs.sites.length), "known analogs checked", "/api/analogs", "terra_nova_known_analogs"],
+      [String(analogs.sites.length), "Known analogs checked", "/api/analogs", "terra_nova_known_analogs"],
     ];
     const box = document.getElementById("facts");
     box.innerHTML = items.map(([n, label, url, dataset]) => `<div data-source-url="${url}" data-dataset-id="${dataset}"><dt><a href="${url}">${label}</a></dt><dd>${counterMarkup(n)}</dd></div>`).join("");
@@ -109,7 +110,6 @@ facts();
 /* Render only API-supplied similarities. No statistics are calculated here. */
 async function evidence() {
   const box = document.getElementById("missionEvidence");
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   try {
     const [result, criteria] = await Promise.all([
       fetch("/api/score", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target_id: "jezero_crater", top_k: 5 }) }),

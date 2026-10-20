@@ -41,7 +41,7 @@ Then:
 - Merge PRs and keep `main` green (tests + lint).
 - Keep `docs/AI_USE.md` and `docs/REFERENCES.md` (every dataset, paper and image) up to date.
 - Draft the project page fields (High-Level Summary, Details, NASA data used, AI use, References).
-- Rewrite the README around the final product name; delete or clean `explanation.md` if it's outdated.
+- Keep the README aligned with the final product name and current implementation.
 **Done when:** the video is uploaded on 1 Oct and the project page draft exists by 12 Nov.
 
 ## Division 2: Lunar targets (Member 2)

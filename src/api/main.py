@@ -19,6 +19,7 @@ import math
 import os
 import re
 import threading
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any
@@ -166,6 +167,7 @@ class _State:
     """Lazily loaded, process-wide read-only cache."""
 
     def __init__(self) -> None:
+        self._load_lock = threading.Lock()
         self.stack: dict[str, np.ndarray] | None = None
         self.lst_source: np.ndarray | None = None
         self.attrs: dict[str, Any] = {}
@@ -177,6 +179,11 @@ class _State:
     def load(self) -> None:
         if self.stack is not None:
             return
+        with self._load_lock:
+            if self.stack is None:
+                self._load()
+
+    def _load(self) -> None:
         if not STACK_PATH.exists():
             raise HTTPException(
                 status_code=503,
@@ -186,7 +193,7 @@ class _State:
                 ),
             )
         root = zarr.open_group(str(STACK_PATH), mode="r")
-        self.stack = {key: np.asarray(root[key][:], dtype=np.float64) for key in CRITERIA}
+        stack = {key: np.asarray(root[key][:], dtype=np.float64) for key in CRITERIA}
         self.lst_source = np.asarray(root["lst_source"][:]) if "lst_source" in root else None
         self.attrs = dict(root.attrs)
         self.ranges = load_normalization()
@@ -196,6 +203,8 @@ class _State:
             self.gazetteer = default_gazetteer(offline=offline_mode())
         except Exception:  # any failure simply disables labels
             self.gazetteer = None
+        # Publish the ready flag only after all dependent state is initialized.
+        self.stack = stack
 
     @property
     def arrays(self) -> dict[str, np.ndarray]:
@@ -605,7 +614,9 @@ def score(request: ScoreRequest) -> dict[str, Any]:
     return payload
 
 
-_ROBUSTNESS_CACHE: dict[str, dict[str, Any]] = {}
+_ROBUSTNESS_CACHE: OrderedDict[str, dict[str, Any]] = OrderedDict()
+_ROBUSTNESS_LOCK = threading.Lock()
+_ROBUSTNESS_LIMIT = 64
 
 
 @app.post("/api/robustness")
@@ -613,8 +624,10 @@ def robustness_report(request: ScoreRequest) -> dict[str, Any]:
     """Uncertainty (Monte Carlo stability of the ranked sites) and sensitivity
     (validation with each criterion left out). Deterministic; cached per request."""
     key = request.model_dump_json(exclude={"include_field"})
-    if key in _ROBUSTNESS_CACHE:
-        return _ROBUSTNESS_CACHE[key]
+    with _ROBUSTNESS_LOCK:
+        if key in _ROBUSTNESS_CACHE:
+            _ROBUSTNESS_CACHE.move_to_end(key)
+            return _ROBUSTNESS_CACHE[key]
     stack = STATE.arrays
     result, profile, target_id = _score(request)
     mask = valid_mask(stack)
@@ -654,9 +667,11 @@ def robustness_report(request: ScoreRequest) -> dict[str, Any]:
         "top_share": mc["top_share"],
         "sensitivity": sens,
     }
-    if len(_ROBUSTNESS_CACHE) > 64:
-        _ROBUSTNESS_CACHE.clear()
-    _ROBUSTNESS_CACHE[key] = payload
+    with _ROBUSTNESS_LOCK:
+        _ROBUSTNESS_CACHE[key] = payload
+        _ROBUSTNESS_CACHE.move_to_end(key)
+        while len(_ROBUSTNESS_CACHE) > _ROBUSTNESS_LIMIT:
+            _ROBUSTNESS_CACHE.popitem(last=False)
     return payload
 
 

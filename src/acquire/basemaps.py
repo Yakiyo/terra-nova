@@ -36,12 +36,6 @@ TREK_LAYERS = {
 }
 TREK_LEVEL = 3  # 16 x 8 tiles of 256 px = 4096 x 2048
 
-CREDITS = {
-    "earth": ("NASA Blue Marble (shaded relief and bathymetry) via NASA GIBS", GIBS_WMS),
-    "moon": ("NASA Moon Trek, LRO WAC Global Mosaic", "https://trek.nasa.gov/moon/"),
-    "mars": ("NASA Mars Trek, Viking MDIM 2.1 Colour Mosaic", "https://trek.nasa.gov/mars/"),
-}
-
 
 def earth(offline: bool | None = None) -> Path:
     """Two 4096 x 4096 GIBS halves (west, east) stitched into 8192 x 4096."""
@@ -78,7 +72,7 @@ SMALL = (1024, 512)
 def small() -> list[Path]:
     """1024 x 512 copies for decoration (background Moon and Mars, target icons): no network."""
     out = []
-    for body in ("earth", "moon", "mars"):
+    for body in ("moon", "mars"):
         path = OUT / f"{body}_sm.jpg"
         with Image.open(OUT / f"{body}.jpg") as image:
             image.convert("RGB").resize(SMALL, Image.Resampling.LANCZOS).save(path, quality=84)

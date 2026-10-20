@@ -31,3 +31,26 @@ test("terrain requests coalesce, separate targets, evict, and retry failures", a
     assert.equal(calls, 11);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('an evicted failing request cannot remove its newer replacement', async () => {
+  const originalFetch=globalThis.fetch;
+  let rejectFirst,calls=0;
+  globalThis.fetch=()=>{
+    calls++;
+    if(calls===1) return new Promise((resolve,reject)=>{rejectFirst=reject;});
+    return Promise.resolve({ok:true,json:async()=>({terrain:'replacement'})});
+  };
+  try {
+    const {terrainData}=await import(`${moduleURL}#replacement`);
+    const old=terrainData({lat:0,lon:0});
+    const rejection=assert.rejects(old,/old failure/);
+    await Promise.resolve();
+    for(let lat=1;lat<=6;lat++) await terrainData({lat,lon:0});
+    const replacement=terrainData({lat:0,lon:0});
+    await replacement;
+    rejectFirst(new Error('old failure'));
+    await rejection;
+    assert.equal(terrainData({lat:0,lon:0}),replacement);
+    assert.equal(calls,8);
+  }finally{globalThis.fetch=originalFetch;}
+});

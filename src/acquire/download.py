@@ -10,7 +10,6 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 try:  # verify TLS with the operating system's trust store when available
     import truststore
@@ -52,14 +51,6 @@ class Fetched:
     url: str
     from_cache: bool
     bytes: int
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "url": self.url,
-            "path": str(self.path),
-            "from_cache": self.from_cache,
-            "bytes": self.bytes,
-        }
 
 
 def fetch(

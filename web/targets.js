@@ -3,11 +3,11 @@
 import { initStarfield } from "./starfield.js";
 import { icon } from "./ui.js";
 import { breadcrumbs } from "./navigation.js";
+import { escapeHtml as esc } from './format.js';
 
 initStarfield("starfield");
 let loadGeneration = 0;
 
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 function selectedBody() {
   const query = new URLSearchParams(location.search);
   const value = (query.has("body") ? query.get("body") : location.hash.slice(1)).toLowerCase();

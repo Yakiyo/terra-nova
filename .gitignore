@@ -18,10 +18,6 @@ cache/raw/*
 # Legacy prototype kept out of this repository's history.
 prototype_v1/
 
-# Local workspace
-.env
-__pycache__/
-
 # Detail imagery tiles: large, re-fetchable (python -m src.acquire.tiles)
 cache/tiles/
 

@@ -10,24 +10,17 @@ import { OrbitControls } from "./vendor/three/OrbitControls.js";
 import { ClimateSim, thermalGradient } from "./climate.js";
 import { terrainData } from "./terrain-data.js";
 import { breadcrumbs } from "./navigation.js";
+import { escapeHtml as esc, decodeFloat32 as decode } from './format.js';
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 export const SUN_PRESETS = {
   earth: { label: "Earth midday", elevation: 55, azimuth: 160, lunar: false },
   evening: { label: "Low evening sun", elevation: 8, azimuth: 250, lunar: false },
   lunar: { label: "Lunar polar sun", elevation: 1.5, azimuth: 135, lunar: true },
 };
-
-function decode(field) {
-  const raw = atob(field.data);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return new Float32Array(bytes.buffer);
-}
 
 /* Sequential ramp for slope: light at 0, orange at the 15 degree rover limit, dark red beyond. */
 const SLOPE_STOPS = [[0, [243, 231, 211]], [5, [240, 190, 140]], [15, [232, 116, 59]], [30, [122, 31, 10]]];
@@ -306,6 +299,8 @@ export class GodsEye {
   /* --------------------------------------------------------------- open */
 
   async show(site, context) {
+    clearTimeout(this.closeTimer);
+    if (this.closeTransition) this.root.removeEventListener('transitionend', this.closeTransition);
     const generation = this.generation = (this.generation || 0) + 1;
     this.open = true;
     this.root.dataset.status = "loading";
@@ -395,16 +390,20 @@ export class GodsEye {
     // Hand the screen back only once the fade has finished, so the map does not
     // start drawing again underneath while the 3D view is still fading out.
     let finished = false;
+    const generation = this.generation;
     const done = () => {
-      if (finished || this.open) return;
+      if (finished || this.open || generation !== this.generation) return;
       finished = true;
+      clearTimeout(this.closeTimer);
+      this.root.removeEventListener('transitionend', this.closeTransition);
       this.root.hidden = true;
       this.root.classList.remove("leaving");
       if (this.onClose) this.onClose();
     };
     if (REDUCED) { done(); return; }
-    this.root.addEventListener("transitionend", (e) => { if (e.target === this.root) done(); }, { once: true });
-    setTimeout(done, 400);   // in case the transition does not fire
+    this.closeTransition = event => { if (event.target === this.root) done(); };
+    this.root.addEventListener('transitionend', this.closeTransition);
+    this.closeTimer = setTimeout(done, 400);   // in case the transition does not fire
   }
 
   /* Esc: close the topmost thing first (guide, profile tool), then the view. */
@@ -445,7 +444,6 @@ export class GodsEye {
     const geo = new THREE.PlaneGeometry(this.sizeKm, this.sizeKm, cols - 1, rows - 1);
     // True slope at the display grid spacing (not exaggerated), for Slope mode and probes.
     const spacing = (this.sizeKm * 1000) / (cols - 1);
-    this.slopes = new Float32Array(rows * cols);
     const colours = new Float32Array(rows * cols * 3);
     this.slopes = decode(data.display_slopes);
     for (let i = 0; i < this.slopes.length; i++) colours.set(slopeColour(this.slopes[i]), i * 3);

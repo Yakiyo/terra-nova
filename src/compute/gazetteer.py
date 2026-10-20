@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -50,16 +50,6 @@ class Place:
     lon: float
     population: int
     feature: str
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "name": self.name,
-            "country": self.country,
-            "lat": self.lat,
-            "lon": self.lon,
-            "population": self.population,
-            "feature": self.feature,
-        }
 
 
 @dataclass(frozen=True)
@@ -227,14 +217,6 @@ class Gazetteer:
             distance_km=distance,
             source=source,
         )
-
-    def label_many(
-        self, lats: Iterable[float], lons: Iterable[float], max_distance_km: float = 400.0
-    ) -> list[Label]:
-        return [
-            self.label(float(lat), float(lon), max_distance_km)
-            for lat, lon in zip(lats, lons, strict=True)
-        ]
 
 
 _DEFAULT: Gazetteer | None = None

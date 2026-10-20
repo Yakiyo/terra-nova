@@ -1,4 +1,5 @@
 /* Small interface helpers shared by every page: icons and toasts. */
+import { animateDisclosure, cancelDisclosure } from './disclosure-motion.js';
 
 /* An icon from icons.svg (Phosphor, MIT). Decorative unless a label is given. */
 export function icon(name, label = "") {
@@ -8,11 +9,30 @@ export function icon(name, label = "") {
 
 const KIND_ICON = { info: "info", success: "check-circle", error: "warning-circle" };
 
+export const ANALOG_ROLES = {
+  positive: { label: 'Known analog', icon: 'rocket', description: 'Environmental analog used as a positive validation control.' },
+  geology: { label: 'Geology only', icon: 'mountains', description: 'Geology outside this model; excluded from validation scoring.' },
+  negative: { label: 'Non-analog reference', icon: 'crosshair', description: 'Validation comparison, not a universal geological judgment.' },
+};
+
+export function catalogRole(site) {
+  return site.kind === 'environment' ? 'positive' : site.kind === 'geology' ? 'geology' : null;
+}
+
+export function analogRoleBadge(role) {
+  const definition = ANALOG_ROLES[role];
+  if (!definition) return '';
+  return `<span class="analog-role ${role}" data-analog-role="${role}" title="${definition.description}" data-source-url="/api/analogs" data-dataset-id="terra_nova_known_analogs">${icon(definition.icon)}${definition.label}</span>`;
+}
+
 const openMenus = new Set();
 
 /* menu(button, panel): a drop-down that opens from a button. Closes on outside click,
  * Esc, Tab or choosing an item; arrows, Home and End move between its controls. */
 export function menu(button, panel) {
+  let opened = false;
+  const topLayer = 'showPopover' in panel;
+  if (topLayer) panel.setAttribute('popover', 'manual');
   if (button.classList.contains("wm-disclosure-trigger")) {
     panel.classList.add("disclosure-panel");
     const header = document.createElement("div");
@@ -33,15 +53,25 @@ export function menu(button, panel) {
   const items = () => [...panel.querySelectorAll("button, a[href]")].filter((el) => !el.disabled && !el.hidden);
   const api = {
     close(focusButton = false) {
-      if (panel.hidden) return;
-      panel.hidden = true;
+      if (!opened) return;
+      opened = false;
+      panel.inert = true;
+      animateDisclosure(button, panel, false, () => {
+        panel.hidden = true;
+        if (topLayer && panel.matches(':popover-open')) panel.hidePopover();
+      });
       button.setAttribute("aria-expanded", "false");
       openMenus.delete(api);
       if (focusButton) button.focus();
     },
     open(focusFirst = false) {
       for (const m of [...openMenus]) m.close();
+      document.dispatchEvent(new Event('menu-open'));
+      cancelDisclosure(panel);
+      opened = true;
       panel.hidden = false;
+      panel.inert = false;
+      if (topLayer) panel.showPopover();
       button.setAttribute("aria-expanded", "true");
       openMenus.add(api);
       if (panel.classList.contains("disclosure-panel")) {
@@ -51,6 +81,7 @@ export function menu(button, panel) {
         panel.style.left = `${Math.max(12, Math.min(bounds.right - panel.offsetWidth, innerWidth - panel.offsetWidth - 12))}px`;
         panel.style.top = `${Math.max(12, Math.min(bounds.bottom + 8, innerHeight - panel.offsetHeight - 12))}px`;
       }
+      animateDisclosure(button, panel, true);
       if (focusFirst) items()[0]?.focus();
     },
   };
@@ -60,7 +91,7 @@ export function menu(button, panel) {
     if (e.key === "ArrowDown") { e.preventDefault(); api.open(true); }
   });
   button.addEventListener("click", () => {
-    if (panel.hidden) api.open(byKey); else api.close();
+    if (!opened) api.open(byKey); else api.close();
     byKey = false;
   });
   panel.addEventListener("keydown", (e) => {
@@ -75,8 +106,10 @@ export function menu(button, panel) {
   // dialog it opens keeps focus and returns it to the button when it closes.
   panel.addEventListener("click", (e) => { if (e.target.closest("button, a")) api.close(true); }, true);
   document.addEventListener("pointerdown", (e) => {
-    if (!panel.hidden && !panel.contains(e.target) && !button.contains(e.target)) api.close();
+    if (opened && !panel.contains(e.target) && !button.contains(e.target)) api.close();
   });
+  document.addEventListener('navigation-open', () => api.close());
+  window.addEventListener('resize', () => api.close());
   return api;
 }
 

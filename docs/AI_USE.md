@@ -86,3 +86,84 @@ summary now use the existing locally hosted Lenis-reference Anton font. No API
 values or scientific calculations changed. Browser checks exercise actual mouse
 clicks with previews deliberately overlapping the toolbar in Globe and Map views
 at desktop and mobile widths.
+
+
+### 2026-10-18 — Frontend consistency
+
+Codex inspected Omega ClearSpace navigation and Lenis demo font assignments, and
+adapted Watermelon Dropdown Disclosure source to the existing vanilla frontend.
+Added shared navigation, range presentation and disclosure motion; changed supporting
+copy to Roboto and neutralized decorative validation greens. Native controls,
+scientific APIs, source attribution and data color ramps are preserved. Extended
+browser checks for navigation focus, slider reset synchronization and animation
+interruptions; desktop/mobile verification results are recorded in docs/FRONTEND_REVIEW.md.
+
+### 2026-10-19 — Design consistency, count-up and analog roles
+
+Codex refined the existing shared controls, consolidated select styles, shortened
+interface copy and added text-link and arrow motion. Home summary counters now
+count up decoratively to exact API values with accessible final text and reduced-
+motion handling. Shared analog role labels and icons use existing validation roles
+and catalog kinds; ranked candidates are not reclassified. Scientific calculations,
+API contracts and datasets are unchanged. Browser smoke coverage includes disabled
+selects, fallback behavior, role accuracy, counter progression and cancellation.
+Verification: the complete UI smoke suite and module syntax checks passed. Desktop
+and mobile design captures passed layout, image, navigation and terrain checks.
+The design detector report retains existing font/token advisories, including stale
+sidecar mismatches; the approved visual system was preserved.
+
+### 2026-10-19 — Link and page-transition corrections
+
+Codex removed underlines from planet navigation links and replaced layered link
+underlines with a single native underline. Added first-paint header/action markup,
+earlier shared-control initialization, font preloads, matching target placeholders
+and progressive document crossfades with reduced-motion support. Removed the opaque
+Home title scrim so the decorative Moon and Mars remain visible. Scientific data
+and calculations are unchanged.
+Verified the initial shell with page JavaScript disabled, navigation and single
+underlines across target routes, and motion/reduced-motion behavior. Desktop/mobile
+captures passed layout and image checks. Scroll and arrow assertions now wait for
+browser frames/animation completion instead of assuming fixed timing.
+
+### 2026-10-19 — Stable menu scroll locking
+
+Codex reserved the document scrollbar gutter and matched navigation dialog widths
+to their headers to prevent layout shifts when opening or closing the menu. Added
+desktop/mobile checks for content width, position, logo alignment and scroll
+position across Home, Targets and Finder. Scientific behavior is unchanged.
+Verification passed: opening and closing navigation preserved layout and scroll
+position across those pages on desktop/mobile; measured opening shifts were zero.
+
+### 2026-10-19 — Page-arrival blink
+
+Codex inspected frames from the supplied screen recording, which showed the Targets
+heading appearing and then being masked by a delayed text reveal. Visible arrival
+text now skips that initial mask while retaining downward scroll replays. Removed
+full-document fades that could expose an empty snapshot during navigation. Added navigation
+regressions with delayed control-script delivery at desktop and mobile sizes.
+Verification passed for real Home/Targets navigation with delayed scripts, existing
+scroll/counter motion, and desktop/mobile Targets captures. The final navigation
+regression completed without browser exceptions.
+
+### 2026-10-19 — Resource and duplication audit
+
+Codex measured and fixed retained dynamic-control listeners and repeated full-page
+DOM scans; added observer/animation cleanup, bounded thumbnail URL ownership and
+coalescing, safer terrain request eviction and close callbacks, and shared codecs.
+Removed confirmed unused legacy font/image assets and obsolete counter CSS. Added
+serialized API initialization and bounded LRU robustness caching without changing
+scientific computation. Offline Python, browser, resource and asset checks passed;
+commands and measured results are recorded in docs/OPTIMIZATION.md.
+
+### 2026-10-20 — Pre-commit repository cleanup
+
+Codex reviewed source references, acquisition entry points, frontend modules,
+dependencies, offline assets and the existing working-tree changes. Removed the
+superseded prototype architecture guide (`explanation.md`), stale session handoff
+(`progress.md`), unused view/basemap helpers, unused serialization and batch-label
+methods, and duplicate ignore entries. Updated remaining documentation references.
+Kept offline predictor arrays, vector data, thumbnails, acquisition tools, tests,
+licenses and design guidance. Scientific formulas and API contracts are unchanged.
+The offline Python suite, JavaScript resource tests, Ruff checks, frontend module
+syntax checks, local asset audit, offline validation controls and full browser
+smoke suite passed after cleanup. Existing dependency deprecation warnings remain.

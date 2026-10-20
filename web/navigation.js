@@ -1,5 +1,5 @@
 /* Adapted from Watermelon Breadcrumb 1; native links preserve browser history. */
-const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+import { escapeHtml as escape } from './format.js';
 
 export function breadcrumbs(container, segments) {
   if (!container) return;
