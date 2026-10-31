@@ -68,7 +68,6 @@
       <button role="tab" id="tabResults" aria-selected="false" aria-controls="results" type="button">Results</button>
       <button role="tab" id="tabExplore" aria-selected="false" aria-controls="explore" type="button">Explore</button>
       <button role="tab" id="tabValidation" aria-selected="false" aria-controls="validation" type="button">Validation</button>
-      <span class="tab-ink" id="tabInk" aria-hidden="true"></span>
     </div>
 
     <section id="target" role="tabpanel" aria-labelledby="tabTarget">
@@ -87,7 +86,6 @@
             <h3 class="eyebrow">Weights</h3>
             <button class="link-button" id="resetWeights" type="button">Reset</button>
           </div>
-          <p class="hint">Adjust each criterion’s influence.</p>
           <div class="weights" id="weights"></div>
         </div>
         <div class="block discovery">
@@ -307,7 +305,7 @@
         <button class="ghost small" type="button" id="geWeather" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-cloud-rain"></use></svg><span>Weather</span></button>
       </div>
       <div class="ge-climate" id="geClimate" aria-live="polite"></div>
-      <p class="hint">Illustrative, not a forecast. Uses this cell’s NASA POWER climate, MODIS surface swing and local sun position. Play a day in Thermal view.</p>
+      <p class="hint">Illustrative, not a forecast. Based on NASA POWER and MODIS.</p>
     </details>
     <p class="hint ge-status" id="geStatus" role="status"></p>
   </aside>

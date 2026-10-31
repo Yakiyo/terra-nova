@@ -5,7 +5,7 @@ equator). Mosaic: 4 x 4 tiles (1024 x 1024 px, ~157 km at the equator), centred 
 scored 0.5 degree cell to the nearest tile.
 
 Imagery (fetched by the browser through ``/api/imagery``):
-  ``s2``  EOxCloudless Sentinel-2 2020, zoom 11 (~76 m/px), ESA Copernicus data
+  ``s2``  EOxCloudless Sentinel-2 2020, zoom 10, ESA Copernicus data
           processed by EOX. Licence: CC BY-NC-SA 4.0 (non-commercial, e.g.
           student and university projects). Attribution is shown in the view.
 
@@ -18,6 +18,7 @@ sites for an offline demo:
 from __future__ import annotations
 
 import argparse
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -106,33 +107,66 @@ def imagery_tile(source: str, z: int, x: int, y: int, offline: bool | None = Non
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prefetch God's Eye tiles for top sites.")
-    parser.add_argument("--top", type=int, default=5, help="top N sites of every target")
+    parser.add_argument("--top", type=int, default=20, help="top N sites of every target")
+    parser.add_argument("--terrain-only", action="store_true", help="skip satellite imagery")
     args = parser.parse_args(argv)
 
+    # Acquisition explicitly prepares caches, including from an OFFLINE=1 shell.
+    previous_offline = os.environ.get("OFFLINE")
+    os.environ["OFFLINE"] = "0"
+    try:
+        return _prepare_sites(args.top, args.terrain_only)
+    finally:
+        if previous_offline is None:
+            os.environ.pop("OFFLINE", None)
+        else:
+            os.environ["OFFLINE"] = previous_offline
+
+
+def _prepare_sites(top: int, terrain_only: bool) -> int:
     from fastapi.testclient import TestClient
 
-    from src.api.main import app
+    from src.api.main import UI_DEFAULTS, app
 
     client = TestClient(app)
     sites: set[tuple[float, float]] = set()
     for target in client.get("/api/targets").json()["targets"]:
-        body = client.post("/api/score", json={"target_id": target["id"], "top_k": args.top}).json()
-        sites |= {(r["lat"], r["lon"]) for r in body["results"]}
-    for done, (lat, lon) in enumerate(sorted(sites), start=1):
+        response = client.post(
+            "/api/score", json={**UI_DEFAULTS, "target_id": target["id"], "top_k": top}
+        )
+        response.raise_for_status()
+        body = response.json()
+        sites |= {(r["lat"], r["lon"]) for r in body["results"] if abs(r["lat"]) <= 84}
+
+    def prepare(site: tuple[float, float]) -> bool:
+        lat, lon = site
         try:
             payload = client.get("/api/site3d", params={"lat": lat, "lon": lon}).json()
         except Exception as exc:  # keep going; report at the end
             print(f"[sitetiles] {lat},{lon} failed: {exc}")
-            continue
+            return False
         if "imagery" not in payload:
             print(f"[sitetiles] {lat},{lon}: {payload.get('detail')}")
-            continue
+            return False
+        if terrain_only:
+            return True
+        success = True
         img = payload["imagery"]["s2"]
         for ty in range(img["y0"], img["y0"] + img["tiles"]):
             for tx in range(img["x0"], img["x0"] + img["tiles"]):
-                imagery_tile("s2", img["zoom"], tx, ty, offline=False)
-        print(f"[sitetiles] {done}/{len(sites)} {lat},{lon}", flush=True)
-    return 0
+                try:
+                    imagery_tile("s2", img["zoom"], tx, ty, offline=False)
+                except Exception as exc:
+                    success = False
+                    print(f"[sitetiles] {lat},{lon} imagery failed: {exc}", flush=True)
+        return success
+
+    success = True
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for done, ready in enumerate(pool.map(prepare, sorted(sites)), start=1):
+            success = success and ready
+            print(f"[sitetiles] {done}/{len(sites)} {'ready' if ready else 'failed'}", flush=True)
+    return 0 if success else 1
 
 
 if __name__ == "__main__":

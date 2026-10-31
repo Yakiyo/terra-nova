@@ -173,7 +173,7 @@ await js(`document.querySelector('[data-view=map]').click()`);
 check("Globe/Map uses a sliding selection", await js(`document.querySelector('[data-view=map]').getAttribute('aria-pressed') === 'true' && !!document.querySelector('.segmented[aria-label=View] .segment-slider') && !document.getElementById('flatmap').hidden`));
 await js(`document.querySelector('[data-view=globe]').click()`);
 check("scores have API-linked graphical gauges", await js(`[...document.querySelectorAll('.site .score-meter')].length > 0 && [...document.querySelectorAll('.site .score-meter')].every(m=>m.dataset.sourceUrl && m.dataset.datasetId && m.getAttribute('aria-label').includes('match'))`));
-check("planet preview caption uses Lenis-reference Roboto", await js(`getComputedStyle(document.getElementById('twinCaption')).fontFamily.includes('Roboto') && getComputedStyle(document.querySelector('.twin-hint')).fontFamily.includes('Roboto')`));
+check("planet preview caption uses Lenis-reference Roboto", await js(`getComputedStyle(document.getElementById('twinCaption')).fontFamily.includes('Roboto')`));
 check("results summary and shared hints use Lenis-reference Roboto", await js(`[...document.querySelectorAll('.hint')].every(el=>getComputedStyle(el).fontFamily.includes('Roboto')) && parseFloat(getComputedStyle(document.getElementById('resultsSummary')).fontSize) >= 14`));
 for (const [trigger, panel] of [['statusPill','statusPanel'],['helpButton','helpMenu']]) {
   await js(`document.getElementById('${trigger}').click()`);
@@ -322,6 +322,7 @@ await sleep(800);
 check("God's Eye takes focus", await js(`document.getElementById('godseye').contains(document.activeElement)`));
 check("God's Eye includes its Finder return breadcrumb", await js(`!!document.querySelector('#terrainBreadcrumbs [data-crumb-action=finder]')`));
 const terrainUnavailable = await js(`document.getElementById('godseye').dataset.status === 'error'`);
+check("God's Eye renders terrain for the prepared top result", await js(`document.getElementById('godseye').dataset.status === 'ready' && !!document.querySelector('#geStats .ge-stat')`));
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 await sleep(600);
 check(terrainUnavailable ? "Esc closes unavailable terrain" : "Esc closes the controls guide first", terrainUnavailable ? await js(`document.getElementById('godseye').hidden`) : (await js(`document.getElementById('geGuide').hidden`)) && !(await js(`document.getElementById('godseye').hidden`)));
@@ -446,7 +447,7 @@ check('text-link keyboard focus uses one animated underline', await js(`getCompu
 await js(`document.querySelector('a.btn-primary').focus()`);
 await ready(`getComputedStyle(document.querySelector('a.btn-primary .button-orb .i')).transform === 'matrix(1, 0, 0, 1, 3, 0)'`);
 check('linked action focus moves its existing arrow', await js(`getComputedStyle(document.querySelector('a.btn-primary .button-orb .i')).transform === 'matrix(1, 0, 0, 1, 3, 0)'`));
-check("supporting text uses Lenis-reference Panchang", await js(`getComputedStyle(document.querySelector('.mission-intro p')).fontFamily.includes('Panchang')`));
+check("supporting text uses Lenis-reference Panchang", await js(`getComputedStyle(document.querySelector('.home-copy .lede')).fontFamily.includes('Panchang')`));
 check("primary buttons have orb details", await js(`!!document.querySelector('.btn-primary > .button-orb[aria-hidden=true]')`));
 check("shared navigation has route and planet destinations", await js(`!!document.querySelector('.site-menu-trigger') && !!document.querySelector('#siteNavigation [aria-current=page]') && document.querySelectorAll('#siteNavigation .site-world-links a').length === 2`));
 check('planet navigation links have no underline', await js(`[...document.querySelectorAll('.site-world-links a')].every(a=>getComputedStyle(a).textDecorationLine === 'none' && !a.classList.contains('text-link-motion'))`));

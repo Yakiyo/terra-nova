@@ -50,10 +50,10 @@ from rasterio.warp import Resampling, reproject
 from scipy.ndimage import distance_transform_edt
 
 from src.acquire import gibs_ndvi, landmask, power
-from src.acquire.download import fetch, utc_now_iso
+from src.acquire.download import REPO_ROOT, fetch, utc_now_iso
+from src.compute import terrain
 from src.compute.similarity import CRITERIA
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = REPO_ROOT / "cache" / "raw"
 DERIVED_DIR = REPO_ROOT / "cache" / "derived"
 STACK_PATH = REPO_ROOT / "cache" / "predictors.zarr"
@@ -163,14 +163,6 @@ def _nearest_fill(a: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------------------
 
 
-def _decode_terrarium(rgb: np.ndarray) -> np.ndarray:
-    """Terrarium PNG encoding: ``elevation = R * 256 + G + B / 256 - 32768``."""
-    r = rgb[:, :, 0].astype(np.float64)
-    g = rgb[:, :, 1].astype(np.float64)
-    b = rgb[:, :, 2].astype(np.float64)
-    return (r * 256.0 + g + b / 256.0) - 32768.0
-
-
 def _load_mercator_dem(offline: bool | None = None) -> np.ndarray:
     grid = np.empty((MERC_PX, MERC_PX), dtype=np.float32)
     for ty in range(TERRARIUM_TILES):
@@ -192,7 +184,7 @@ def _load_mercator_dem(offline: bool | None = None) -> np.ndarray:
             if rgb.shape[:2] != (TERRARIUM_PX, TERRARIUM_PX):
                 raise BuildError(f"{name} decoded to {rgb.shape}, expected square tile")
             y0, x0 = ty * TERRARIUM_PX, tx * TERRARIUM_PX
-            grid[y0 : y0 + TERRARIUM_PX, x0 : x0 + TERRARIUM_PX] = _decode_terrarium(rgb)
+            grid[y0 : y0 + TERRARIUM_PX, x0 : x0 + TERRARIUM_PX] = terrain.decode_terrarium(rgb)
         _log(f"terrarium: row {ty + 1}/{TERRARIUM_TILES} decoded")
     return grid
 

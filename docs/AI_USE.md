@@ -167,3 +167,66 @@ licenses and design guidance. Scientific formulas and API contracts are unchange
 The offline Python suite, JavaScript resource tests, Ruff checks, frontend module
 syntax checks, local asset audit, offline validation controls and full browser
 smoke suite passed after cleanup. Existing dependency deprecation warnings remain.
+
+### 2026-10-31 — Terrain loading and interface copy review
+
+Codex reviewed acquisition, API, compute tests and frontend behavior, and reproduced
+an offline God's Eye failure on a ranked Jezero result using Playwright. Site tile
+preparation used different discovery filters from Finder. Aligned preparation with
+the API's UI defaults, made explicit acquisition work from an offline shell, restored
+the environment afterward, added bounded parallel preparation and failure exit
+codes, and populated the local elevation cache for the default rankings. These
+gitignored tiles must travel with the app for an offline demo; other locations may
+still require preparation. Satellite imagery falls back to measured shaded relief.
+
+Fixed same-target terrain links retaining the previous location and retries skipping
+an interrupted terrain build. Removed repeated Home and target-list copy and moved
+matching and terrain-scale explanations into disclosures, retaining source links,
+measurements and caveats. Scientific calculations were unchanged.
+
+Validation: offline Python and JavaScript tests, Ruff, frontend module syntax,
+full browser smoke suite, Playwright retry/cache/link regressions and desktop/mobile screenshots. The design
+detector flagged existing font, radius and decorative-container conventions covered
+by DESIGN.md; the review preserved the established identity.
+
+### 2026-10-31 — Satellite imagery follow-up
+
+The user's Gobi Desert screenshot showed measured relief without satellite
+imagery. The earlier preparation downloaded elevation only. Prepared satellite
+tiles for Finder's default rankings, and changed the development instructions to
+recommend full imagery preparation. Fixed Satellite selection reusing an empty
+texture after failure, made incomplete imagery retry on reopening, and prevented
+automatic Relief fallback from carrying into a different site. Explicit user
+surface selections remain authoritative. Added a Playwright regression covering
+blocked-image recovery, switching sites and satellite rendering across rankings.
+Imagery source: EOxCloudless Sentinel-2 2020, https://cloudless.eox.at/ (dataset
+`s2cloudless-2020_3857`). No scientific calculations changed.
+
+Playwright confirmed satellite rendering at sampled ranks for Moon and Mars,
+including the exact Gobi Desert link, and passed forced-failure retry and
+cross-site fallback checks. JavaScript resource tests, syntax checks and Ruff
+passed. The concurrent full smoke run flagged an unrelated mobile preview
+position check; terrain checks passed.
+The isolated interaction smoke rerun passed, including that mobile preview check.
+
+### 2026-10-31 — Conservative code and asset cleanup
+
+Codex traced module references, declarations, stylesheet selectors and asset
+references, and checked image/vendor files for identical contents. Removed the
+legacy tab underline DOM, resize handler and update function; the shared segmented
+control already owns the visible slider. Removed obsolete hint/card selectors,
+hidden target planet markup, its unused background animation, and disabled Home
+scrim rules. Removed the unused Panchang 700 face and local binary and narrowed
+font acquisition to the active weight. Preserved imagery, licenses, offline caches,
+API endpoints and targeted regression scripts.
+
+Replaced the duplicate Terrarium decoder and repository-root calculation in the
+predictor acquisition script with the existing shared implementations. Kept the
+NaN-aware acquisition block mean separate from the ordinary terrain block mean;
+their behaviors differ. No scientific formulas or displayed behavior changed.
+
+Validation: offline Python suite, JavaScript cache/codec tests, Ruff, module syntax,
+literal local asset audit and cached font acquisition passed. Browser smoke
+verification disconnected before completion. Fresh Playwright checks passed for
+terrain retry/reopening/shared links, desktop/mobile Targets and terrain, Home's
+active font and appearance, and the single shared tab slider.

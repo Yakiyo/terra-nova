@@ -28,13 +28,10 @@ function renderNavigation(body) {
 const coord = (lat, lon) => `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? "E" : "W"}`;
 
 function card(t, i) {
-  const body = t.body.toLowerCase();
   return `<a class="dest-card reveal" style="--d: ${i}" data-source-url="${esc(t.source_url)}" data-dataset-id="${esc(t.id)}" href="finder.html#target=${encodeURIComponent(t.id)}">
-      <span class="orb" style="background-image: url('assets/${esc(body)}_sm.jpg'); --x: ${(((t.longitude + 180) / 360) * 100 + 25).toFixed(1)}%" aria-hidden="true"></span>
       <div>
         <h3>${esc(t.short_name)}</h3>
         <span class="where num">${esc(t.body)} · ${coord(t.latitude, t.longitude)}</span>
-        <p>${esc(t.summary)}</p>
       </div>
       <span class="go">${icon("arrow-right")}</span>
     </a>`;
@@ -46,7 +43,6 @@ function customCard(i) {
       <div>
         <h3>Your own profile</h3>
         <span class="where">Any body, any site</span>
-        <p>Type the rainfall, temperature swing, slope and other values you need, and see where Earth comes closest.</p>
       </div>
       <span class="go">${icon("arrow-right")}</span>
     </a>`;

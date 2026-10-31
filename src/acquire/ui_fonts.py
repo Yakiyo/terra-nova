@@ -31,22 +31,19 @@ def main():
         shutil.copyfile(result.path, destination / name)
         print(name, "cached" if result.from_cache else "downloaded")
     css = fetch(
-        "https://api.fontshare.com/v2/css?f[]=panchang@600,700&display=swap",
+        "https://api.fontshare.com/v2/css?f[]=panchang@600&display=swap",
         filename="panchang.css",
         raw_dir=cache,
     )
     content = css.path.read_text(encoding="utf-8")
-    for weight in (600, 700):
-        block = next(
-            block for block in content.split("@font-face") if f"font-weight: {weight}" in block
-        )
-        url = re.search(r"url\(['\"]?([^)'\"]+\.woff2)", block).group(1)
-        if url.startswith("//"):
-            url = "https:" + url
-        name = f"panchang-{weight}.woff2"
-        result = fetch(url, filename=name, raw_dir=cache)
-        shutil.copyfile(result.path, destination / name)
-        print(name, "cached" if result.from_cache else "downloaded")
+    block = next(block for block in content.split("@font-face") if "font-weight: 600" in block)
+    url = re.search(r"url\(['\"]?([^)'\"]+\.woff2)", block).group(1)
+    if url.startswith("//"):
+        url = "https:" + url
+    name = "panchang-600.woff2"
+    result = fetch(url, filename=name, raw_dir=cache)
+    shutil.copyfile(result.path, destination / name)
+    print(name, "cached" if result.from_cache else "downloaded")
     package = fetch(
         "https://api.fontshare.com/v2/fonts/download/panchang",
         filename="panchang.zip",

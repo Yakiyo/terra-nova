@@ -646,14 +646,11 @@ function renderTargetDetail() {
       <a href="${esc(t.source_url)}" target="_blank" rel="noopener">Source: ${esc(t.source_label || "reference")}</a>
       ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
     </div>
-    <p class="how">How matching works: every land cell on Earth is compared with <b>this site's
-      signature</b>, the numbers below, measured on the ${esc(t.body)} by the cited missions. It is not a
-      picture-to-picture comparison. Each criterion is scored 0–100% and combined with your weights.</p>
+    <details><summary>How matching works</summary><p class="how">Earth cells are matched against this site's measured conditions using your weights.</p></details>
     ${t.location_note ? `<p class="hint">${esc(t.location_note)}</p>` : ""}
     <table class="profile"><caption>What Earth is matched against</caption>${rows}</table>`;
   const caption = $("twinCaption");
-  caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} target · ${fmtCoord(t.latitude, t.longitude)}
-    <span class="twin-hint">Drag to rotate, double-click to reset</span>`;
+  caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} · ${fmtCoord(t.latitude, t.longitude)}`;
   $("twin").hidden = !twin;
   if (twin) twin.show(t.body, t.latitude, t.longitude).catch(() => {});
 }
@@ -1564,14 +1561,6 @@ function wireKeys() {
 
 const TABS = [["tabTarget", "target"], ["tabResults", "results"], ["tabExplore", "explore"], ["tabValidation", "validation"]];
 
-function moveTabInk() {
-  const on = TABS.find(([tab]) => $(tab).getAttribute("aria-selected") === "true");
-  const btn = on && $(on[0]);
-  if (!btn || !btn.offsetWidth) return;
-  const ink = $("tabInk");
-  ink.style.transform = `translateX(${btn.offsetLeft}px) scaleX(${btn.offsetWidth / 100})`;
-}
-
 function selectTab(name) {
   for (const [tab, panel] of TABS) {
     const on = panel === name;
@@ -1585,7 +1574,6 @@ function selectTab(name) {
       $(panel).classList.add("panel-enter");
     }
   }
-  moveTabInk();
   if (name === "explore") renderExplore();
 }
 
@@ -1829,12 +1817,10 @@ function loadingStep(n, text) {
   $("loadingStep").textContent = `Step ${n} of 3`;
   $("loadBar").style.transform = `scaleX(${n / 3})`;
 }
-// A link to another target (typed, pasted, or Back) only changes the hash: start over for it.
+// UI updates use replaceState, so hashchange means an externally followed link.
+// Restore the entire shared state, including sites and terrain within one target.
 window.addEventListener("hashchange", () => {
-  const wanted = readHash().target;
-  const now = state.mode === "custom" ? "custom" : state.targetId;
-  if (wanted && (TARGET_ALIASES[wanted] || wanted) !== now) location.reload();
+  if (readHash().target) location.reload();
 });
-window.addEventListener("resize", debounce(moveTabInk, 100));
 
 init();

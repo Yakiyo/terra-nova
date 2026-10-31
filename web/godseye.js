@@ -187,7 +187,14 @@ export class GodsEye {
     }));
     this.root.querySelectorAll("[data-imagery]").forEach((b) => b.addEventListener("click", () => {
       this.imagery = b.dataset.imagery;
+      this.imageryFallback = false;
       this._applyMaterial();
+      // Failed tiles may have been prepared since the view first opened.
+      // Selecting Satellite must retry them rather than reuse the empty texture.
+      if (this.imagery === "s2" && this.imagerySettled && this.imageryIncomplete) {
+        $("geStatus").textContent = "Loading satellite imagery…";
+        void this._loadImagery(this.data, this.generation, true);
+      }
     }));
     $("geCell").addEventListener("change", (e) => { if (this.cellLine) this.cellLine.visible = e.target.checked; });
     $("geContours").addEventListener("change", (e) => { this.contour.uOn.value = e.target.checked ? 1 : 0; });
@@ -325,6 +332,7 @@ export class GodsEye {
     $("geSub").textContent = context.subtitle || "";
     $("geBadges").innerHTML = context.badges || "";
     $("geStats").innerHTML = "";
+    $("geGuide").hidden = true;
     $("geStatus").textContent = "Loading terrain…";
     $("geLoading").hidden = false;
     $("geError").hidden = true;
@@ -334,7 +342,7 @@ export class GodsEye {
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const data = await terrainData(site, context.targetId);
       if (!this.open || generation !== this.generation) return;
-      const reuse = this.data === data;
+      const reuse = this.builtData === data;
       this.data = data;
       this.profilePoints = [];
       this._clearProfile();
@@ -342,7 +350,11 @@ export class GodsEye {
       $("geProbe").hidden = true;
       this._toggleProfileMode(false);
       this._showExaggeration();
-      if (!reuse) this._build(data);
+      if (!reuse) {
+        this.builtData = null;
+        this._build(data);
+        this.builtData = data;
+      }
       if (reuse && this.imagerySettled && !this.imageryAvailable) {
         this.imagery = "relief";
         this._applyMaterial();
@@ -356,7 +368,9 @@ export class GodsEye {
       $("geStatus").textContent = reuse ? (this.imageryMessage || "") : "Terrain ready. Loading satellite imagery…";
       this._introFlight(true);
       this._guide();
-      if (!reuse || !this.imagerySettled) await this._loadImagery(data, generation);
+      if (!reuse || !this.imagerySettled || this.imageryIncomplete) {
+        await this._loadImagery(data, generation, !!this.imageryIncomplete);
+      }
     } catch (err) {
       if (!this.open || generation !== this.generation) return;
       $("geLoading").hidden = true;
@@ -370,7 +384,7 @@ export class GodsEye {
     this.root.dataset.status = "error";
     const box = $("geError");
     box.hidden = false;
-    box.innerHTML = `<h3>Terrain unavailable</h3><p>The terrain data for this site could not be loaded. Retry, or return to the map to explore another location.</p>
+    box.innerHTML = `<h3>Terrain unavailable</h3><p>${message.includes("offline mode") ? "This site’s terrain has not been cached for offline use." : "Terrain could not load. Retry or choose another site."}</p>
       <details class="terrain-error-details"><summary>Data preparation details</summary><p>${esc(message)}</p></details>
       <div class="ge-error-actions"><button class="primary" type="button" id="geRetry">Try again</button>
         <button class="ghost" type="button" id="geErrorClose">Back to the map</button></div>`;
@@ -422,6 +436,9 @@ export class GodsEye {
   /* -------------------------------------------------------------- build */
 
   _build(data) {
+    if (this.imageryFallback) this.imagery = "s2";
+    this.imageryFallback = false;
+    this.imageryIncomplete = false;
     this.imagerySettled = false;
     this.imageryMessage = "";
     this.imageTexture?.dispose();
@@ -648,8 +665,8 @@ export class GodsEye {
     const lunar = !!this.sun.lunar && Number(elevation) === SUN_PRESETS.lunar.elevation;
     this.root.classList.toggle("lunar-sky", lunar);
     $("geSunNote").textContent = lunar
-      ? "Lunar polar sun: the Moon's spin axis is tilted only ~1.5° to the ecliptic, so at the poles the Sun circles within about 1.5° of the horizon. No air scatters the light, so shadows are black."
-      : "Drag the sliders to move the Sun. Long, low shadows show relief that a rover or lander would face.";
+      ? "Lunar polar lighting: low Sun, black shadows."
+      : "";
     const d = (this.sizeKm || 100) * 1.2;
     const el = Math.max(0.3, Number(elevation)) * DEG;
     const az = Number(azimuth) * DEG;   // clockwise from north; north is -Z
@@ -668,7 +685,9 @@ export class GodsEye {
     this.climate?.afterSun();
   }
 
-  async _loadImagery(data, generation) {
+  async _loadImagery(data, generation, retry = false) {
+    this.imagerySettled = false;
+    const suffix = retry ? `?retry=${Date.now()}` : "";
     const s2 = data.imagery.s2;
     const canvas = this.imageCanvas;
     const texture = this.imageTexture;
@@ -695,21 +714,32 @@ export class GodsEye {
             resolve();
           };
           img.onerror = () => { clearTimeout(timeout); failed++; resolve(); };
-          img.src = `/api/imagery/s2/${s2.zoom}/${s2.x0 + i}/${s2.y0 + j}.jpg`;
+          img.src = `/api/imagery/s2/${s2.zoom}/${s2.x0 + i}/${s2.y0 + j}.jpg${suffix}`;
         }));
       }
     }
     await Promise.all(jobs);
     if (this.data !== data) return;
     this.imagerySettled = true;
+    this.imageryIncomplete = failed > 0;
     this.imageryAvailable = loaded > 0;
     if (generation !== this.generation || !this.open) return;
     if (!loaded && this.open) {
-      this.imagery = "relief";
-      this._applyMaterial();
-      this.imageryMessage = "Satellite imagery is unavailable for this site. Showing the measured terrain as shaded relief.";
+      if (this.imagery === "s2") {
+        this.imagery = "relief";
+        this.imageryFallback = true;
+        this._applyMaterial();
+      }
+      this.imageryMessage = this.imageryFallback
+        ? "Satellite imagery is unavailable for this site. Showing the measured terrain as shaded relief."
+        : "Satellite imagery is unavailable for this site.";
       $("geStatus").textContent = this.imageryMessage;
     } else {
+      if (this.imageryFallback && this.imagery === "relief") {
+        this.imagery = "s2";
+        this.imageryFallback = false;
+        this._applyMaterial();
+      }
       this.imageryMessage = failed ? `${failed} imagery tiles could not be loaded.` : "";
       $("geStatus").textContent = this.imageryMessage;
     }
@@ -735,9 +765,9 @@ export class GodsEye {
       <div class="ge-stat wide"><span>Rover-trafficable (under ${data.stats.trafficable_deg}°)</span>
         <b class="num">${pct(c.share_under_15)}</b>
         <div class="bar" role="img" aria-label="${pct(c.share_under_15)} trafficable"><i style="width:${(c.share_under_15 * 100).toFixed(1)}%"></i></div></div>
-      <p class="hint">Measured on ${data.stats.slope_baseline_m} m elevation pixels inside the scored 0.5° cell (red outline).
+      <details class="ge-section"><summary>Measurement scale</summary><p class="hint">Measured on ${data.stats.slope_baseline_m} m elevation pixels inside the scored 0.5° cell (red outline).
         The probe, profile and Slope colours use the ${Math.round(data.ground_size_m / 255)} m display grid, so they read a little gentler.</p>
-      ${compare}<a class="ge-stats-source" href="${esc(data.provenance.source_url)}" data-dataset-id="${esc(data.provenance.dataset_id)}" target="_blank" rel="noopener">${esc(data.provenance.dataset_id)} · terrain source</a>`;
+      ${compare}</details><a class="ge-stats-source" href="${esc(data.provenance.source_url)}" data-dataset-id="${esc(data.provenance.dataset_id)}" target="_blank" rel="noopener">${esc(data.provenance.dataset_id)} · terrain source</a>`;
   }
 
   /* --------------------------------------------------- probe + profile */

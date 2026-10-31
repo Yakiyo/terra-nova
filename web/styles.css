@@ -7,7 +7,6 @@
 @font-face { font-family: "Anton"; font-weight: 400; font-display: swap; src: url(vendor/fonts/anton-regular.ttf) format("truetype"); }
 @font-face { font-family: "Roboto"; font-weight: 100 900; font-display: swap; src: url(vendor/fonts/roboto-variable.ttf) format("truetype"); }
 @font-face { font-family: "Panchang"; font-weight: 600; font-display: swap; src: url(vendor/fonts/panchang-600.woff2) format("woff2"); }
-@font-face { font-family: "Panchang"; font-weight: 700; font-display: swap; src: url(vendor/fonts/panchang-700.woff2) format("woff2"); }
 
 @font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url(vendor/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
 @font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: swap; src: url(vendor/fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); }
@@ -76,7 +75,7 @@ p { margin: 0; text-wrap: pretty; }
 a { color: var(--ink); text-decoration-color: var(--line-2); text-underline-offset: 3px; transition: text-decoration-color var(--t-fast); }
 a:hover { text-decoration-color: var(--accent); }
 button, input, select { font: inherit; color: inherit; }
-code, kbd, pre, .mono { font-family: var(--mono); }
+code, kbd, pre { font-family: var(--mono); }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 ::selection { background: rgba(242, 29, 56, 0.35); color: var(--ink); }
 input { caret-color: var(--accent); }
@@ -92,7 +91,7 @@ input { caret-color: var(--accent); }
 
 /* ---------------------------------------------------------------- buttons */
 
-.btn, button.ghost, button.primary, .godseye-button, .icon-button, .chip-button {
+.btn, button.ghost, button.primary, .godseye-button, .icon-button {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 34px; padding: 0 14px; border-radius: var(--r);
   font-size: 13px; font-weight: 500; line-height: 1; white-space: nowrap; text-decoration: none;
@@ -162,8 +161,6 @@ button.ghost.small, button.primary.small, .godseye-button.small { min-height: 30
   padding: 0 11px; border: 1px solid var(--line); border-radius: 999px;
   color: var(--ink-3); font-size: 12px; white-space: nowrap; background: transparent;
 }
-.chip-button { min-height: 26px; padding: 0 11px; border-radius: 999px; font-size: 12px; color: var(--ink-2); border: 1px solid var(--line-2); background: transparent; }
-.chip-button:hover { color: var(--ink); border-color: var(--ink-3); }
 .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
 .chip .dot.on { background: var(--ok); }
 .top-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
@@ -254,18 +251,14 @@ button.ghost.small, button.primary.small, .godseye-button.small { min-height: 30
 .dest-card:hover { border-color: var(--line-2); background: var(--surface-2); transform: translateY(-2px); }
 .dest-card:active { transform: translateY(0); }
 .dest-card .orb {
-  width: 72px; height: 72px; border-radius: 50%; background-size: 200% 100%; background-position: var(--x, 30%) 50%;
-  box-shadow: inset -14px -11px 24px rgba(0, 0, 0, 0.85), inset 3px 2px 8px rgba(255, 255, 255, 0.08);
+  width: 72px; height: 72px; border-radius: 50%;
 }
 .dest-card .orb.custom { display: grid; place-items: center; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--ink-2); }
 .dest-card .orb.custom .i { width: 28px; height: 28px; }
 .dest-card h3 { font-size: 16.5px; font-weight: 600; }
 .dest-card .where { display: block; margin-top: 3px; color: var(--ink-3); font-size: 12px; }
-.dest-card p { margin-top: 11px; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .dest-card .go { position: absolute; right: 16px; top: 18px; color: var(--ink-3); transition: color var(--t-fast), transform var(--t-state) var(--ease); }
 .dest-card:hover .go { color: var(--accent); transform: translateX(3px); }
-.dest-card:hover .orb, .dest-card:focus-visible .orb { animation: orb-turn 14s linear infinite; }
-@keyframes orb-turn { from { background-position: var(--x, 30%) 50%; } to { background-position: calc(var(--x, 30%) - 200%) 50%; } }
 .dest-state { margin-top: 32px; padding: 20px; border: 1px solid var(--line); border-radius: var(--r-lg); color: var(--ink-2); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .skeleton { background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: var(--r-lg); }
 .dest-grid .skeleton { height: 128px; }
@@ -311,10 +304,6 @@ body.hide-sidebar .edge-toggle .i { transform: rotate(180deg); }
 }
 .tabs button:hover { color: var(--ink-2); }
 .tabs button[aria-selected="true"] { color: var(--ink); }
-.tab-ink {
-  position: absolute; bottom: -1px; left: 0; height: 2px; width: 100px; background: var(--accent);
-  transform-origin: left; transition: transform var(--t-state) var(--ease);
-}
 [role="tabpanel"] { outline: none; }
 .panel-enter { animation: panel-in var(--t-state) var(--ease) both; }
 @keyframes panel-in { from { opacity: 0; transform: translateY(6px); } }
@@ -710,10 +699,9 @@ pre.json { max-height: 260px; overflow: auto; font: 11px/1.5 var(--mono); color:
 .twin canvas:active { cursor: grabbing; }
 .twin figcaption { font-size: 11px; color: var(--ink-3); line-height: 1.4; margin-top: 6px; }
 .twin figcaption strong { color: var(--ink); font-weight: 600; display: block; font-size: 12.5px; }
-.twin-hint { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 .twin > .box-toggle { position: absolute; top: 6px; right: 6px; z-index: 2; }
 .twin.collapsed { width: auto; min-width: 160px; }
-.twin.collapsed canvas, .twin.collapsed .twin-hint { display: none; }
+.twin.collapsed canvas { display: none; }
 .twin.collapsed figcaption { margin: 0; padding-right: 22px; text-align: left; }
 
 .tooltip {
@@ -872,6 +860,7 @@ body.touring .legend, body.touring .twin { opacity: 0.35; transition: opacity va
 .ge-stat span { display: block; font-size: 12px; color: var(--ink-3); }
 .ge-stat b { font: 500 15px/1.3 var(--mono); }
 .ge-stat.wide { grid-column: 1 / -1; }
+.ge-stats > details { grid-column: 1 / -1; }
 .ge-stat .bar { margin-top: 6px; height: 4px; }
 .ge-stats .hint, .ge-compare { grid-column: 1 / -1; }
 .ge-stats .hint { margin-top: 8px; font-size: 12px; }
@@ -992,7 +981,6 @@ body.touring .legend, body.touring .twin { opacity: 0.35; transition: opacity va
   .legend .note, .legend .credit-line { display: none; }
   .twin { width: 140px; padding: 8px; }
   .twin canvas { width: 122px; height: 122px; }
-  .twin figcaption .twin-hint { display: none; }
   .ge-panel { top: auto; bottom: 0; right: 0; left: 0; width: auto; max-height: 46vh; border-radius: var(--r-lg) var(--r-lg) 0 0; }
   .ge-hud { bottom: calc(46vh + 12px); }
   .ge-credit { display: none; }
@@ -1054,7 +1042,6 @@ body.touring .legend, body.touring .twin { opacity: 0.35; transition: opacity va
 .home-actions { gap: 12px; margin-top: 32px; }
 .home-actions .btn { min-height: 48px; }
 .home-globe { position: absolute; z-index: 0; width: 84%; height: 116%; right: -20%; top: -8%; }
-.home::after { content: ""; position: absolute; z-index: 1; pointer-events: none; inset: 0; background: linear-gradient(90deg, var(--bg) 0%, rgba(5,5,7,.75) 20%, rgba(5,5,7,0) 65%); }
 .globe-hint { right: 25%; left: auto; bottom: 12%; font-size: 12px; }
 .globe-fallback { background: url(assets/earth.jpg) center / cover; opacity: .5; }
 .globe-fallback canvas { visibility: hidden; }
@@ -1062,7 +1049,7 @@ body.touring .legend, body.touring .twin { opacity: 0.35; transition: opacity va
 .mission-section { padding: 100px var(--page-gutter); background: var(--surface); position: relative; }
 .mission-intro { display: grid; grid-template-columns: 1.2fr 1fr; align-items: end; gap: 64px; padding-bottom: 48px; }
 .mission-intro h2, .evidence-copy h2, .terrain-story h2 { font: 500 clamp(32px, 4.4vw, 64px)/1.07 var(--display); letter-spacing: -.035em; }
-.mission-intro p, .evidence-copy p, .terrain-story p { color: var(--ink-2); max-width: 48ch; font-size: 18px; line-height: 1.65; }
+.evidence-copy p, .terrain-story p { color: var(--ink-2); max-width: 48ch; font-size: 18px; line-height: 1.65; }
 .mission-destinations { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .mission-world { display: flex; align-items: end; min-height: 340px; overflow: hidden; position: relative; isolation: isolate; padding: 32px; text-decoration: none; background: var(--bg); }
 .mission-world::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(5,5,7,.95), rgba(5,5,7,.1)); }
@@ -1104,10 +1091,8 @@ body.touring .legend, body.touring .twin { opacity: 0.35; transition: opacity va
 .planet-credit { font-size: 11px; color: var(--ink-2); }
 .planet-group .dest-grid { display: flex; flex-direction: column; margin: 0; gap: 0; }
 .planet-group .dest-card { grid-template-columns: 1fr; padding: 24px 36px 24px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; border-radius: 0; }
-.planet-group .dest-card .orb { display: none; }
 .planet-group .dest-card:hover { transform: none; background: var(--surface); padding-left: 16px; }
 .dest-card h3 { font-size: 21px; font-weight: 500; letter-spacing: -.02em; }
-.dest-card p { -webkit-line-clamp: unset; display: block; max-width: 65ch; }
 .dest-card .go { top: 28px; right: 12px; color: var(--ink); }
 .dest-group > h2 { font: 500 28px/1.2 var(--display); text-transform: none; letter-spacing: -.02em; }
 .page-targets .dest-group:last-child .dest-grid { grid-template-columns: 1fr; }
@@ -1176,13 +1161,12 @@ body:has(.layout) .topbar { padding-inline: 24px; gap: 24px; }
   .home-copy h1 { font-size: clamp(42px, 10vw, 68px); }
   .home-copy .lede { font-size: 16px; max-width: 30ch; }
   .home-globe { top: auto; bottom: -18%; right: -25%; width: 130%; height: 75%; }
-  .home::after { background: linear-gradient(180deg, var(--bg) 0%, rgba(5,5,7,.8) 30%, transparent 70%); }
   .home-actions .btn { font-size: 13px; padding-inline: 14px; }
   .globe-hint { display: none; }
   .mission-section, .evidence-section, .terrain-story { padding: 64px 24px; }
   .mission-intro, .evidence-section, .dest-head, .planet-group { grid-template-columns: 1fr; }
   .mission-intro { gap: 24px; }
-  .mission-intro p, .evidence-copy p, .terrain-story p { font-size: 16px; }
+  .evidence-copy p, .terrain-story p { font-size: 16px; }
   .mission-destinations { grid-template-columns: 1fr; gap: 16px; }
   .mission-world { min-height: 260px; padding: 24px; }
   .home-facts { flex-direction: column; gap: 24px; }
@@ -1259,7 +1243,7 @@ body:has(.layout) .topbar { padding-inline: 24px; gap: 24px; }
 
 /* Watermelon button / map-control adaptations; clear crimson and orbital details. */
 :root { --support: "Panchang", "Roboto", sans-serif; }
-.home-copy .lede, .mission-intro p, .evidence-copy p, .terrain-story p, .dest-head p {
+.home-copy .lede, .evidence-copy p, .terrain-story p, .dest-head p {
   font-family: var(--support); font-weight: 600; font-size: clamp(14px, 1.12vw, 16px); line-height: 1.85; letter-spacing: -.015em; max-width: 48ch;
 }
 .home-copy .lede { max-width: min(43ch, 530px); }
@@ -1298,13 +1282,13 @@ button.primary:active, .btn:active, .godseye-button:active { transform: none; }
 @media (max-width: 720px) {
   .home-actions { gap: 12px; }
   .home-actions .btn { font-size: 13px; padding-left: 16px; }
-  .home-copy .lede, .mission-intro p, .evidence-copy p, .terrain-story p, .dest-head p { font-size: 14px; line-height: 1.8; }
+  .home-copy .lede, .evidence-copy p, .terrain-story p, .dest-head p { font-size: 14px; line-height: 1.8; }
   .top-right { gap: 6px; }
   #statusPill { min-height: 40px; }
   .zoom-controls { right: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .nav-slider, .button-orb { transition: none; }
+  .button-orb { transition: none; }
   :is(.btn, .godseye-button):hover .button-orb { transform: none; }
 }
 
@@ -1323,7 +1307,6 @@ button.ghost .button-orb .i, .godseye-button.small .button-orb .i { width: 15px;
 .wm-segment > button[aria-pressed=true], .wm-segment > button[aria-selected=true] { background: transparent; color: var(--bg); }
 .tabs.wm-segment { border: 1px solid var(--line); margin: 12px 16px; min-height: 48px; }
 .tabs.wm-segment > button { padding-inline: 8px; min-width: 0; }
-.tabs.wm-segment .tab-ink { display: none; }
 .wm-select { position: relative; min-width: 0; width: 100%; font: 500 14px/1.45 var(--font); }
 .wm-select > summary { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px 6px 6px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); cursor: pointer; list-style: none; font-weight: 600; }
 .wm-select > summary::-webkit-details-marker { display: none; }
@@ -1392,7 +1375,6 @@ button.ghost .button-orb .i, .godseye-button.small .button-orb .i { width: 15px;
 /* Exact Watermelon Save Toggle / Dropdown Disclosure vocabulary. */
 .twin figcaption { font: 400 14px/1.5 var(--font); letter-spacing: 0; }
 .twin figcaption strong { font: 600 14px/1.4 var(--font); letter-spacing: 0; margin-bottom: 5px; }
-.twin figcaption .twin-hint { font: 400 14px/1.5 var(--font); letter-spacing: 0; margin-top: 5px; }
 .known-save-control { width: 202px; height: 44px; display: flex; justify-content: center; flex: none; }
 .save-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 44px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface-2); color: var(--ink-2); padding: 0 12px; overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 13px/1 var(--font); }
 .save-toggle[aria-pressed=true] { color: var(--ink); border-color: var(--ink-3); }

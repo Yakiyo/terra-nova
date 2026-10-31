@@ -5,7 +5,7 @@ import { revealOnEntry } from "./reveal.js";
 import { enhanceFinderControls } from "./finder-controls.js";
 import { within } from './dom-lifecycle.js';
 
-const textSelector = ".home-copy h1, .home-copy .lede, .mission-intro h2, .mission-intro p, .evidence-copy h2, .evidence-copy p, .terrain-story h2, .terrain-story p, .dest-head h1, .dest-head p, .planet-intro h2";
+const textSelector = ".home-copy h1, .home-copy .lede, .mission-intro h2, .evidence-copy h2, .evidence-copy p, .terrain-story h2, .terrain-story p, .dest-head h1, .dest-head p, .planet-intro h2";
 function decorate(root = document) {
   within(root, 'a[href]').forEach(link => {
     const excluded = link.matches('.btn, .nav-link, .mission-world, .dest-card, .skip, .scroll-cue') || link.closest('.brand, .body-switch, .site-world-links');

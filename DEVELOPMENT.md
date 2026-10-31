@@ -24,6 +24,7 @@ Martian target sites.
 - Run:       `OFFLINE=1 uvicorn src.api.main:app --reload`, then open http://127.0.0.1:8000/
 - Data:      `python -m src.acquire.build_predictor_stack`, `python -m src.acquire.calibrate`, `python -m src.acquire.basemaps`
 - Offline demo prefetch (gitignored caches): `python -m src.acquire.tiles --level 1`, `python -m src.acquire.tiles --level 2 --around-top 20`, `python -m src.acquire.sitetiles --top 5`, `python -m src.acquire.peek`
+- God's Eye default-results preparation: `python -m src.acquire.sitetiles` caches elevation and satellite imagery using Finder's discovery filters. `--terrain-only` skips satellite imagery and leaves uncached sites in shaded relief. The acquisition command downloads explicitly even from an `OFFLINE=1` shell; the running offline server stays offline. Copy `cache/sitetiles` with the app for an offline demo.
 - UI smoke test (app running on :8000): `node scripts/ui_smoke.mjs`
 - JS syntax check: `node --input-type=module --check < web/app.js` (plain `node --check` misses module errors)
 

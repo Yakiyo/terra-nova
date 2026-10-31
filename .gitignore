@@ -29,6 +29,7 @@ cache/peek/
 
 # Reproducible frontend review evidence and downloaded vendor staging.
 artifacts/frontend/
+.playwright-cli/
 cache/vendor/
 # Panchang permits self-hosting, but not redistribution via a public repository.
 web/vendor/fonts/panchang-*.woff2
