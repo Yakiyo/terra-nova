@@ -1,0 +1,131 @@
+@media(min-width:1021px){
+.page-home.cinematic-active>.home,.page-home.cinematic-active>.mission-section,.page-home.cinematic-active>.evidence-section,.page-home.cinematic-active>.terrain-story,.page-home.cinematic-active>#starfield{display:none}
+.page-home.cinematic-active .site-header{position:fixed!important;inset:0 0 auto;z-index:50;background:transparent;border:0}
+.cinematic{position:relative;background:var(--bg);color:var(--ink);isolation:isolate}
+.cinematic-canvas{position:fixed;inset:0;width:100%;height:100vh;pointer-events:none;z-index:0}
+.cinematic-blackout{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:3}
+.cinematic-chapters{position:relative;z-index:1}
+.cinematic-chapter{height:220vh;position:relative;min-height:1200px}
+.cinematic-copy{position:sticky;top:20vh;margin-left:7vw;width:min(470px,36vw);padding:24px 0;will-change:opacity}
+.cinematic-copy h1,.cinematic-copy h2{font:400 clamp(52px,5.1vw,82px)/1.06 var(--display);letter-spacing:-.015em;text-transform:uppercase;text-wrap:balance}
+.cinematic-copy h1 em{font-style:normal;color:var(--ink)}
+.cinematic-copy p{font-size:16px;line-height:1.7;max-width:38ch;margin-top:22px;color:var(--ink-2)}
+.cinematic-copy a{display:inline-flex;gap:12px;align-items:center;margin-top:22px;color:var(--ink);font-size:14px;text-underline-offset:6px;text-decoration-color:var(--line-2)}
+.chapter-hero .cinematic-copy{top:20vh;margin:auto;width:90%;text-align:center}
+.chapter-hero h1{font-size:clamp(64px,6.4vw,96px);line-height:1.06;letter-spacing:.005em}
+.chapter-hero .cinematic-copy p{margin:24px auto 0;max-width:50ch;font-size:17px}
+.cinematic-copy .cinematic-scroll{display:flex;flex-direction:column;margin:38px auto 0;width:max-content;text-decoration:none;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.cinematic-scroll span{font-size:42px;line-height:1;font-weight:200}
+.cinematic-list{top:15vh}
+.chapter-orbit .cinematic-copy{top:32vh;margin-inline:auto;width:min(850px,70vw);text-align:center}
+.chapter-orbit blockquote{margin:0}
+.chapter-orbit blockquote p{font:400 clamp(36px,3.3vw,60px)/1.25 var(--display);letter-spacing:-.02em;text-transform:uppercase;max-width:none;margin:0;color:var(--ink);text-wrap:balance}
+.chapter-orbit blockquote footer{margin-top:24px;font:400 14px/1.5 var(--font);color:var(--ink-2)}
+.chapter-orbit .cinematic-copy>p{margin:32px auto 0;max-width:48ch}
+.chapter-mars .cinematic-copy{margin-left:56vw;width:min(550px,37vw)}
+.chapter-moon .cinematic-copy{width:min(600px,40vw)}
+.cinematic-list h2{font-size:clamp(46px,4.5vw,68px)}
+.cinematic-targets,.cinematic-analog-list{margin-top:28px;border-top:1px solid var(--line)}
+.cinematic-target{display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--line);padding:13px 0}
+.cinematic-target img,.regional-thumb{width:56px;height:56px;object-fit:cover;flex:none;border-radius:4px;opacity:.85}
+.cinematic-copy .target-source{display:block;font-size:14px;margin-top:10px;color:var(--ink-3)}
+.chapter-analogs .cinematic-copy{top:10vh}
+.chapter-analogs h2{font-size:48px;max-width:420px}
+.cinematic-target button,.cinematic-analog-list button{border:0;background:none;color:var(--ink-2);font:400 16px/1.4 var(--font);text-align:left;cursor:pointer;padding:8px 0;transition:color .25s ease}
+.cinematic-target button{flex:1}
+.cinematic-target button:hover,.cinematic-analog-list button:hover{color:var(--ink)}
+.cinematic-target button[aria-pressed=true],.cinematic-analog-list button[aria-pressed=true]{color:var(--ink);font-weight:600}
+.cinematic-analog-list button[aria-pressed=true]::after{content:'↗';float:right;color:var(--accent)}
+.cinematic-target a{margin:0;font-size:12px;white-space:nowrap}
+.cinematic-target-detail{font-size:14px!important;line-height:1.55!important;min-height:48px;margin-top:17px!important;max-height:110px;max-width:52ch!important;overflow:auto}
+.cinematic-analog-list button{display:block;width:100%;padding:14px 0;border-bottom:1px solid var(--line)}
+.cinematic-analog-detail{padding-top:22px;min-height:136px}
+.cinematic-analog-detail strong{font-size:14px;font-weight:500;color:var(--tool)}
+.cinematic-analog-detail p{font-size:14px;margin-top:8px;line-height:1.6}
+.cinematic-analog-detail a{margin-top:12px;font-size:14px}
+.chapter-finale{height:110vh;min-height:800px}
+.cinematic-finale-media{position:absolute;inset:0;background:linear-gradient(0deg,#050505 0%,transparent 40%,#050505 100%),url('assets/cinematic/milky-way.jpg') center/cover;opacity:.7;z-index:-1}
+.cinematic-finale-media video{position:absolute;width:100%;height:100%;object-fit:cover}
+.cinematic-finale-media video:not([src]){display:none}
+.chapter-finale .cinematic-copy{top:25vh;margin:auto;width:80%;text-align:center}
+.chapter-finale p{margin:24px auto}
+.cinematic-copy .cinematic-launch{margin:20px auto;background:var(--accent-btn);padding:20px 30px;text-decoration:none;text-transform:uppercase;letter-spacing:.06em;font-size:13px}
+.cinematic-credit{position:relative;text-align:center;padding:28px;font-size:14px;color:var(--ink-3);z-index:2}
+.cinematic-credit a{color:inherit}
+.cinematic-no-webgl{background:#050505 url('assets/cinematic/milky-way.jpg') center/cover fixed}
+.cinematic-no-webgl canvas{display:none}
+.cinematic-no-webgl .cinematic-blackout{display:none}
+.cinematic-no-webgl .cinematic-copy{opacity:1!important;transform:none!important}
+.cinematic-no-webgl .chapter-orbit{background:linear-gradient(#05050788,#050507bb),url('assets/cinematic/earth.jpg') center/cover}
+.departing .cinematic-copy{opacity:0!important;transition:opacity .3s}
+}
+@media(min-width:1021px) and (max-height:800px){
+  .cinematic-list,.chapter-analogs .cinematic-copy{top:90px;padding-block:8px}
+  .cinematic-list h2,.chapter-analogs h2{font-size:40px}
+  .cinematic-copy p{margin-top:14px}
+  .cinematic-targets,.cinematic-analog-list{margin-top:16px}
+  .cinematic-target{padding-block:8px}
+  .cinematic-analog-list button{padding-block:10px}
+  .cinematic-analog-detail{padding-top:14px}
+}
+@media(prefers-reduced-motion:reduce){.cinematic-copy{will-change:auto}.cinematic *{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+
+@media(min-width:1021px){
+.cinematic{--display:"Anton",sans-serif}
+.cinematic-copy h1,.cinematic-copy h2{font-family:var(--display);font-weight:400;text-transform:uppercase;letter-spacing:-.015em;line-height:1.06}
+.chapter-hero h1{font-size:clamp(40px,4.5vw,76px)}
+.cinematic-list h2,.chapter-analogs h2{font-size:clamp(32px,3.2vw,52px)}
+.cinematic-copy h1 em,.chapter-orbit blockquote p{color:var(--tool)}
+.cinematic-copy p{color:var(--ink-3)}
+.cinematic-target button[aria-pressed=true],.cinematic-analog-list button[aria-pressed=true]{color:var(--tool)}
+.cinematic-target a{color:var(--accent);font-size:22px;padding:10px}
+.cinematic-analog-detail:empty{display:none}
+}
+
+/* Original display typography with generous destination rows. */
+@media(min-width:1021px){
+
+
+.chapter-hero h1{font-size:clamp(56px,5.5vw,96px)}
+.cinematic-list h2,.chapter-analogs h2{font-size:clamp(48px,4.4vw,76px)}
+.chapter-moon .cinematic-copy{width:46vw;max-width:800px}
+.chapter-mars .cinematic-copy{margin-left:52vw;width:41vw;max-width:750px}
+.cinematic-targets{margin-top:36px;border:0}
+.cinematic-target{gap:26px;padding:22px 0;border:0}
+.cinematic-target .regional-thumb{width:96px;height:96px;border-radius:4px}
+.cinematic-target button{font-size:clamp(19px,1.5vw,28px);line-height:1.3;font-weight:400}
+.cinematic-target a{font-size:28px;padding:16px}
+.cinematic a,.cinematic a:hover,.cinematic a:focus-visible{ text-decoration:none!important;background-image:none!important }
+.cinematic a:focus-visible,.cinematic button:focus-visible{outline:2px solid var(--tool);outline-offset:6px}
+.cinematic-scroll{padding:12px}
+.cinematic-scroll span{font-size:52px}
+}
+@media(min-width:1021px) and (max-height:800px){
+.cinematic-target{padding:14px 0;gap:20px}
+.cinematic-target .regional-thumb{width:72px;height:72px}
+.cinematic-list h2{font-size:48px}
+}
+
+@media(min-width:1021px){
+.cinematic{background:#050505}
+.cinematic-scroll svg{width:44px;height:44px;display:block}
+.cinematic-chapter{height:290vh}
+.chapter-finale{height:130vh}
+.cinematic-analog-list,.cinematic-analog-list button,.cinematic-targets,.cinematic-target{border:0}
+.cinematic-analog-list button[aria-pressed=true]::after{content:none}
+.chapter-analogs .cinematic-copy{width:44vw;max-width:760px}
+.cinematic-analog-list{margin-top:30px}
+.cinematic-analog-list button{font-size:clamp(21px,1.75vw,32px);padding:18px 0;line-height:1.3}
+.cinematic-target{padding:24px 0;gap:28px}
+.cinematic-target .regional-thumb{width:112px;height:112px}
+.cinematic-copy .cinematic-site-link{font-size:clamp(22px,1.85vw,34px);line-height:1.3;color:var(--ink-2);white-space:normal;padding:8px 0;margin:0;flex:1}
+.cinematic-copy .cinematic-site-link:hover{color:var(--tool)}
+}
+@media(min-width:1021px) and (max-height:800px){
+.cinematic-target{padding:16px 0}
+.cinematic-target .regional-thumb{width:88px;height:88px}
+.cinematic-analog-list button{padding:13px 0;font-size:23px}
+}
+
+
+

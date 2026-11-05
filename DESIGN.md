@@ -285,3 +285,24 @@ release their observers, media-query listeners and animations through
 dom-lifecycle.js. Shared presentation codecs live in format.js; preview resource
 ownership uses bounded-cache.js. Keep reusable renderer resources and offline
 assets rather than treating intentionally cached resources as unused.
+
+## Cinematic Home chapter transitions
+
+Desktop Home uses a persistent planetary renderer. Earth opens as a cropped,
+cloud-covered horizon, then returns as a close orbital surface beneath a centered
+TerraNova brand quote. The Moon enters from the right with its content on the left;
+Mars enters from the left with its content on the right. Their limbs extend beyond
+the viewport, following the supplied Omega screenshot's composition.
+
+Chapter exits fade all scene content to true black (`#000`), hold while the scene
+changes, and reveal the incoming scene before its text. This is scroll choreography
+inside Home, not a document navigation fade. The solar corona and blue atmosphere
+are planetary lighting, not control decoration. Shader colors belong to the imagery.
+Reduced motion uses static chapter compositions without blackouts, automatic cloud
+drift, corona animation, or Lenis smoothing. Keyboard focus brings its chapter into
+the readable hold. Mobile keeps the existing Home layout.
+
+Visual reference inspected with Playwright CLI:
+source_url: https://www.omegawatches.com/world-of-omega/sustainability/clearspace
+dataset_id: omega_clearspace_ui_reference (visual reference, not scientific data).
+Texture provenance remains in `web/assets/cinematic/CREDITS.md`.

@@ -1,0 +1,29 @@
+PASS  desktop cinematic Home mounts with sourced targets
+PASS  chapter transition reaches full black
+PASS  Earth orbit emerges with centered quote
+PASS  cinematic reduced motion removes blackout and smoothing
+PASS  home planetary links are filtered
+PASS  counter values and provenance match API
+PASS  counter reveals finish
+PASS  evidence reveals finish with readable sources
+PASS  counters replay after leaving and re-entering
+PASS  counters count up monotonically to exact API values
+PASS  live reduced motion settles counters
+PASS  narrative text reveals on scroll
+PASS  upward scrolling does not replay text
+PASS  upward entry keeps counter values final  ({"runsBefore":3,"state":{},"values":[{"visual":"78,247","final":"78,247"},{"visual":"5","final":"5"},{"visual":"12","final":"12"}]})
+PASS  text-link keyboard focus uses one animated underline
+PASS  linked action focus moves its existing arrow
+PASS  supporting text uses Lenis-reference Panchang
+PASS  primary buttons have orb details
+PASS  shared navigation has route and planet destinations
+PASS  planet navigation links have no underline
+PASS  Home planets are not covered by an opaque title scrim
+PASS  headers retain one pre-rendered navigation trigger
+PASS  evidence bars use clear red
+PASS  Home evidence bars are rounded and source labels use Roboto
+PASS  local display and body fonts loaded
+PASS  reduced motion uses final static values
+PASS  text links animate without changing selection controls
+PASS  unsupported popovers retain usable native selects  ({"supported":false,"adapters":0,"selects":[{"id":"perCountry","hidden":false},{"id":"layer","hidden":false}]})
+PASS  native fallback retains application handlers

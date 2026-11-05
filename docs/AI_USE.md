@@ -230,3 +230,36 @@ literal local asset audit and cached font acquisition passed. Browser smoke
 verification disconnected before completion. Fresh Playwright checks passed for
 terrain retry/reopening/shared links, desktop/mobile Targets and terrain, Home's
 active font and appearance, and the single shared tab slider.
+
+### 2026-11-05 — Cinematic Earth, sunlight and chapter choreography
+
+Codex inspected the live Omega ClearSpace page using Playwright CLI and compared
+the supplied screenshot with the running local Home page. Refined the existing
+Three.js renderer with cloud shadows, ocean shading, atmospheric light and an
+animated solar corona, using the existing locally hosted textures. Added full-black
+chapter changes, a centered TerraNova brand quote over the orbital Earth view, and
+large cropped Moon/right and Mars/left entrances. Preserved API target selection,
+source links, analog locations, mobile Home and the Finder launch.
+
+No scientific calculations or datasets changed. The quote reuses TerraNova's own
+headline and is identified as brand copy. The visual reference has source_url
+https://www.omegawatches.com/world-of-omega/sustainability/clearspace and dataset_id
+omega_clearspace_ui_reference. Imagery has source_url
+https://www.solarsystemscope.com/textures/ and dataset_id
+solar_system_scope_planetary_textures; see the existing asset credits for licensing.
+
+Playwright verified desktop/laptop/mobile rendering, a fully opaque blackout,
+forward and backward chapter navigation, target selection, keyboard focus between
+chapters, reduced motion, WebGL context-loss fallback and the Finder launch without
+JavaScript exceptions. JavaScript syntax checks passed. The Impeccable detector
+reported design-token advisories; the intentional black transition is documented
+in DESIGN.md. Legacy counter checks in the UI smoke script now run at the smaller
+viewport where that layout is still active; desktop checks cover the cinematic flow.
+The broad browser run passed its existing checks but exposed fixed-delay timing in
+the new software-rendered scene checks. Replacing those delays with rendered-state
+waits made the motion smoke rerun pass (`artifacts/cinematic-motion-smoke.txt`).
+`nCinematic simplification: removed catalog page content and Home descriptions/source rows at user request, retained Finder access, introduced Panchang display with blue/white/red roles, and animated stars and hero planets. No scientific calculations changed.
+`nCursor/motion refinement: Earth uses eased pointer rotation; Moon/Mars rotate independently at a more visible pace. Removed visible location rings, enlarged destination rows, removed Home link underlines and changed display type to light Roboto. Hero arrow retains an accessible label and animated Lenis scrolling. Reduced-motion preferences remain respected.
+`nHome space refinement: integrated user-supplied Lucide chevron SVG, brighter screen-sized stars, longer chapters and bounded wheel deltas. Enlarged destination/analog lists and removed divider lines and red arrows. Site names now link directly to Finder. Compared large-wheel input on Omega using Playwright; timing is tuned to the reference rather than copied from its implementation.
+`nSpace color polish: replaced the navy Home background with neutral near-black and neutralized the star tint while preserving visibility, motion and planetary atmospheric lighting.
+`nRestored the original Anton display typography at user request; existing Roboto body text and Panchang supporting styles remain. Preserved the current layout, colors and motion.

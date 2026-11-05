@@ -19,7 +19,7 @@ function enhanceHeader(header, terrain = false) {
   dialog.append(nav);
   const worlds = document.createElement('div');
   worlds.className = 'site-world-links';
-  worlds.innerHTML = '<a href="targets.html?body=moon">Explore the Moon</a><a href="targets.html?body=mars">Explore Mars</a>';
+  worlds.innerHTML = '<a href="finder.html#target=lunar_south_pole">Explore the Moon</a><a href="finder.html#target=jezero_crater">Explore Mars</a>';
   nav.append(worlds);
   document.body.append(dialog);
   header.prepend(trigger);

@@ -379,6 +379,22 @@ await ready(`document.querySelector('#finderBreadcrumbs [aria-current]') && docu
 check("target-specific Finder breadcrumb", await js(`document.querySelector('#finderBreadcrumbs a[href="targets.html?body=mars"]') && document.querySelector('#finderBreadcrumbs [aria-current]').textContent.includes(document.querySelector('.target-card[aria-checked=true] strong').textContent)`));
 
 }
+// Desktop Home is a cinematic journey; the counter/evidence layout lives on smaller screens.
+await send('Emulation.setDeviceMetricsOverride', {width:1600,height:900,deviceScaleFactor:1,mobile:false});
+await page('index.html', 1000);
+await ready(`document.querySelector('.cinematic-site-link') && document.querySelector('.cinematic')?.dataset.chapter === '0'`);
+check('desktop cinematic Home mounts with sourced targets', await js(`!!document.querySelector('.cinematic-canvas') && [...document.querySelectorAll('.cinematic-target-detail')].every(el=>el.dataset.sourceUrl && el.dataset.datasetId)`));
+await js(`window.scrollTo(0,document.querySelector('.chapter-hero').offsetHeight*.97)`);
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`);
+check('chapter transition reaches full black', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`));
+await js(`{const el=document.querySelector('.chapter-orbit');window.scrollTo(0,el.getBoundingClientRect().top+scrollY+el.offsetHeight*.32)}`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '1' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
+check('Earth orbit emerges with centered quote', await js(`document.querySelector('.cinematic').dataset.chapter === '1' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && getComputedStyle(document.querySelector('.chapter-orbit .cinematic-copy')).textAlign === 'center' && !!document.querySelector('.chapter-orbit blockquote')`));
+await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && !document.documentElement.classList.contains('lenis')`);
+check('cinematic reduced motion removes blackout and smoothing', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && !document.documentElement.classList.contains('lenis')`));
+await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+await send('Emulation.setDeviceMetricsOverride', {width:1000,height:900,deviceScaleFactor:1,mobile:false});
 await page("index.html", 1000);
 await ready(`document.querySelector('#facts dd')`);
 check("home planetary links are filtered", await js(`document.querySelector('.mission-world.moon').getAttribute('href') === 'targets.html?body=moon' && document.querySelector('.mission-world.mars').getAttribute('href') === 'targets.html?body=mars'`));
@@ -487,3 +503,4 @@ chrome.kill();
 process.exit(failed || errors.length ? 1 : 0);
 }
 finish();
+
