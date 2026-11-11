@@ -800,7 +800,7 @@ function renderWeights() {
 
 /* ----------------------------------------------------------------- scoring */
 
-async function runScore() {
+async function runScore({ throwOnError = false } = {}) {
   const ticket = ++state.request;
   $("resultsSummary").textContent = "Scoring…";
   $("progress").classList.add("on");
@@ -829,6 +829,7 @@ async function runScore() {
     robustSoon(ticket);
     if (!$("explore").hidden) renderExplore();
   } catch (err) {
+    if (throwOnError) throw err;
     if (ticket === state.request) toast(`Scoring failed: ${err.message}`);
   } finally {
     if (ticket === state.request) $("progress").classList.remove("on");
@@ -1248,19 +1249,24 @@ const restoreMap = () => {
   eyeReturnFocus?.focus?.();
 };
 
-function openGodsEye(r, preset = null) {
-  if (!r || Math.abs(r.lat) > 84) { toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude.", "info"); return Promise.resolve(); }
+function openGodsEye(r, preset = null, { arrival = false } = {}) {
+  if (!r || Math.abs(r.lat) > 84) {
+    if (arrival) throw new Error('The selected site is outside terrain coverage. Return to Finder to choose another site.');
+    toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude.", "info"); return Promise.resolve();
+  }
   hidePeek();
   if (!(eye instanceof GodsEye)) {
     try {
       eye = new GodsEye($("godseye"));
       eye.onClose = restoreMap;
     } catch {
+      if (arrival) throw new Error('God’s Eye could not start WebGL. Enable browser hardware acceleration and retry.');
       toast("God’s Eye could not start WebGL. Try a browser with hardware acceleration enabled.", "error");
       return Promise.resolve();
     }
   }
-  eyeReturnFocus = document.activeElement;
+  if (arrival) window.rocketTransition?.adopt();
+  eyeReturnFocus = arrival ? document.querySelector('#siteList .site.active') || $('tabResults') : document.activeElement;
   const t = target();
   const context = {
     targetId: state.mode === "target" ? state.targetId : null,
@@ -1744,6 +1750,7 @@ async function init() {
     ]);
     if (!health.ok) throw new Error(health.detail || "backend not ready");
     Object.assign(state, { health, targets: targets.targets, criteria: criteria.criteria, sources, analogs });
+    if (!state.targets.length) throw new Error('The target catalog is empty. Retry when the local data is available.');
     for (const w of criteria.weights) state.defaults[w.key] = w.weight;
     const hash = readHash();
     const wanted = TARGET_ALIASES[hash.target] || hash.target;
@@ -1782,15 +1789,25 @@ async function init() {
 
     if (hash.target === "custom") chooseTarget(CUSTOM_ID);
     loadingStep(3, `Scoring ${fmtInt(health.candidate_cells)} land cells…`);
-    await runScore();
+    await runScore({ throwOnError: true });
     if (hash.view === "map") setView("map");
     if (hash.layer && state.criteria.some((c) => c.key === hash.layer)) {
       layer.value = hash.layer;
       await setLayer(hash.layer);
     }
-    const site = state.data?.results.find((r) => String(r.rank) === hash.site);
+    await window.rocketTransition?.ready;
+    const enteringEye = hash.eye === '1' && !window.rocketTransition?.cancelled;
+    const site = hash.site !== undefined
+      ? state.data?.results.find((r) => String(r.rank) === hash.site)
+      : enteringEye ? state.data?.results.find(r => Math.abs(r.lat) <= 84) : null;
     if (site) selectResult(site);
-    if (site && hash.eye === "1") openGodsEye(site, hash.sun in SUN_PRESETS ? hash.sun : null);
+    if (enteringEye) {
+      if (!site) throw new Error(hash.site !== undefined
+        ? 'The linked site is not in these results. Return to Finder to choose another site.'
+        : 'No ranked sites support terrain viewing with these filters. Return to Finder to change the target or filters.');
+      openGodsEye(site, hash.sun in SUN_PRESETS ? hash.sun : null, { arrival: true });
+      writeHash();
+    }
     else if (state.data?.results.length) globe.flyTo(state.data.results[0].lat, state.data.results[0].lon);
     if (hash.tab === "validation") selectTab("validation");
     if (hash.dialog === "method") $("openMethod").click();
@@ -1799,6 +1816,7 @@ async function init() {
     ["click", "change"].forEach((ev) => document.addEventListener(ev, () => setTimeout(writeHash, 0)));
     selectTab(hash.target === "custom" ? "target" : "results");
   } catch (err) {
+    window.rocketTransition?.fail(err.message);
     $("loading").classList.add("failed");
     $("loadingText").textContent = `Could not start: ${err.message}. Check that the TerraNova server is running.`;
     $("loadingRetry").hidden = false;
@@ -1820,7 +1838,8 @@ function loadingStep(n, text) {
 // UI updates use replaceState, so hashchange means an externally followed link.
 // Restore the entire shared state, including sites and terrain within one target.
 window.addEventListener("hashchange", () => {
-  if (readHash().target) location.reload();
+  const hash = readHash();
+  if (hash.target || hash.eye === '1') location.reload();
 });
 
-init();
+export const startup = init();

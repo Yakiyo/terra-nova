@@ -6,6 +6,9 @@
 <link rel="preload" href="vendor/fonts/panchang-600.woff2" as="font" type="font/woff2" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js" } }
+  </script>
   <script>
     if (matchMedia('(min-width: 1021px), (hover: hover) and (pointer: fine)').matches) {
       document.documentElement.classList.add('cinematic-pending');
@@ -28,9 +31,8 @@
   <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="cinematic.css">
 <link rel="stylesheet" href="shared-controls.css">
-  <script type="importmap">
-    { "imports": { "three": "./vendor/three/three.module.min.js" } }
-  </script>
+<link rel="stylesheet" href="rocket-transition.css">
+<script src="rocket-transition.js"></script>
   <script type="module" src="controls.js"></script>
 </head>
 <body class="page-home">

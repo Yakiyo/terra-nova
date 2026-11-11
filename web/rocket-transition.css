@@ -1,0 +1,17 @@
+/* The hull's opaque safe region is x=72..168, y=200..660 in the SVG. */
+.rocket-overlay{position:fixed;inset:0;z-index:2147483646;overflow:hidden;pointer-events:auto;isolation:isolate}
+.rocket-sprite{position:absolute;left:50%;top:50%;width:240px;height:800px;max-width:none;margin-left:-120px;margin-top:-430px;transform-origin:120px 430px;will-change:transform}
+html.rocket-busy{overflow:hidden!important}
+html.rocket-busy body{overscroll-behavior:none}
+.godseye[data-arrival]{transition:none;transform:none;opacity:1}
+.godseye[data-arrival]>:not(#geArrival){display:none!important}
+#geArrival{position:absolute;inset:0;background:var(--bg);color:var(--ink);padding:var(--page-gutter,24px)}
+.ge-arrival-header{display:flex;justify-content:space-between;align-items:center;gap:24px}
+.ge-arrival-header h2{font:400 clamp(28px,4vw,48px)/1.1 var(--display)}
+.ge-arrival-content{position:absolute;inset:25% 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center}
+.ge-arrival-content p{max-width:48ch;font:400 16px/1.6 var(--font);color:var(--ink-2)}
+.ge-arrival-content details{max-width:60ch;color:var(--ink-3);overflow:auto}
+.ge-arrival-content summary{cursor:pointer}
+.ge-arrival-content details p{font-size:14px;overflow-wrap:anywhere}
+.godseye[data-arrival="error"] .spinner{display:none}
+@media(prefers-reduced-motion:reduce){.rocket-sprite{will-change:auto}#geArrival .spinner{animation:none}}

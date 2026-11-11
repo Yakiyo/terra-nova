@@ -20,7 +20,7 @@ if (desktop.matches) {
       <section class="cinematic-chapter chapter-moon" id="cinematic-moon"><div class="cinematic-copy cinematic-list"><h2>The Moon</h2><p>Choose a lunar site to inspect its story.</p><div class="cinematic-targets" data-body="Moon"></div></div></section>
       <section class="cinematic-chapter chapter-mars" id="cinematic-mars"><div class="cinematic-copy cinematic-list"><h2>Mars</h2><p>Explore the places shaping future exploration.</p><div class="cinematic-targets" data-body="Mars"></div></div></section>
       <section class="cinematic-chapter chapter-analogs" id="cinematic-analogs"><div class="cinematic-copy cinematic-list"><h2>Other worlds.<br>Closer than you think.</h2><p>These places have hosted real Moon and Mars exploration work. Click a location to travel there.</p><div class="cinematic-analog-list"></div><div class="cinematic-analog-detail" aria-live="polite"></div></div></section>
-      <section class="cinematic-chapter chapter-finale" id="cinematic-finale"><div class="cinematic-copy"><h2>The next discovery<br>starts here.</h2><p>Find a place on Earth that helps us understand another world.</p><a class="cinematic-launch" href="finder.html">Take me to Finder</a></div></section>
+      <section class="cinematic-chapter chapter-finale" id="cinematic-finale"><div class="cinematic-copy"><h2>The next discovery<br>starts here.</h2><p>Find a place on Earth that helps us understand another world.</p><a class="cinematic-launch" href="finder.html#eye=1" aria-description="Opens God’s Eye for the highest-ranked terrain-supported site">Take me to Finder</a></div></section>
     </div>
     <div class="cinematic-blackout" aria-hidden="true"></div>`;
   document.querySelector('.site-header').after(root);

@@ -36,11 +36,18 @@ const pending = new Map();
 const errors = [];
 ws.addEventListener("message", (m) => {
   const msg = JSON.parse(m.data);
-  if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+  if (msg.id && pending.has(msg.id)) {
+    const entry = pending.get(msg.id); pending.delete(msg.id); clearTimeout(entry.timer);
+    if (msg.error) entry.reject(new Error(JSON.stringify(msg.error))); else entry.resolve(msg);
+  }
   if (msg.method === "Runtime.exceptionThrown") errors.push(msg.params.exceptionDetails.exception?.description || msg.params.exceptionDetails.text);
   if (msg.method === 'Fetch.requestPaused') setTimeout(() => send('Fetch.continueRequest', {requestId:msg.params.requestId}), 800);
 });
-const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+const send = (method, params = {}) => new Promise((resolve, reject) => {
+  const i = ++id;
+  const timer = setTimeout(() => { pending.delete(i); reject(new Error(`Browser command timed out: ${method}`)); }, 30000);
+  pending.set(i, {resolve, reject, timer}); ws.send(JSON.stringify({ id: i, method, params }));
+});
 const js = async (expr) => (await send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true })).result?.result?.value;
 const ready = async (expression) => {
   for (let i = 0; i < 150; i++) {
@@ -58,7 +65,7 @@ const page = async (path, wait) => {
 };
 
 const checks = [];
-const check = (name, ok, detail = "") => { checks.push({ name, ok: !!ok, detail }); };
+const check = (name, ok, detail = "") => { checks.push({ name, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); };
 
 await send("Runtime.enable");
 await send("Page.enable");

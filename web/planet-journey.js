@@ -7,7 +7,6 @@ export function surfacePoint(lat, lon, radius = 1) {
   return new THREE.Vector3(Math.cos(p) * Math.cos(l), Math.sin(p), -Math.cos(p) * Math.sin(l)).multiplyScalar(radius);
 }
 const clamp = x => Math.max(0, Math.min(1, x));
-const lerp = (a, b, t) => a + (b - a) * t;
 const ease = x => { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); };
 const planetVertex = `
   varying vec2 uvMap;
@@ -163,7 +162,7 @@ export function initPlanetJourney(root, getSelection) {
 
   const chapters = [...root.querySelectorAll('.cinematic-chapter')];
   const copies = chapters.map(c => c.querySelector('.cinematic-copy'));
-  let tops = [], halfWidth = 5, lenis, raf, last = 0, launch = 0, failed = false;
+  let tops = [], halfWidth = 5, lenis, raf, last = 0, failed = false, inFlight = false;
   const pointer = new THREE.Vector2(), pointerAim = new THREE.Vector2();
   let spin = 0;
   const movePointer = event => { pointerAim.set(event.clientX / innerWidth * 2 - 1, event.clientY / innerHeight * 2 - 1); };
@@ -182,6 +181,7 @@ export function initPlanetJourney(root, getSelection) {
   const configureScroll = () => {
     lenis?.destroy();
     lenis = reduced.matches || failed ? null : new Lenis({autoRaf: false, anchors: false, lerp: .045, wheelMultiplier: .55, syncTouch: false, virtualScroll: event => { event.deltaY = Math.max(-180, Math.min(180, event.deltaY)); return true; }});
+    if (inFlight) lenis?.stop();
     requestAnimationFrame(resize);
   };
   configureScroll(); reduced.addEventListener('change', configureScroll);
@@ -198,8 +198,10 @@ export function initPlanetJourney(root, getSelection) {
     last = 0;
   };
   document.addEventListener('visibilitychange', syncVisibility);
-  const nav = e => e.detail.open ? lenis?.stop() : lenis?.start();
+  const nav = e => e.detail.open || inFlight ? lenis?.stop() : lenis?.start();
   document.addEventListener('navigation-state', nav);
+  const flight = e => { inFlight = e.detail.active; if (inFlight) lenis?.stop(); else lenis?.start(); };
+  document.addEventListener('rocket-flight', flight);
   // Chapter anchors land in the readable hold, rather than stopping inside a blackout.
   const revealChapter = (chapter, immediate = true) => {
     const i = chapters.indexOf(chapter);
@@ -222,24 +224,6 @@ export function initPlanetJourney(root, getSelection) {
   });
   const hashChapter = chapters.find(c => `#${c.id}` === location.hash);
   if (hashChapter) requestAnimationFrame(() => revealChapter(hashChapter));
-
-  const rocket = new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({color: 0xe8edf3, metalness: .7, roughness: .26});
-  rocket.add(new THREE.Mesh(new THREE.CylinderGeometry(.13, .18, .95, 32), metal));
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(.13, .3, 32), metal); nose.position.y = .625; rocket.add(nose);
-  const stripe = new THREE.Mesh(new THREE.CylinderGeometry(.135, .148, .12, 32), new THREE.MeshStandardMaterial({color: 0xd5092b}));
-  stripe.position.y = .2; rocket.add(stripe);
-  for (let i = 0; i < 4; i++) {
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(.025, .32, .32), metal);
-    fin.rotation.y = i * Math.PI / 2; fin.position.set(Math.sin(i * Math.PI / 2) * .17, -.36, Math.cos(i * Math.PI / 2) * .17);
-    rocket.add(fin);
-  }
-  rocket.visible = false; scene.add(rocket);
-  root.querySelector('.cinematic-launch').addEventListener('click', event => {
-    if (reduced.matches || failed || launch) return;
-    event.preventDefault(); launch = performance.now(); lenis?.stop(); rocket.visible = true;
-    setTimeout(() => location.assign('finder.html'), 1400);
-  });
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
@@ -321,11 +305,6 @@ export function initPlanetJourney(root, getSelection) {
       w.surface.quaternion.slerp(targetQ, reduced.matches ? 1 : 1 - Math.exp(-dt * 3));
     }
     if (!reduced.matches && index < 2) earthMaterial.uniforms.cloudDrift.value += dt * .00035;
-    if (launch) {
-      const p = ease((now - launch) / 1300);
-      rocket.position.set(0, lerp(-2, 0, p), 10); rocket.rotation.z = -.2;
-      rocket.scale.setScalar(lerp(.5, 65, p * p)); root.classList.add('departing');
-    }
     renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(frame);
@@ -337,6 +316,7 @@ export function initPlanetJourney(root, getSelection) {
     cancelAnimationFrame(raf); lenis?.destroy();
     removeEventListener('pointermove', movePointer); document.documentElement.removeEventListener('pointerleave', resetPointer);
     removeEventListener('resize', resize); document.removeEventListener('navigation-state', nav);
+    document.removeEventListener('rocket-flight', flight);
     reduced.removeEventListener('change', configureScroll);
     document.removeEventListener('keydown', trackKeyboard);
     document.removeEventListener('keyup', clearKeyboard);
