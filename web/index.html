@@ -6,10 +6,24 @@
 <link rel="preload" href="vendor/fonts/panchang-600.woff2" as="font" type="font/woff2" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script>
+    if (matchMedia('(min-width: 1021px), (hover: hover) and (pointer: fine)').matches) {
+      document.documentElement.classList.add('cinematic-pending');
+    }
+  </script>
+  <style>
+    .cinematic-pending .page-home > :is(.home,.mission-section,.evidence-section,.terrain-story,#starfield,.site-foot){display:none}
+    .cinematic-pending .page-home{background:#050505}
+    .cinematic-pending .page-home::before{content:'';position:fixed;inset:0;background:linear-gradient(0deg,#050505 0%,transparent 40%,#050505 100%),url('assets/cinematic/milky-way.jpg') center/cover;opacity:.7;pointer-events:none}
+    .cinematic-pending .page-home .site-header{position:fixed;inset:0 0 auto;background:transparent;border:0}
+  </style>
   <title>TerraNova · Earth analogs for Moon and Mars bases</title>
   <meta name="description" content="TerraNova scores every land cell on Earth against Moon and Mars base sites using NASA data, and ranks the closest analogs.">
   <meta name="theme-color" content="#050507">
   <link rel="icon" href="brand.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/cinematic/milky-way.jpg" as="image">
+  <link rel="modulepreload" href="cinematic.js">
+  <link rel="modulepreload" href="planet-journey.js">
   <link rel="stylesheet" href="vendor/lenis/lenis.css">
   <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="cinematic.css">

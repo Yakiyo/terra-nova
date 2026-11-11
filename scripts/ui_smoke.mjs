@@ -2,6 +2,7 @@
 //
 //   1. start the app:   OFFLINE=1 .venv/Scripts/uvicorn src.api.main:app --port 8000
 //   2. run:             node scripts/ui_smoke.mjs [http://127.0.0.1:8000]
+//   Home layout only:   node scripts/ui_smoke.mjs http://127.0.0.1:8000 --home-layout-only
 //
 // Drives a headless Chrome over the DevTools protocol (Node 22+ has WebSocket
 // built in; no npm install). Fails with exit code 1 on any JavaScript error or
@@ -123,7 +124,7 @@ if (process.argv.includes('--blink-only')) {
   await send('Fetch.disable');
   finish();
 }
-if (!process.argv.includes("--motion-only")) {
+if (!process.argv.includes("--motion-only") && !process.argv.includes('--home-layout-only') && !process.argv.includes('--chapter-only')) {
 await send('Emulation.setScriptExecutionDisabled', {value:true});
 await page('index.html', 400);
 await ready(`document.querySelector('.home-copy') && getComputedStyle(document.querySelector('.topbar')).display === 'grid'`);
@@ -379,22 +380,79 @@ await ready(`document.querySelector('#finderBreadcrumbs [aria-current]') && docu
 check("target-specific Finder breadcrumb", await js(`document.querySelector('#finderBreadcrumbs a[href="targets.html?body=mars"]') && document.querySelector('#finderBreadcrumbs [aria-current]').textContent.includes(document.querySelector('.target-card[aria-checked=true] strong').textContent)`));
 
 }
-// Desktop Home is a cinematic journey; the counter/evidence layout lives on smaller screens.
+// Desktop Home stays cinematic when DevTools or a narrow window reduces its width.
 await send('Emulation.setDeviceMetricsOverride', {width:1600,height:900,deviceScaleFactor:1,mobile:false});
 await page('index.html', 1000);
 await ready(`document.querySelector('.cinematic-site-link') && document.querySelector('.cinematic')?.dataset.chapter === '0'`);
 check('desktop cinematic Home mounts with sourced targets', await js(`!!document.querySelector('.cinematic-canvas') && [...document.querySelectorAll('.cinematic-target-detail')].every(el=>el.dataset.sourceUrl && el.dataset.datasetId)`));
+await js(`window.homeResizeSentinel = true`);
+await send('Emulation.setDeviceMetricsOverride', {width:723,height:1018,deviceScaleFactor:1,mobile:false});
+await ready(`innerWidth === 723 && document.querySelector('.cinematic')?.dataset.chapter === '0'`);
+check('docked DevTools keeps cinematic Home without a reload', await js(`window.homeResizeSentinel === true && getComputedStyle(document.querySelector('.home')).display === 'none' && document.querySelector('.cinematic h1').textContent.includes('Our next frontier') && document.documentElement.scrollWidth <= innerWidth`));
+await page('index.html', 1000);
+await ready(`document.querySelector('.cinematic')?.dataset.chapter === '0'`);
+check('narrow desktop cold load uses cinematic Home', await js(`document.body.classList.contains('cinematic-active') && getComputedStyle(document.querySelector('.home')).display === 'none'`));
+if (process.argv.includes('--home-layout-only')) {
+  await send('Emulation.setTouchEmulationEnabled', {enabled:true});
+  await send('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await page('index.html', 1000);
+  await ready(`document.querySelector('#facts dd')`);
+  check('touch phone retains mobile Home', await js(`!document.body.classList.contains('cinematic-active') && getComputedStyle(document.querySelector('.home')).display !== 'none' && !matchMedia('(pointer:fine)').matches`));
+  finish();
+}
+await send('Emulation.setDeviceMetricsOverride', {width:1600,height:900,deviceScaleFactor:1,mobile:false});
 await js(`window.scrollTo(0,document.querySelector('.chapter-hero').offsetHeight*.97)`);
 await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`);
 check('chapter transition reaches full black', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`));
 await js(`{const el=document.querySelector('.chapter-orbit');window.scrollTo(0,el.getBoundingClientRect().top+scrollY+el.offsetHeight*.32)}`);
 await ready(`document.querySelector('.cinematic').dataset.chapter === '1' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
 check('Earth orbit emerges with centered quote', await js(`document.querySelector('.cinematic').dataset.chapter === '1' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && getComputedStyle(document.querySelector('.chapter-orbit .cinematic-copy')).textAlign === 'center' && !!document.querySelector('.chapter-orbit blockquote')`));
+await js(`{const el=document.querySelector('.chapter-analogs');window.scrollTo(0,el.offsetTop+el.offsetHeight*.8)}`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '4'`);
+check('shared space stays behind the outgoing Earth', await js(`getComputedStyle(document.querySelector('.cinematic-space-media')).position === 'fixed' && Number(getComputedStyle(document.querySelector('.cinematic-space-media')).zIndex) < Number(getComputedStyle(document.querySelector('.cinematic-canvas')).zIndex)`));
+await js(`{const el=document.querySelector('.chapter-analogs');window.scrollTo(0,el.offsetTop+el.offsetHeight*.97)}`);
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`);
+check('Earth exit reaches full black before finale', await js(`document.querySelector('.cinematic').dataset.chapter === '4' && getComputedStyle(document.querySelector('.cinematic-space-media')).visibility === 'visible'`));
+await js(`window.scrollTo(0,document.querySelector('.chapter-finale').offsetTop)`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '5'`);
+check('finale scene swaps beneath full black', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1' && getComputedStyle(document.querySelector('.cinematic-space-media')).visibility === 'visible' && Number(document.querySelector('.chapter-finale .cinematic-copy').style.opacity) === 0`));
+await js(`window.scrollTo(0,document.querySelector('.chapter-finale').offsetTop+innerHeight*.32)`);
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
+check('finale reveals full viewport and readable copy', await js(`getComputedStyle(document.querySelector('.cinematic-space-media')).position === 'fixed' && document.querySelector('.cinematic-space-media').getBoundingClientRect().top === 0 && document.querySelector('.cinematic-space-media').getBoundingClientRect().height === innerHeight && Number(document.querySelector('.chapter-finale .cinematic-copy').style.opacity) === 1`));
+await js(`{const el=document.querySelector('.chapter-analogs');window.scrollTo(0,el.offsetTop+el.offsetHeight*.32)}`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '4' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
+check('reverse scroll retains the shared space background', await js(`getComputedStyle(document.querySelector('.cinematic-space-media')).visibility === 'visible'`));
+check('restored focus does not rewind to an earlier chapter', await js(`(async () => {
+  const before = scrollY;
+  document.querySelector('.cinematic-scroll').focus({preventScroll:true});
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  return scrollY === before && document.querySelector('.cinematic').dataset.chapter === '4';
+})()`));
+check('tab visibility cancels easing without changing the scroll position', await js(`(async () => {
+  document.querySelector('.cinematic-scroll').click();
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
+  document.dispatchEvent(new Event('visibilitychange'));
+  const before = scrollY;
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});
+  document.dispatchEvent(new Event('visibilitychange'));
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  delete document.hidden;
+  return scrollY === before;
+})()`));
+await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+await ready(`document.querySelector('.cinematic').dataset.chapter === '2'`);
+check('intentional keyboard navigation still reveals the focused chapter', await js(`document.activeElement.matches('.chapter-moon .cinematic-site-link') && Number(document.querySelector('.chapter-moon .cinematic-copy').style.opacity) > .9`));
 await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
 await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && !document.documentElement.classList.contains('lenis')`);
 check('cinematic reduced motion removes blackout and smoothing', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && !document.documentElement.classList.contains('lenis')`));
+if (process.argv.includes('--chapter-only')) finish();
 await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
 await send('Emulation.setDeviceMetricsOverride', {width:1000,height:900,deviceScaleFactor:1,mobile:false});
+// Explicitly emulate touch: width alone no longer identifies a mobile device.
+await send('Emulation.setTouchEmulationEnabled', {enabled:true});
 await page("index.html", 1000);
 await ready(`document.querySelector('#facts dd')`);
 check("home planetary links are filtered", await js(`document.querySelector('.mission-world.moon').getAttribute('href') === 'targets.html?body=moon' && document.querySelector('.mission-world.mars').getAttribute('href') === 'targets.html?body=mars'`));

@@ -1,6 +1,6 @@
 import { initPlanetJourney } from './planet-journey.js';
 
-const desktop = matchMedia('(min-width: 1021px)');
+const desktop = matchMedia('(min-width: 1021px), (hover: hover) and (pointer: fine)');
 if (desktop.matches) {
   const analogs = [
     { name: 'Lanzarote, Spain', lat: 29.04, lon: -13.63, kind: 'Moon & Mars geology', detail: 'ESA PANGAEA trains astronauts in planetary field geology across its volcanic terrain.', source_url: 'https://www.esa.int/Newsroom/Press_Releases/Media_invitation_Astronaut_geology_training_in_Lanzarote_for_future_missions_to_Moon_and_Mars', dataset_id: 'esa_pangaea_lanzarote' },
@@ -13,19 +13,20 @@ if (desktop.matches) {
   root.className = 'cinematic';
   root.innerHTML = `
     <canvas class="cinematic-canvas" aria-hidden="true"></canvas>
+    <div class="cinematic-space-media" aria-hidden="true"><video muted loop playsinline preload="none"></video></div>
     <div class="cinematic-chapters">
-      <section class="cinematic-chapter chapter-hero" id="cinematic-start"><div class="cinematic-copy"><h1>Our next frontier.<br><em>Begins on Earth.</em></h1><p>Find Earth analogs for Moon and Mars bases.</p><a class="cinematic-scroll" href="#cinematic-orbit" aria-label="Scroll to Earth from orbit"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg></a></div></section>
-      <section class="cinematic-chapter chapter-orbit" id="cinematic-orbit" aria-label="Earth from orbit"><div class="cinematic-copy"><blockquote><p>“Our next frontier<br>begins on Earth.”</p><footer>TerraNova</footer></blockquote><p>Explore places beyond Earth, then find where their conditions echo on our own planet.</p></div></section>
+      <section class="cinematic-chapter chapter-hero" id="cinematic-start"><div class="cinematic-copy"><h1>Our next frontier<br><em>Begins on Earth</em></h1><p>Find Earth analogs for Moon and Mars bases.</p><a class="cinematic-scroll" href="#cinematic-orbit" aria-label="Scroll to Earth from orbit"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/></svg></a></div></section>
+      <section class="cinematic-chapter chapter-orbit" id="cinematic-orbit" aria-label="Earth from orbit"><div class="cinematic-copy"><blockquote><p>Our next frontier<br>begins on Earth</p><footer>TerraNova</footer></blockquote><p>Explore places beyond Earth, then find where their conditions echo on our own planet.</p></div></section>
       <section class="cinematic-chapter chapter-moon" id="cinematic-moon"><div class="cinematic-copy cinematic-list"><h2>The Moon</h2><p>Choose a lunar site to inspect its story.</p><div class="cinematic-targets" data-body="Moon"></div></div></section>
       <section class="cinematic-chapter chapter-mars" id="cinematic-mars"><div class="cinematic-copy cinematic-list"><h2>Mars</h2><p>Explore the places shaping future exploration.</p><div class="cinematic-targets" data-body="Mars"></div></div></section>
       <section class="cinematic-chapter chapter-analogs" id="cinematic-analogs"><div class="cinematic-copy cinematic-list"><h2>Other worlds.<br>Closer than you think.</h2><p>These places have hosted real Moon and Mars exploration work. Click a location to travel there.</p><div class="cinematic-analog-list"></div><div class="cinematic-analog-detail" aria-live="polite"></div></div></section>
-      <section class="cinematic-chapter chapter-finale" id="cinematic-finale"><div class="cinematic-finale-media"><video muted loop playsinline preload="none" aria-hidden="true"></video></div><div class="cinematic-copy"><h2>The next discovery<br>starts here.</h2><p>Find a place on Earth that helps us understand another world.</p><a class="cinematic-launch" href="finder.html">Take me to Finder</a></div></section>
+      <section class="cinematic-chapter chapter-finale" id="cinematic-finale"><div class="cinematic-copy"><h2>The next discovery<br>starts here.</h2><p>Find a place on Earth that helps us understand another world.</p><a class="cinematic-launch" href="finder.html">Take me to Finder</a></div></section>
     </div>
     <div class="cinematic-blackout" aria-hidden="true"></div>`;
   document.querySelector('.site-header').after(root);
   document.body.classList.add('cinematic-active');
+  document.documentElement.classList.remove('cinematic-pending');
   document.querySelector('main#main').id='legacy-main';root.id='main';
-  const credit=document.createElement('p');credit.className='cinematic-credit';credit.innerHTML='<a href="https://www.solarsystemscope.com/textures/" data-dataset-id="solar_system_scope_planetary_textures" target="_blank" rel="noopener">Planetary textures: Solar System Scope / INOVE · CC BY 4.0</a>';root.append(credit);
 
   let selectedAnalog = 0, selectedMoon = 0, selectedMars = 0;
   const targetLists = {Moon:[],Mars:[]};

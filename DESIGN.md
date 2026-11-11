@@ -298,9 +298,22 @@ Chapter exits fade all scene content to true black (`#000`), hold while the scen
 changes, and reveal the incoming scene before its text. This is scroll choreography
 inside Home, not a document navigation fade. The solar corona and blue atmosphere
 are planetary lighting, not control decoration. Shader colors belong to the imagery.
+The finale's Milky Way background is shared across all Home chapters, fixed behind
+the transparent planetary canvas and below the blackout. It never scrolls over a
+planet. Finale text follows the shared entrance timing and remains readable at the end.
+The cinematic starfield drifts continuously with edge wrapping in viewport space;
+it never tilts out of view. Reduced motion freezes its drift. Texture attribution
+is retained in `web/assets/cinematic/CREDITS.md` rather than a visible Home credit.
 Reduced motion uses static chapter compositions without blackouts, automatic cloud
 drift, corona animation, or Lenis smoothing. Keyboard focus brings its chapter into
-the readable hold. Mobile keeps the existing Home layout.
+the readable hold. Narrow touch devices keep the existing Home layout. Mouse and
+trackpad desktops retain the cinematic Home at narrow viewport widths, including
+when DevTools is docked. Landing module selection and cinematic CSS use the same
+width-or-hover/fine-pointer media query; resizing within desktop mode does not reload.
+Desktop Home hides the legacy layout synchronously before first paint while scene
+modules load; failures restore the usable fallback. Restoring browser focus must
+not navigate chapters. Only intentional Tab navigation reveals a focused chapter.
+Changing tab visibility cancels unfinished easing at the current scroll position.
 
 Visual reference inspected with Playwright CLI:
 source_url: https://www.omegawatches.com/world-of-omega/sustainability/clearspace

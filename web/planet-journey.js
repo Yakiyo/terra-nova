@@ -109,12 +109,27 @@ export function initPlanetJourney(root, getSelection) {
 
   const starPositions = []; let seed = 42;
   const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  for (let i = 0; i < 1600; i++) starPositions.push((random() - .5) * 24, (random() - .5) * 14, -15);
+  for (let i = 0; i < 1600; i++) starPositions.push(random() * 2 - 1, random() * 2 - 1, -15);
   const starGeo = new THREE.BufferGeometry();
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+  const starUniforms = {
+    starExtent: {value: new THREE.Vector2(5.2, 3.2)},
+    starOffset: {value: new THREE.Vector2()},
+  };
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
-    color: 0xd5d5d5, size: 1.5, sizeAttenuation: false, transparent: true, opacity: .68, depthWrite: false,
+    color: 0xd5d5d5, size: 1.5, sizeAttenuation: false, transparent: true, opacity: .2, depthWrite: false,
   }));
+  // Wrap in screen-aligned space instead of rotating the flat field out of view.
+  stars.material.onBeforeCompile = shader => {
+    Object.assign(shader.uniforms, starUniforms);
+    shader.vertexShader = `uniform vec2 starExtent; uniform vec2 starOffset;\n${shader.vertexShader}`
+      .replace('#include <begin_vertex>', `
+        #include <begin_vertex>
+        transformed.xy = mod(position.xy * starExtent + starOffset + starExtent, starExtent * 2.) - starExtent;
+      `);
+  };
+  // The shader owns the viewport-sized positions, not the CPU bounding sphere.
+  stars.frustumCulled = false;
   scene.add(stars);
 
   // A soft, animated optical corona, with no hard-edged sphere underneath it.
@@ -159,6 +174,7 @@ export function initPlanetJourney(root, getSelection) {
   const resize = () => {
     renderer.setSize(innerWidth, innerHeight, false);
     halfWidth = 3 * innerWidth / innerHeight;
+    starUniforms.starExtent.value.set(halfWidth + .2, 3.2);
     camera.left = -halfWidth; camera.right = halfWidth; camera.updateProjectionMatrix();
     tops = chapters.map(c => c.getBoundingClientRect().top + scrollY);
   };
@@ -169,6 +185,19 @@ export function initPlanetJourney(root, getSelection) {
     requestAnimationFrame(resize);
   };
   configureScroll(); reduced.addEventListener('change', configureScroll);
+  let keyboardFocus = false;
+  const trackKeyboard = event => { keyboardFocus = event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey; };
+  const clearKeyboard = () => { keyboardFocus = false; };
+  document.addEventListener('keydown', trackKeyboard);
+  document.addEventListener('keyup', clearKeyboard);
+  window.addEventListener('blur', clearKeyboard);
+  const syncVisibility = () => {
+    clearKeyboard();
+    // Cancel unfinished easing at the visible position; never replay it on return.
+    lenis?.scrollTo(window.scrollY, {immediate: true, force: true});
+    last = 0;
+  };
+  document.addEventListener('visibilitychange', syncVisibility);
   const nav = e => e.detail.open ? lenis?.stop() : lenis?.start();
   document.addEventListener('navigation-state', nav);
   // Chapter anchors land in the readable hold, rather than stopping inside a blackout.
@@ -186,6 +215,8 @@ export function initPlanetJourney(root, getSelection) {
   });
   // Native Tab can reach the next section even while its visual entrance is masked.
   root.addEventListener('focusin', event => {
+    if (!keyboardFocus || document.hidden) return;
+    clearKeyboard();
     const chapter = event.target.closest('.cinematic-chapter');
     if (chapter && Number(chapter.querySelector('.cinematic-copy').style.opacity) < .9) revealChapter(chapter);
   });
@@ -227,15 +258,19 @@ export function initPlanetJourney(root, getSelection) {
     blackout.style.opacity = String(1 - visibility);
     root.dataset.chapter = String(index);
     copies.forEach((copy, i) => {
-      copy.style.opacity = reduced.matches ? String(i === index ? 1 : 0) : String(i === index ? (index === 0 ? 1 : ease((raw - .12) / .16)) * (1 - ease((raw - .65) / .18)) : 0);
-      if (index === chapters.length - 1 && i === index) copy.style.opacity = String(arrive);
+      copy.style.opacity = reduced.matches ? String(i === index ? 1 : 0) : String(i === index ? (index === 0 ? 1 : ease((raw - .12) / .16)) * (index === chapters.length - 1 ? 1 : 1 - ease((raw - .65) / .18)) : 0);
       copy.style.pointerEvents = Number(copy.style.opacity) > .1 ? '' : 'none';
     });
     for (const w of Object.values(worlds)) w.group.visible = false;
     sun.visible = index === 0;
     sun.position.set(halfWidth * .44, 2.05, -9);
     sun.material.uniforms.time.value = reduced.matches ? 0 : now / 1000;
-    stars.visible = true; if (!reduced.matches) { stars.rotation.z += dt * .003; stars.rotation.y += dt * .006; }
+    stars.visible = true;
+    if (!reduced.matches) {
+      const offset = starUniforms.starOffset.value, extent = starUniforms.starExtent.value;
+      offset.x = (offset.x + dt * .025) % (extent.x * 2);
+      offset.y = (offset.y + dt * .012) % (extent.y * 2);
+    }
     const drift = reduced.matches ? 0 : raw;
     const enter = reduced.matches ? 1 : ease(raw / .32);
     const earth = worlds.earth;
@@ -303,6 +338,10 @@ export function initPlanetJourney(root, getSelection) {
     removeEventListener('pointermove', movePointer); document.documentElement.removeEventListener('pointerleave', resetPointer);
     removeEventListener('resize', resize); document.removeEventListener('navigation-state', nav);
     reduced.removeEventListener('change', configureScroll);
+    document.removeEventListener('keydown', trackKeyboard);
+    document.removeEventListener('keyup', clearKeyboard);
+    window.removeEventListener('blur', clearKeyboard);
+    document.removeEventListener('visibilitychange', syncVisibility);
     const geometries = new Set(), materials = new Set();
     scene.traverse(object => { if (object.geometry) geometries.add(object.geometry); if (object.material) materials.add(object.material); });
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); renderer.dispose();

@@ -1,5 +1,57 @@
 # Use of AI in this project
 
+### 2026-11-11 — Shared space backdrop, refresh and tab-return stability
+
+Codex reused the finale's Milky Way backdrop behind every cinematic Home chapter
+and kept wrapped stars as a subtle continuous overlay. Added synchronous desktop
+loading selection to prevent the legacy Home flashing before modules initialize,
+with a fallback when the cinematic import fails. Chapter focus reveals now require
+intentional Tab input; visibility changes cancel stale Lenis easing at the current
+scroll position. No scientific data or calculations changed.
+Playwright checked delayed script loading, all chapter backgrounds, restored focus,
+interrupted easing, actual tab switching and the existing touch-phone layout.
+Chapter regression checks passed. Review script and captures are in
+`artifacts/verify-home-stability.js`, `artifacts/home-refresh-loading.png` and
+`artifacts/home-shared-space.png`.
+
+### 2026-11-11 — Looping space stars and credit-line removal
+
+Codex replaced the cinematic star plane's accumulating rotation with viewport-sized
+wrapped drift in the existing points shader. Star offsets remain bounded and the
+field adapts to window resizing; reduced motion freezes the drift. Removed the
+visible planetary-texture credit line at the user's request, retaining the asset
+provenance in `web/assets/cinematic/CREDITS.md`. No scientific data changed.
+Chapter smoke checks passed. Playwright verified simulated long-running offsets,
+credit removal and reduced motion without JavaScript errors. Visual capture:
+`artifacts/starfield-long-run.png`.
+
+### 2026-11-11 — Consistent Earth-to-finale transition
+
+Codex fixed the final chapter background scrolling over the outgoing Earth scene.
+The finale media now fills the viewport and becomes visible only when the shared
+chapter controller swaps scenes beneath full black. Finale text uses the shared
+entrance curve while retaining its final readable state. WebGL fallback keeps a
+section-local background. No scientific calculations or data changed.
+The focused chapter smoke checks passed, including the outgoing scene, full-black
+swap, full-viewport entrance, reverse scrolling and reduced motion. Desktop visual
+captures are `artifacts/finale-transition-earth-fixed.png` and
+`artifacts/finale-transition-arrival-fixed.png`.
+
+### 2026-11-11 — Home design selection with docked DevTools
+
+Codex traced the old Home appearing in the supplied screenshot to width-only
+desktop selection. Updated the landing entry, cinematic guard and stylesheet to
+retain cinematic Home for mouse/trackpad desktops at narrow widths. Added compact
+desktop styles and browser regressions for resizing and cold loading, and kept
+the existing touch-phone experience. No scientific calculations or data changed.
+Playwright verified the narrow desktop composition and the touch-phone fallback;
+captures are in `artifacts/home-docked-fixed.png` and
+`artifacts/home-mobile-preserved.png`.
+The focused Home layout smoke checks passed. The broader suite still expects
+the retired Targets page and its old Home links; those existing expectations
+prevent a clean full-suite result. Home chapter transitions, reduced motion and
+mobile counters passed the separate motion run.
+
 Keep this current as you build. Every member adds their own entries.
 
 ## Tools

@@ -6,8 +6,10 @@ Inspected Omega ClearSpace live through Playwright CLI and applied the user's
 follow-up: cloud/ocean Earth shading, animated warm solar corona, full-black scene
 changes, centered TerraNova quote over an orbital Earth view, Moon entering from
 the right and Mars from the left with oversized cropped limbs. Renderer ownership
-is in `web/planet-journey.js`; `web/landing-entry.js` selects desktop/mobile and
-reloads when crossing that breakpoint. This supersedes the older transition and
+is in `web/planet-journey.js`; `web/landing-entry.js` selects cinematic Home for wide
+viewports or mouse/trackpad input, preserving it with docked DevTools. Narrow touch
+devices use mobile Home; only a change of experience reloads the page.
+This supersedes the older transition and
 subtle-cloud notes below.
 
 Playwright confirmed desktop, laptop, mobile, reverse scroll, keyboard traversal,
