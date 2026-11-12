@@ -1,4 +1,4 @@
-import Lenis from './vendor/lenis/lenis.mjs';
+import Lenis from './vendor/lenis/lenis.js';
 
 // Presentation-only navigation. A gesture chooses a chapter; Lenis supplies
 // its timed travel rather than multiplying raw wheel distance across the story.

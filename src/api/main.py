@@ -1378,6 +1378,7 @@ class _RevalidatingStaticFiles(StaticFiles):
 
 
 if WEB_PATH.exists():
-    # Windows can register .mjs as text/plain, which browsers reject for modules.
+    # Use JavaScript MIME types regardless of the host's file associations.
+    mimetypes.add_type("text/javascript", ".js")
     mimetypes.add_type("text/javascript", ".mjs")
     app.mount("/", _RevalidatingStaticFiles(directory=str(WEB_PATH), html=True), name="web")

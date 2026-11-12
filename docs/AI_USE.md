@@ -393,3 +393,8 @@ dataset_id: omega_clearspace_ui_reference. No artwork or code was copied from Om
 Codex traced a local homepage fallback to the Windows MIME type for `lenis.mjs`
 and registered the JavaScript MIME type before mounting the frontend.
 source_url: ../src/api/main.py (dataset_id: terra_nova_static_module_mime).
+
+Codex renamed the vendored Lenis module to `.js`, updated both imports, and made
+the server explicitly register JavaScript MIME types for both extensions.
+source_url: ../src/api/main.py, ../web/chapter-navigation.js, ../web/experience.js
+(dataset_id: terra_nova_static_module_mime).

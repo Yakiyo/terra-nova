@@ -29,6 +29,12 @@ Martian target sites.
 - Visual review scripts (need `playwright-cli` on PATH, with a browser session open on the app): `playwright-cli -s=rocket-review run-code --filename=scripts/rocket_review.js` and `playwright-cli -s=chapter-review run-code --filename=scripts/chapter_review.js`.
 - JS syntax check: `node --input-type=module --check < web/app.js` (plain `node --check` misses module errors)
 
+The cinematic homepage is on `rework`. If a checkout shows the older homepage,
+run `git branch --show-current` and check that the running server was started
+from that checkout. Restart Uvicorn after pulling. In the browser's Network tab,
+`/vendor/lenis/lenis.js` should have a `Content-Type` of `text/javascript`.
+Narrow touch screens use the lightweight homepage by design.
+
 ## Adding a criterion
 Four places must agree: `CRITERIA` in `src/compute/similarity.py`,
 `data/normalization.json` (range, weight, source), a stage in

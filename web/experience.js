@@ -1,5 +1,5 @@
 /* Narrative pages only. Maps and scientific controls retain native scrolling. */
-import Lenis from "./vendor/lenis/lenis.mjs";
+import Lenis from "./vendor/lenis/lenis.js";
 
 const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 let lenis;
