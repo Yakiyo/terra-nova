@@ -3,7 +3,8 @@
 (() => {
   const seen = (() => { try { return sessionStorage.getItem("tn-intro") === "1"; } catch { return false; } })();
   const forced = new URLSearchParams(location.search).has("intro");
-  if (!seen || forced) {
+  void seen; void forced;
+  {
     const el = document.createElement("div");
     el.className = "tn-intro"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "TerraNova introduction");
     const dots = [6, 11, 15, 19, 26, 31, 33, 36, 41, 70, 76, 82, 88, 94].map((x) => `<i style="left:${x}%;animation-delay:${(x % 7) * .4}s"></i>`).join("");

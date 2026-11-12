@@ -12,10 +12,10 @@ const W = {
       earth: (h) => 15 + 13 * Math.cos(2 * Math.PI * (h - 14) / 24), earthName: "Atacama Desert, Chile",
       note: "Simplified daily curve based on Curiosity's weather station (REMS) in Gale Crater. Dust storms flatten the swing: less sun by day, more warmth trapped at night." },
     missions: [
-      { name: "Curiosity", year: "2012", where: "Gale Crater", earth: "Dumont Dunes, Mojave Desert, USA", q: "Curiosity rover selfie", text: "A test rover, 'Scarecrow', practised driving on sand dunes in the Mojave before Curiosity tackled Martian dunes." },
-      { name: "Spirit & Opportunity", year: "2004", where: "Gusev Crater & Meridiani", earth: "Silver Lake, Mojave Desert, USA", q: "Opportunity rover Mars", text: "The FIDO prototype rover rehearsed whole mission days in the Mojave before launch." },
-      { name: "Perseverance", year: "2021", where: "Jezero Crater", earth: "Atacama Desert, Chile", q: "Perseverance rover Jezero", text: "NASA's ARADS project drilled in the Atacama, Earth's driest desert, to practise hunting for traces of life." },
-      { name: "Humans on Mars", year: "future", where: "—", earth: "Devon Island, Canada · Mauna Loa, Hawaii", q: "Haughton Mars Project Devon Island", text: "The Haughton-Mars Project and the HI-SEAS habitat rehearse how crews would live and work on Mars." },
+      { name: "Curiosity", year: "2012", where: "Gale Crater", earth: "Dumont Dunes, Mojave Desert, USA", q: "Curiosity rover selfie|Curiosity rover", text: "A test rover, 'Scarecrow', practised driving on sand dunes in the Mojave before Curiosity tackled Martian dunes." },
+      { name: "Spirit & Opportunity", year: "2004", where: "Gusev Crater & Meridiani", earth: "Silver Lake, Mojave Desert, USA", q: "Opportunity rover Mars|Mars Exploration Rover", text: "The FIDO prototype rover rehearsed whole mission days in the Mojave before launch." },
+      { name: "Perseverance", year: "2021", where: "Jezero Crater", earth: "Atacama Desert, Chile", q: "Perseverance rover Jezero|Perseverance rover", text: "NASA's ARADS project drilled in the Atacama, Earth's driest desert, to practise hunting for traces of life." },
+      { name: "Humans on Mars", year: "future", where: "—", earth: "Devon Island, Canada · Mauna Loa, Hawaii", q: "Haughton Mars Project Devon Island|Devon Island|Mars analog habitat", text: "The Haughton-Mars Project and the HI-SEAS habitat rehearse how crews would live and work on Mars." },
     ],
   },
   moon: {
@@ -28,18 +28,18 @@ const W = {
       earth: (d) => -25 + 8 * Math.sin(2 * Math.PI * d), earthName: "Devon Island, Canada",
       note: "Simplified equatorial surface temperature. Near the south pole, crater floors that never see sunlight stay below −230 °C and can trap water ice." },
     missions: [
-      { name: "Apollo 11–17", year: "1969–72", where: "Six landing sites", earth: "Iceland · Hawaii · Arizona", q: "Apollo astronauts geology training", text: "Crews trained in Iceland's lava fields, on Hawaii's volcanoes and among Arizona's cinder craters." },
-      { name: "Apollo 14", year: "1971", where: "Fra Mauro", earth: "Cinder Lake crater field, Arizona, USA", q: "Cinder Lake crater field Apollo", text: "Engineers blasted craters near Flagstaff to recreate a lunar landing site for training." },
-      { name: "Artemis", year: "2020s", where: "South Pole", earth: "San Francisco volcanic field, Arizona · Iceland", q: "Artemis astronaut field training Arizona", text: "Artemis crews practise moonwalks and sample collection on volcanic ground in Arizona." },
-      { name: "Lava-tube explorers", year: "future", where: "Lunar pits", earth: "Lanzarote, Spain", q: "ESA PANGAEA Lanzarote", text: "ESA's PANGAEA and CAVES courses train astronauts in Lanzarote's lava tubes, a model for lunar caves." },
+      { name: "Apollo 11–17", year: "1969–72", where: "Six landing sites", earth: "Iceland · Hawaii · Arizona", q: "Apollo astronauts geology training|Apollo geology field training", text: "Crews trained in Iceland's lava fields, on Hawaii's volcanoes and among Arizona's cinder craters." },
+      { name: "Apollo 14", year: "1971", where: "Fra Mauro", earth: "Cinder Lake crater field, Arizona, USA", q: "Cinder Lake crater field Apollo|Apollo crater field Flagstaff", text: "Engineers blasted craters near Flagstaff to recreate a lunar landing site for training." },
+      { name: "Artemis", year: "2020s", where: "South Pole", earth: "San Francisco volcanic field, Arizona · Iceland", q: "Artemis astronauts field test Arizona|JETT Arizona|astronaut geology training Arizona|Apollo geology training", text: "Artemis crews practise moonwalks and sample collection on volcanic ground in Arizona." },
+      { name: "Lava-tube explorers", year: "future", where: "Lunar pits", earth: "Lanzarote, Spain", q: "Lanzarote|lava tube cave|Canary Islands volcanic", text: "ESA's PANGAEA and CAVES courses train astronauts in Lanzarote's lava tubes, a model for lunar caves." },
     ],
   },
 };
 const PROCESSES = [
-  { t: "Dust & wind", mars: "Planet-wide dust storms bury solar panels.", earth: "Sahara and Taklamakan dust, measured by NASA MERRA-2.", q: "Mars dust storm", qe: "Sahara dust storm satellite" },
-  { t: "Ice & cold", mars: "Ice caps and ground ice; lunar craters hide ice.", earth: "Permafrost and ice fields, from NASA MODIS snow cover.", q: "Mars north polar ice cap", qe: "Devon Island Haughton crater" },
-  { t: "Volcanic rock", mars: "Basalt plains and giant volcanoes.", earth: "Basalt fields in Iceland, Hawaii, Lanzarote.", q: "Olympus Mons", qe: "Iceland lava field" },
-  { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes used for astronaut and robot training.", q: "Mars lava tube skylight", qe: "lava tube cave Lava Beds" },
+  { t: "Dust & wind", mars: "Planet-wide dust storms bury solar panels.", earth: "Sahara and Taklamakan dust, measured by NASA MERRA-2.", q: "Mars dust storm|Mars dust", qe: "Sahara dust storm|dust storm Africa satellite|dust storm" },
+  { t: "Ice & cold", mars: "Ice caps and ground ice; lunar craters hide ice.", earth: "Permafrost and ice fields, from NASA MODIS snow cover.", q: "Mars north polar ice cap|Mars polar ice", qe: "Devon Island Haughton crater|Devon Island|Arctic ice" },
+  { t: "Volcanic rock", mars: "Basalt plains and giant volcanoes.", earth: "Basalt fields in Iceland, Hawaii, Lanzarote.", q: "Olympus Mons|Mars volcano", qe: "Iceland lava field|Iceland volcano|lava field" },
+  { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes used for astronaut and robot training.", q: "Mars pit crater skylight|Mars pit crater|Arsia Mons pit", qe: "Lava Beds National Monument|lava tube|cave" },
 ];
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -100,7 +100,7 @@ document.getElementById("learn").innerHTML = `
 <section class="ln-sec" id="ch4">
   <header class="ln-h"><span class="ln-mono">04</span><h2>Same processes, two worlds/</h2></header>
   <div class="ln-grid">${PROCESSES.map((p, i) => `<article class="ln-pair">
-    <div class="ln-ph" data-q="${esc(worldId === "moon" && i < 2 ? (i ? "lunar south pole crater shadow" : "lunar regolith dust Apollo") : worldId === "moon" && i === 2 ? "lunar mare basalt" : worldId === "moon" ? "lunar pit lava tube LRO" : p.q)}"><span class="ln-mono">${esc(w.name)}</span></div>
+    <div class="ln-ph" data-q="${esc(worldId === "moon" && i < 2 ? (i ? "lunar south pole|Shackleton crater|Moon south pole" : "lunar dust Apollo|Apollo footprint lunar soil|Apollo regolith") : worldId === "moon" && i === 2 ? "lunar mare|Mare Tranquillitatis|Moon surface" : worldId === "moon" ? "Marius Hills pit|lunar pit|Moon crater" : p.q)}"><span class="ln-mono">${esc(w.name)}</span></div>
     <div class="ln-ph" data-q="${esc(p.qe)}"><span class="ln-mono">Earth</span></div>
     <div class="ln-pair-t"><span class="ln-mono">${pad(i + 1)}</span><h3>${esc(p.t)}</h3><p>${esc(worldId === "moon" ? p.earth : p.mars + " " + p.earth)}</p></div>
   </article>`).join("")}</div>
@@ -142,17 +142,19 @@ function draw() {
 T.addEventListener("input", draw); D?.addEventListener("input", draw); draw();
 
 // ---- NASA Image Library photos (public domain), loaded lazily
-const io = new IntersectionObserver((entries) => entries.forEach(async (e) => {
-  if (!e.isIntersecting) return; io.unobserve(e.target);
-  const el = e.target;
+async function loadPhoto(el) {
   try {
-    const r = await fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(el.dataset.q)}&media_type=image`);
-    const item = (await r.json()).collection.items.find((x) => x.links?.[0]?.href);
-    if (!item) return;
+    let item = null;
+    for (const q of el.dataset.q.split("|")) {
+      const r = await fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=image`);
+      item = (await r.json()).collection.items.find((x) => x.links?.[0]?.href);
+      if (item) break;
+    }
+    if (!item) { el.style.background = `center/cover url('${w.tex}')`; return; }
     const img = new Image(); img.alt = item.data?.[0]?.title || ""; img.loading = "lazy";
     img.onload = () => el.classList.add("is-in"); img.src = item.links[0].href;
     img.title = `${item.data?.[0]?.title || ""} · NASA Image Library`;
     el.prepend(img);
-  } catch { /* keep the placeholder */ }
-}), { rootMargin: "200px" });
-document.querySelectorAll(".ln-ph").forEach((el) => io.observe(el));
+  } catch { el.style.background = `center/cover url('${w.tex}')`; }
+}
+document.querySelectorAll(".ln-ph").forEach((el) => loadPhoto(el));
