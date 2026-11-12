@@ -13,6 +13,7 @@ import { escapeHtml as esc, decodeFloat32 as decode, formatCoord, topShareText }
 import { BoundedCache } from './bounded-cache.js';
 import { fetchReadiness, readinessHtml } from "./readiness.js";
 import { renderTargetPicker, installTabIntros } from "./target-picker.js";
+import { enhanceTargetDetail, refreshComparison, syncActiveLayer } from "./target-insights.js";
 queueMicrotask(() => installTabIntros(esc));
 
 const starfield = initStarfield("starfield");
@@ -596,6 +597,7 @@ async function setLayer(key) {
   if (seq !== layerSeq) return;
   state.layer = key;
   paintLayer();
+  syncActiveLayer(key);
 }
 
 /* ----------------------------------------------------------------- targets */
@@ -639,34 +641,50 @@ function renderTargetDetail() {
       : "earth_percentile" in m ? "est"
         : Math.abs(m.effective_value - m.value) > 1e-9 ? "edge" : "exact";
     if (kind === "off") {
-      return `<li class="pf-row is-off"><span class="pf-label">${esc(c.label)}</span><span class="pf-tag pf-off">Not used</span></li>`;
+      return `<li class="pf-row is-off" data-key="${esc(c.key)}"><span class="pf-label">${esc(c.label)}</span><span class="pf-tag pf-off">Not used</span></li>`;
     }
     const lo = Number(c.earth_min), hi = Number(c.earth_max);
     const pos = hi > lo ? Math.max(0, Math.min(1, (m.effective_value - lo) / (hi - lo))) : 0.5;
     const detail = kind === "edge" ? `Real value ${esc(fmtValue(m.value, c.unit))}`
       : kind === "est" ? `Earth's ${m.earth_percentile}th percentile${m.measured_value != null ? ` · measured ${esc(fmtValue(m.measured_value, c.unit))}` : ""}`
         : "";
-    return `<li class="pf-row">
+    return `<li class="pf-row" data-key="${esc(c.key)}" data-layer="${esc(c.key)}" title="Show ${esc(c.label.toLowerCase())} across Earth">
       <span class="pf-label">${esc(c.label)}</span>
       <b class="pf-value num">${esc(fmtValue(m.effective_value, c.unit))}</b>
       <span class="pf-bar" role="img" aria-label="${Math.round(pos * 100)}% of the way through Earth's range"><i style="left:${(pos * 100).toFixed(1)}%"></i></span>
       <span class="pf-ends"><span>${esc(fmtValue(lo, c.unit))}</span><span>${esc(fmtValue(hi, c.unit))}</span></span>
       <span class="pf-tag pf-${kind}" title="${esc(STATUS[kind][1])}">${STATUS[kind][0]}</span>
       ${detail ? `<span class="pf-detail">${detail}</span>` : ""}
+      <span class="ti-readout"></span>
     </li>`;
   }).join("");
   const plain = TARGET_PLAIN[t.id];
   const chips = state.criteria.filter((c) => {
     const m = t.criteria[c.key];
     return m.value !== null && m.value !== undefined && (state.weights[c.key] ?? 0) !== 0;
-  }).map((c) => `<li><small>${esc(c.label)}</small><b class="num">${esc(fmtValue(t.criteria[c.key].effective_value, c.unit))}</b></li>`).join("");
+  }).map((c) => `<li><button type="button" data-layer="${esc(c.key)}" title="Show ${esc(c.label.toLowerCase())} across Earth"><small>${esc(c.label)}</small><b class="num">${esc(fmtValue(t.criteria[c.key].effective_value, c.unit))}</b></button></li>`).join("");
   $("targetDetail").innerHTML = `
     ${plain ? `<dl class="tp-plain"><dt>What it is</dt><dd>${esc(plain[0])}</dd><dt>Why it matters</dt><dd>${esc(plain[1])}</dd></dl>`
       : `<p class="tp-summary">${esc(t.summary)}</p>`}
     <h3 class="tp-chips-head">What Earth must look like to match</h3>
+    <p class="ti-hint">${icon("globe-hemisphere-east")}<span>Tap a condition to see it across Earth.</span>
+      <button type="button" class="ti-back link-button" hidden>Back to the match map</button></p>
     <ul class="tp-chips">${chips}</ul>
+    <section class="ti-funnel" aria-label="How Earth gets narrowed down">
+      <div class="ti-funnel-head">
+        <div><b>How Earth gets narrowed down</b><small>Watch the globe as each condition is switched on.</small></div>
+        <button type="button" class="ti-play">${icon("play")} Play</button>
+      </div>
+      <ol class="ti-steps"></ol>
+      <p class="ti-caption" aria-live="polite"></p>
+      <button type="button" class="ti-restore link-button" hidden>Back to the match map</button>
+    </section>
     <details class="tp-more"><summary>Full matching profile and sources</summary>
-      <p class="pf-intro">Each bar runs from Earth's lowest to highest value. The dot is what we look for.</p>
+      <p class="pf-intro">Each bar runs from Earth's lowest to highest value.</p>
+      <div class="ti-compare">
+        <span class="ti-keys"><span><i class="k-target"></i>this site</span><span><i class="k-match"></i><span class="ti-key-match">#1 match</span></span><span><i class="k-place"></i>a place you know:</span></span>
+        <select class="ti-place-select" aria-label="Compare with a place you know"></select>
+      </div>
       <ul class="pf-legend">${Object.entries(STATUS).map(([k, [name, why]]) => `<li><span class="pf-tag pf-${k}">${name}</span>${esc(why)}</li>`).join("")}</ul>
       <ul class="pf-list">${rows}</ul>
       ${t.location_note ? `<div class="pf-note"><b>About the pin</b><p>${esc(t.location_note)}</p></div>` : ""}
@@ -675,6 +693,16 @@ function renderTargetDetail() {
         ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">See it on NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
       </div>
     </details>`;
+  enhanceTargetDetail({
+    api, esc, fmtValue, decode, currentLayer: () => state.layer,
+    criterion: (k) => state.criteria.find((c) => c.key === k),
+    topResult: () => state.data?.results?.[0] || null,
+    showLayer: (k) => { $("layer").value = k; $("layer").dispatchEvent(new Event("change")); },
+    setOverlay: (img) => { globe.setOverlay(img); flat.setOverlay(img); },
+    restoreOverlay: () => paintLayer(),
+    setLegend: (html) => { $("legend").innerHTML = html; },
+    funnelQuery: () => `target_id=${encodeURIComponent(state.targetId)}&weights=${encodeURIComponent(Object.entries(state.weights).map(([k, v]) => `${k}:${v}`).join(","))}`,
+  });
   const caption = $("twinCaption");
   caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} · ${fmtCoord(t.latitude, t.longitude)}`;
   $("twin").hidden = !twin;
@@ -915,6 +943,7 @@ const topKSoon = debounce(() => { if (!state.selected) showList(); runScore(); }
 
 /* fresh: a new ranking (stagger the rows in); otherwise an in-place refresh. */
 function renderResults(fresh = false) {
+  queueMicrotask(refreshComparison);
   const d = state.data;
   if (!d || state.awaitingCustom) return;
   const bits = [];

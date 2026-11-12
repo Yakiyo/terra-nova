@@ -39,6 +39,7 @@ from src.agents.rationale import explain_cell, load_targets
 from src.compute import (
     countries,
     datachecks,
+    funnel,
     qualification,
     robustness,
     terrain,
@@ -1190,6 +1191,21 @@ def scorefield(
     request = ScoreRequest(target_id=target_id, weights=_parse_weights(weights))
     result, _, _ = _score(request)
     return _field(result.score)
+
+
+@app.get("/api/funnel")
+def funnel_view(
+    target_id: str | None = Query(default=None),
+    weights: str | None = Query(default=None, description="Comma separated key:weight pairs."),
+    threshold: float = Query(default=funnel.DEFAULT_THRESHOLD, gt=0.0, le=1.0),
+) -> dict[str, Any]:
+    """How Earth's land narrows down as each condition is applied (explanatory view)."""
+    if not target_id:
+        target_id = next(iter(_targets()), None)
+    request = ScoreRequest(target_id=target_id, weights=_parse_weights(weights))
+    result, _, _ = _score(request)
+    summary, level = funnel.elimination_funnel(result, valid_mask(STATE.arrays), threshold)
+    return {**summary, "target_id": target_id, "level": _field(level)}
 
 
 @app.get("/api/validation")
