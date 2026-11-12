@@ -126,3 +126,23 @@
 .sd-hero.is-loading::after { content: "Loading sharper imagery…"; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
   padding: 3px 9px; border-radius: 999px; background: rgba(5,5,7,.7); color: rgba(255,255,255,.8); font-size: 10.5px; }
 .ic-img img.is-quick { filter: saturate(1.1); }
+/* Placeholder: blurred + dimmed with a shimmer until a sharp image arrives. */
+.sd-hero { isolation: isolate; }
+.sd-hero:not(.is-sharp) { background-size: 140% auto; }
+.sd-hero:not(.is-sharp)::before { content: ""; position: absolute; inset: -20px; z-index: 0; background: inherit; filter: blur(10px) brightness(.7); }
+.sd-hero:not(.is-sharp) .sd-shade { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.08) 50%, transparent 70%) 0 0 / 200% 100%,
+  linear-gradient(180deg, rgba(0,0,0,.25) 0%, transparent 35%, rgba(0,0,0,.82) 100%); animation: sd-shimmer 1.6s linear infinite; }
+.sd-hero > * { position: relative; z-index: 1; }
+.sd-hero > .sd-shade { position: absolute; z-index: 1; }
+.sd-hero > .sd-hero-top, .sd-hero > .sd-hero-bottom { position: absolute; z-index: 2; }
+.sd-hero.is-sharp::before { content: none; }
+@keyframes sd-shimmer { to { background-position: -200% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) { .sd-hero .sd-shade { animation: none; } }
+.ic-img img.is-quick { filter: blur(3px) brightness(.8); transform: scale(1.1); }
+.ic-img { overflow: hidden; }
+.sd-hero.is-lowres::before { filter: blur(4px) brightness(.85); }
+.sd-hero.is-lowres .sd-shade { animation: none; }
+.sd-hero.is-lowres::after { content: "Low-resolution preview · satellite imagery is slow to reach right now"; position: absolute; top: 12px; left: 50%;
+  transform: translateX(-50%); z-index: 3; padding: 3px 9px; border-radius: 999px; background: rgba(5,5,7,.7); color: rgba(255,255,255,.75);
+  font-size: 10px; white-space: nowrap; }
+.sd-hero.is-loading::after { z-index: 3; }

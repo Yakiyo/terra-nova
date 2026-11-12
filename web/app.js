@@ -216,17 +216,38 @@ async function thumbFor(cell) {
   try { return await request; } finally { pendingThumbs.delete(cell.key); }
 }
 
+function gibsDirect(lat, lon) {
+  const s = Math.max(-90, lat - 1), n = Math.min(90, lat + 1), w = Math.max(-180, lon - 1), e = Math.min(180, lon + 1);
+  const url = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0"
+    + "&LAYERS=BlueMarble_NextGeneration&STYLES=&CRS=EPSG:4326"
+    + `&BBOX=${s},${w},${n},${e}&WIDTH=320&HEIGHT=320&FORMAT=image/jpeg`;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const t = setTimeout(() => resolve(null), 15000);
+    img.onload = () => { clearTimeout(t); resolve(url); };
+    img.onerror = () => { clearTimeout(t); resolve(null); };
+    img.src = url;
+  });
+}
+
 async function loadThumb(cell) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 6000);
   let out;
   try {
     const res = await fetch(`/api/thumb?lat=${cell.lat}&lon=${cell.lon}`, {signal:controller.signal});
     if (!res.ok) throw new Error(String(res.status));
     out = { src: URL.createObjectURL(await res.blob()), credit: "NASA Blue Marble NG · GIBS · 2°×2°" };
   } catch {
-    const src = localCrop(cell.lat, cell.lon);
-    out = src ? { src, credit: "Offline preview · Blue Marble 10 km" } : null;
+    // The server could not fetch it in time: ask NASA GIBS directly from the browser (same
+    // Blue Marble layer and 2 x 2 degree window as src/acquire/thumbs.py), and only fall
+    // back to the low-resolution crop of the globe texture if that fails too.
+    const direct = await gibsDirect(cell.lat, cell.lon);
+    if (direct) out = { src: direct, credit: "NASA Blue Marble NG · GIBS · 2°×2°" };
+    else {
+      const src = localCrop(cell.lat, cell.lon);
+      out = src ? { src, credit: "Offline preview · Blue Marble 10 km" } : null;
+    }
   } finally { clearTimeout(timer); }
   if (out) thumbCache.set(cell.key, out);
   return out;
@@ -449,11 +470,17 @@ function infoCard(r) {
     img.alt = `Satellite view around ${fmtCoord(r.lat, r.lon)}`;
     const quick = localCrop(r.lat, r.lon);
     if (quick && box) { img.src = quick; img.className = "is-quick"; box.prepend(img); }
-    thumbFor(cellOf(r.lat, r.lon)).then((thumb) => {
-      if (!thumb || !box) return;
-      img.src = thumb.src; img.className = "";
+    // First sharp image wins: the NASA thumbnail or the terrain-relief preview.
+    let sharp = false;
+    const use = (src) => {
+      if (sharp || !box || !src || src.startsWith("data:")) return;
+      sharp = true; img.src = src; img.className = "";
       if (!img.isConnected) box.prepend(img);
-    });
+    };
+    thumbFor(cellOf(r.lat, r.lon)).then((thumb) => use(thumb?.src));
+    const relief = new Image();
+    relief.onload = () => use(relief.src);
+    relief.src = `/api/peek.jpg?lat=${cellOf(r.lat, r.lon).lat}&lon=${cellOf(r.lat, r.lon).lon}`;
   }
   // Sit above the point, but stay inside the stage.
   const onPlace = (x, y, w, h) => {
@@ -1127,14 +1154,26 @@ function renderDetail(r) {
   {
     det.dataset.index = String(r.index);
     const hero = det.querySelector(".sd-hero"), key = String(r.index);
-    const set = (url) => { if (hero && det.dataset.index === key) hero.style.backgroundImage = `url('${url}')`; };
+    const set = (url, sharp) => {
+      if (!hero || det.dataset.index !== key) return;
+      hero.style.backgroundImage = `url('${url}')`;
+      if (sharp) hero.classList.add("is-sharp");
+    };
     const quick = localCrop(r.lat, r.lon);
-    if (quick) set(quick);
+    if (quick) set(quick, false);
     hero?.classList.add("is-loading");
-    thumbFor(cellOf(r.lat, r.lon)).then((t) => { if (t) set(t.src); });
+    // The NASA thumbnail counts as sharp only if it really came from the server (the
+    // offline fallback is the same low-resolution crop as the placeholder).
+    thumbFor(cellOf(r.lat, r.lon)).then((t) => { if (t && !t.src.startsWith("data:")) set(t.src, true); });
     const relief = new Image();
-    relief.onload = () => { set(relief.src); hero?.classList.remove("is-loading"); };
-    relief.onerror = () => hero?.classList.remove("is-loading");
+    relief.onload = () => { set(relief.src, true); hero?.classList.remove("is-loading"); };
+    const giveUp = () => {
+      if (!hero || det.dataset.index !== key || hero.classList.contains("is-sharp")) return;
+      hero.classList.remove("is-loading");
+      hero.classList.add("is-lowres");
+    };
+    relief.onerror = giveUp;
+    setTimeout(giveUp, 25000);
     relief.src = `/api/peek.jpg?lat=${r.lat}&lon=${r.lon}`;
   }
   det.querySelector(".back").addEventListener("click", showList);
