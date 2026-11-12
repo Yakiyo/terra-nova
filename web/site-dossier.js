@@ -65,7 +65,7 @@ export function dossierHtml(r, ctx) {
 
   return `
     <button class="ghost small back" type="button">${icon("arrow-left")}All ranked sites</button>
-    <section class="sd-hero" style="background-image:url('${esc(ctx.heroUrl)}'), url('${esc(ctx.fallbackUrl)}')">
+    <section class="sd-hero">
       <div class="sd-shade"></div>
       <div class="sd-hero-top">${r.rank ? `<span class="sd-rank num">#${r.rank}</span>` : ""}
         <span class="sd-ring" style="--v:${r.score}"><b class="num">${Math.round(r.score * 100)}</b><small>% match</small></span></div>
@@ -81,7 +81,7 @@ export function dossierHtml(r, ctx) {
       <div class="sd-twin-head">
         <span class="sd-side"><i class="sd-body" style="background-image:url('${esc(bodyImage)}')"></i><b>${esc(t.short_name)}</b><small>${esc(t.body)}</small></span>
         <span class="sd-vs">vs</span>
-        <span class="sd-side sd-right"><i class="sd-body sd-earthball" style="background-image:url('${esc(ctx.fallbackUrl)}')"></i><b>${esc(name)}</b><small>Earth</small></span>
+        <span class="sd-side sd-right"><i class="sd-body sd-earthball" style="background-image:url('${esc(ctx.quickUrl || ctx.fallbackUrl)}')"></i><b>${esc(name)}</b><small>Earth</small></span>
       </div>
       <ul class="sd-rows">${twin}</ul>
       <p class="sd-verdict">${esc(verdict(rows))}</p>

@@ -441,14 +441,20 @@ function infoCard(r) {
     $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
   });
   for (const type of ["pointerdown", "wheel", "dblclick"]) el.addEventListener(type, (e) => e.stopPropagation());
-  thumbFor(cellOf(r.lat, r.lon)).then((thumb) => {
+  {
+    // Instant preview cut from the globe's own Blue Marble image, replaced by the sharper
+    // NASA thumbnail when it arrives (a never-seen place can take several seconds).
     const box = el.querySelector(".ic-img");
-    if (!thumb || !box) return;
     const img = new Image();
     img.alt = `Satellite view around ${fmtCoord(r.lat, r.lon)}`;
-    img.src = thumb.src;
-    box.prepend(img);
-  });
+    const quick = localCrop(r.lat, r.lon);
+    if (quick && box) { img.src = quick; img.className = "is-quick"; box.prepend(img); }
+    thumbFor(cellOf(r.lat, r.lon)).then((thumb) => {
+      if (!thumb || !box) return;
+      img.src = thumb.src; img.className = "";
+      if (!img.isConnected) box.prepend(img);
+    });
+  }
   // Sit above the point, but stay inside the stage.
   const onPlace = (x, y, w, h) => {
     const cw = el.offsetWidth, ch = el.offsetHeight;
@@ -1113,11 +1119,24 @@ function renderDetail(r) {
     coord: fmtCoord, topShare: topShare(r.percentile), cells: state.sorted.length,
     stability: stabilityOf(r), pinned: state.pins.some((x) => x.index === r.index),
     bodyImage: `assets/${t.body.toLowerCase()}_sm.jpg`,
-    heroUrl: `/api/peek.jpg?lat=${r.lat}&lon=${r.lon}`, fallbackUrl: `/api/thumb?lat=${r.lat}&lon=${r.lon}`,
+    quickUrl: localCrop(r.lat, r.lon), fallbackUrl: `/api/thumb?lat=${r.lat}&lon=${r.lon}`,
     worldview, gmaps, moreHtml,
   });
   $("resultsSummary").hidden = true;
   document.querySelector("#results > .advanced-settings")?.setAttribute("hidden", "");
+  {
+    det.dataset.index = String(r.index);
+    const hero = det.querySelector(".sd-hero"), key = String(r.index);
+    const set = (url) => { if (hero && det.dataset.index === key) hero.style.backgroundImage = `url('${url}')`; };
+    const quick = localCrop(r.lat, r.lon);
+    if (quick) set(quick);
+    hero?.classList.add("is-loading");
+    thumbFor(cellOf(r.lat, r.lon)).then((t) => { if (t) set(t.src); });
+    const relief = new Image();
+    relief.onload = () => { set(relief.src); hero?.classList.remove("is-loading"); };
+    relief.onerror = () => hero?.classList.remove("is-loading");
+    relief.src = `/api/peek.jpg?lat=${r.lat}&lon=${r.lon}`;
+  }
   det.querySelector(".back").addEventListener("click", showList);
   det.querySelector("#openEye").addEventListener("click", () => openGodsEye(r));
   det.querySelector("#sdRaw")?.addEventListener("click", () => download(`terranova-site-${r.lat}_${r.lon}.json`, JSON.stringify(rawData, null, 2), "application/json"));
