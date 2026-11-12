@@ -52,12 +52,14 @@ TerraNova treats analog search as an **operational proxy problem**: match the **
 
 | Capability | Description |
 |------------|-------------|
-| **Target profiles** | Shackleton rim, Malapert Massif, Haworth cold trap, Jezero, Gale, or a **custom** signature (`data/targets.json`). |
+| **Target profiles** | Shackleton rim, Malapert Massif, Haworth cold trap, **Marius Hills lava-tube skylight**, Jezero, Gale, **Utopia Planitia ice-rich ground**, or a **custom** signature (`data/targets.json`). |
 | **Global screening** | Every scorable land cell compared on precipitation, vegetation (NDVI), temperature ranges, MODIS LST diurnal swing, slope, and roughness. |
 | **Ranked discovery** | 3D globe heatmap, top-*N* list, **novelty** (`new` / `near_known` / `known` vs `data/known_analogs.json`). |
 | **Explainability** | Per-criterion similarity, weights, sources, and rule-based site cards (`src/agents/rationale.py`). |
 | **Validation** | ROC-AUC vs catalog analogs and humid **negative controls**; leave-one-criterion-out and stability probes. |
 | **God's Eye 3D** | Local DEM mesh (~150 m), optional Sentinel-2 drape, **lunar low-sun** preset, slope/rover-trafficability stats, GeoJSON/CSV export. |
+| **EVA traverse and mission dossier** | In God's Eye, plan up to 8 waypoints (Basecamp, Science Station, Drill Site…). The server measures elevation, grade, climb, hazards over 15° and Tobler walking time on the full-resolution tiles (`src/compute/traverse.py`). Export a printable, fully cited mission dossier (HTML) and the route as GeoJSON. |
+| **Hardware test readiness** | For any site: could a VIPER-class ice drill, low-sun navigation, a spacesuit or a rover be field-tested here (TRL 5-6)? Four categories, each requirement with its value, a sourced threshold and pass / near / fail (`src/compute/qualification.py`). |
 
 **Design principle:** scoring at request time is **deterministic arithmetic** in `src/compute`—no LLM, no randomness, no network when `OFFLINE=1`.
 
@@ -98,7 +100,6 @@ End-to-end pipeline (offline build → online query):
 
 **God's Eye (on demand):** `GET /api/site3d` mosaics **AWS Terrain Tiles** (Terrarium); browser loads **EOx Sentinel-2 cloudless** tiles via `/api/imagery/...` (cache under `cache/sitetiles/`).
 
-**Architecture diagram (video / slides):** [`docs/TerraNova-architecture-video.drawio`](docs/TerraNova-architecture-video.drawio)
 
 ---
 
@@ -136,10 +137,24 @@ Any $s_k = 0$ **vetoes** the cell (e.g. dense vegetation cannot be saved by corr
 | `lst_diurnal_range` | Mean LST day − night (K) | [MODIS LST 2000–2020 (Zenodo)](https://doi.org/10.5281/zenodo.6458406); gaps filled from POWER `TS_RANGE` |
 | `slope` | Regional slope of 0.5° DEM (°) | [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) |
 | `roughness` | RMS height ~28 km window (m) | AWS Terrain Tiles |
-| `mean_annual_temperature` | Mean monthly T2M (°C) | NASA POWER (default weight 0; **Haworth** enables 2× for cold-trap proxy) |
+| `mean_annual_temperature` | Mean monthly T2M (°C) | NASA POWER (default weight 0; enabled by **Haworth** 2×, **Utopia** 2× and the **lava tube** 1×) |
 | `elevation` | Mean elevation (m) | AWS Terrain Tiles (default weight 0) |
+| `basaltic_volcanic` | Dominant rock class: basalt 1, intermediate volcanic 0.5, other 0 | [GLiM](https://doi.org/10.1594/PANGAEA.788537) gridded to 0.5° (default weight 0; the **lava tube** target enables 2×) |
 
 Land mask: Natural Earth 1:50m land minus lakes; cell scorable if ≥50% land.
+
+### Lava tubes and ground ice (archetypes)
+
+Two targets go beyond surface sites (spec and sources: [`docs/WINNING_FEATURES.md`](docs/WINNING_FEATURES.md)):
+
+* **Marius Hills lava-tube skylight (Moon):** a habitat inside a lava tube. Deep lunar lava tubes
+  keep a stable ~17 °C and form in basaltic lava, so the Earth match is **basaltic lava fields in a mild,
+  stable climate**: a new rock-type layer (GLiM) weighted 2× plus mean temperature. The five catalogued
+  lava-tube sites (Craters of the Moon, Lava Beds, Lava River Cave, Víðgelmir, Undara) all rank in Earth's
+  top 2% for this target.
+* **Utopia Planitia ice-rich ground (Mars):** water for In-Situ Resource Utilization from buried ice
+  (MRO SHARAD). Matched to Earth's cold, barren, dry **continuous-permafrost** regime (20th-percentile mean
+  temperature, about −24 °C), validated on Devon Island, Axel Heiberg and the McMurdo Dry Valleys.
 
 ### Lunar cold traps (operational proxy)
 
@@ -149,11 +164,11 @@ Absolute lunar PSR temperatures (~40 K) are **not** matched on Earth. For **Hawo
 
 ## Validation
 
-Catalog: **`data/known_analogs.json`** (USGS-style analogs, Apollo training sites, polar deserts, plus **negative controls**—Amazon, Congo, cropland, etc.).
+Catalog: **`data/known_analogs.json`** (16 catalogued analog sites, each with its English Wikipedia source: Apollo training sites, polar deserts, lava tubes, impact structures; plus **negative controls**: Amazon, Congo, cropland, etc.).
 
 | Check | Result (current build) |
 |-------|----------------------|
-| **ROC-AUC** (analog-like vs humid/vegetated controls) | **1.00** on all five built-in targets |
+| **ROC-AUC** (analog-like vs humid/vegetated controls) | **1.00** on all seven built-in targets |
 | **Leave-one-out** | Dropping **vegetation** hurts separation most; other criteria often leave AUC at 1.00 |
 | **Cross-dataset checks** | e.g. MODIS LST swing vs POWER TS_RANGE ρ ≈ 0.92 ([`/api/datachecks`](http://127.0.0.1:8000/api/datachecks)) |
 
@@ -187,13 +202,14 @@ Example control percentiles (lunar south pole target, from `check_controls`):
 | MODIS Terra LST 2000–2020 | LP DAAC via [Zenodo 6458406](https://doi.org/10.5281/zenodo.6458406) | Diurnal thermal swing | GeoTIFF → `lst_modis.npy` |
 | Terrain (SRTM/GMTED/ETOPO1) | [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | Elevation, slope, roughness | Terrarium PNG |
 | Natural Earth | Natural Earth | Land/ocean mask, country borders, gazetteer | GeoJSON in `cache/raw/` |
+| Global Lithological Map (GLiM, 0.5°) | Hartmann & Moosdorf 2012, [PANGAEA](https://doi.org/10.1594/PANGAEA.788537), CC-BY 3.0 | Basaltic volcanic rock (lava-tube target) | ASCII grid → `basaltic_volcanic.npy` (`python -m src.acquire.glim`) |
 
 ### Planetary target signatures (literature + agency references)
 
 | Body | Sites in app | Ground-truth inputs (cited in `targets.json`) |
 |------|--------------|-----------------------------------------------|
-| **Moon** | Shackleton rim, Malapert, Haworth PSR | LRO LOLA / Diviner literature, Artemis III regions (NASA 2024), peer-reviewed polar studies |
-| **Mars** | Jezero, Gale | MOLA/HRSC context, REMS/MEDA climate tables, rover landing literature |
+| **Moon** | Shackleton rim, Malapert, Haworth PSR, Marius Hills skylight | LRO LOLA / Diviner literature, Artemis III regions (NASA 2024), peer-reviewed polar studies, LROC Lunar Pit Atlas |
+| **Mars** | Jezero, Gale, Utopia Planitia | MOLA/HRSC context, REMS/MEDA climate tables, rover landing literature, MRO SHARAD ice (NASA JPL 2016), NSSDC Mars fact sheet |
 
 **Next ingestion (hackathon):** NASA [PGDA Product 78](https://pgda.gsfc.nasa.gov/products/78) 5 m LOLA site DEMs/slope; HiRISE/CRISM site tiles for Mars mineralogy ([`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.md)).
 
@@ -243,7 +259,7 @@ terra-nova/
 ├── web/                       # index.html, app.js, globe.js, godseye.js, …
 ├── scripts/                   # setup.ps1, check_controls.py
 ├── tests/
-└── docs/                      # VIDEO_SCRIPT, DATA_REQUESTS, architecture draw.io
+└── docs/                      # WINNING_FEATURES, DATA_REQUESTS, VIDEO_SCRIPT, AI_USE
 ```
 
 ---
@@ -255,8 +271,8 @@ terra-nova/
 Requires [git](https://git-scm.com/) and [uv](https://github.com/astral-sh/uv) (`winget install astral-sh.uv`):
 
 ```powershell
-git clone -b feature/v2-nasa-data-globe https://github.com/Yakiyo/terra-nova.git
-cd terra-nova
+git clone -b rework https://github.com/Yakiyo/exo-earth.git
+cd exo-earth
 powershell -File scripts/setup.ps1
 $env:OFFLINE = "1"
 .venv\Scripts\python.exe -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload
@@ -282,8 +298,8 @@ Open **http://127.0.0.1:8000/**. No environment activation is needed for these c
 ### Linux / macOS
 
 ```bash
-git clone -b feature/v2-nasa-data-globe https://github.com/Yakiyo/terra-nova.git
-cd terra-nova
+git clone -b rework https://github.com/Yakiyo/exo-earth.git
+cd exo-earth
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -r requirements.txt
 OFFLINE=1 .venv/bin/python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
@@ -306,11 +322,23 @@ reusing a Windows `.venv`.
   Linux/macOS, or `.\.venv\Scripts\Activate.ps1` in PowerShell. Alternatively,
   replace `python` with the explicit environment Python path shown above.
 
-### God's Eye offline prefetch
+### Offline demo prefetch (run once, online, before the demo)
 
-```bash
-OFFLINE=0 python -m src.acquire.sitetiles --top 5
+**Needed before an offline demo.** God's Eye, the hover previews and the detail imagery
+only work offline for places whose tiles are cached. The prefetch scripts rank every
+target exactly as the Finder does (its discovery filters and each target's default
+weights), so the cached sites are the ones the Finder lists. With internet access:
+
+```powershell
+$env:OFFLINE = "0"
+.venv\Scripts\python -m src.acquire.sitetiles          # God's Eye terrain + imagery, top 20 of every target
+.venv\Scripts\python -m src.acquire.peek               # hover previews
+.venv\Scripts\python -m src.acquire.thumbs             # Blue Marble thumbnails
+.venv\Scripts\python -m src.acquire.tiles --level 2 --around-top 20   # detail map imagery
 ```
+
+Run it again after any change to targets, weights or data, then check offline:
+`$env:OFFLINE = "1"` and open God's Eye on a few results of each target.
 
 ### Tests
 
@@ -326,11 +354,23 @@ OFFLINE=1 python -m scripts.check_controls
 
 | Method | Path | Purpose |
 |--------|------|---------|
+| `GET` | `/api/health` | Readiness: predictor stack present, offline flag, grid shape |
+| `GET` | `/api/criteria` | Criteria, units, Earth ranges and default weights |
 | `POST` | `/api/score` | Rank cells for a target; optional full score field |
+| `POST` | `/api/robustness` | Stability of the ranked sites (Monte Carlo) and leave-one-criterion-out |
 | `POST` | `/api/explain` | Breakdown for any lat/lon |
 | `GET` | `/api/validation` | ROC-AUC and control-site table |
-| `GET` | `/api/site3d` | God's Eye heightmap + terrain statistics |
-| `GET` | `/api/targets`, `/api/criteria`, `/api/sources` | Catalog and provenance |
+| `GET` | `/api/datachecks` | Do independent datasets agree? (Spearman correlations) |
+| `GET` | `/api/scorefield` | The whole score surface for map rendering |
+| `GET` | `/api/predictor` | One raw predictor grid |
+| `GET` | `/api/cell` | Predictors, label, novelty and provenance for one coordinate |
+| `GET` | `/api/search` | Find a place: analogs, regions, towns or "lat, lon" |
+| `GET` | `/api/analogs` | The known-analog catalogue |
+| `GET` | `/api/site3d` | God's Eye heightmap + terrain statistics (incl. how much of the cell the block covers) |
+| `POST` | `/api/traverse` | EVA route analysis on a site's God's Eye terrain: 2-8 waypoints → profile, legs, hazards, walking time |
+| `GET` | `/api/qualification` | Hardware test readiness matrix for a lat/lon (`terrain=1` uses the site terrain for the rover) |
+| `GET` | `/api/targets`, `/api/sources` | Catalog and provenance |
+| `GET` | `/api/thumb`, `/api/peek`, `/api/peek.jpg`, `/api/tile/...`, `/api/imagery/...` | Cached imagery for previews, the map and God's Eye (404 offline when not cached) |
 
 Interactive docs: **http://127.0.0.1:8000/docs** when the server is running.
 
@@ -353,11 +393,11 @@ Scoring stays **deterministic code** in `src/compute`; AI assistants may help bu
 
 | Area | In this repo |
 |------|----------------|
-| **Targets** | Five built-in Moon/Mars profiles + custom JSON (`data/targets.json`); terrain slopes/roughness via **Earth-percentile classes** tied to literature, not yet PGDA/HiRISE rasters |
-| **Earth stack** | Prebuilt **0.5°** predictor cube (`cache/predictors.zarr`): NASA POWER, GIBS MODIS NDVI, MODIS LST (Zenodo) + gap-fill, AWS Terrain Tiles slope/roughness |
+| **Targets** | Seven built-in Moon/Mars profiles (including a lava-tube habitat and an ice-rich ISRU site) + custom JSON (`data/targets.json`); terrain slopes/roughness via **Earth-percentile classes** tied to literature, not yet PGDA/HiRISE rasters |
+| **Earth stack** | Prebuilt **0.5°** predictor cube (`cache/predictors.zarr`): NASA POWER, GIBS MODIS NDVI, MODIS LST (Zenodo) + gap-fill, AWS Terrain Tiles slope/roughness, GLiM basaltic rock |
 | **Scoring & validation** | Geometric mean, Earth-envelope target clamping, ROC-AUC vs known analogs and negative controls |
 | **UI** | **FastAPI** + static **Three.js** globe, weight sliders, rule-based rationale cards, **God’s Eye** 3D (~150 m Terrarium + Sentinel-2 drape) |
-| **Novelty** | Distance to **12** catalogued analog sites (`data/known_analogs.json`) |
+| **Novelty** | Distance to **16** catalogued analog sites (`data/known_analogs.json`) |
 
 This MVP proves **global screening + explainable ranks + local terrain preview** on open NASA-centric data at hackathon scale.
 
@@ -371,7 +411,7 @@ This MVP proves **global screening + explainable ranks + local terrain preview**
 | **Copernicus GLO-30** as primary global elevation (polar coverage) | AWS Terrarium / derived slopes at 0.5° only |
 | **ESA CCI permafrost** (MAGT) for PSR / cryic-soil proxy (e.g. Haworth mode) | Documented plan; see Haworth note in [Scoring model](#scoring-model) and [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.md) |
 | **Operational access** (`F_ops`: roads, WDPA, hazards) | Not scored |
-| **Cave / lava-tube skylight** detection layer (LROC / HiRISE pit catalogs) | Not scored |
+| **Cave / lava-tube skylight** detection layer (LROC / HiRISE pit catalogs) | Partly: the lava-tube target scores basaltic rock (GLiM); individual caves are not detected |
 | **React + MapLibre** production frontend | Not in repo; current demo is Three.js + FastAPI |
 
 Team backlog and dataset requests: [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.md). Mentor-style gap analysis: [`docs/REVIEW.md`](docs/REVIEW.md).
@@ -381,8 +421,10 @@ Team backlog and dataset requests: [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.
 1. **0.5° cells (~55 km)** average small features with surroundings—not a substitute for 30 m field geology.
 2. **Terrain targets** use Earth-percentile **classes** until PGDA/HiRISE site DTMs are ingested.
 3. **Polar scoring** gaps where elevation tiles and MODIS LST are missing (gap-fill documented in `/api/sources`).
-4. **Novelty** is distance to a **12-site** catalog—not a claim of “never studied anywhere.”
+4. **Novelty** is distance to a **16-site** catalog—not a claim of “never studied anywhere.”
 5. **Physics ceiling:** open-Earth sites cannot replicate lunar PSR vacuum or exact regolith chemistry; scores mean **best terrestrial proxy** for listed stresses.
+6. **Rock type is the dominant class of a 55 km cell** (GLiM): it marks basaltic country, not individual caves.
+7. **No ice-cover layer:** cold targets (Haworth, Utopia) can still match glacier ice; telling ice sheets from ice-cemented permafrost needs one.
 
 ### Roadmap (post-MVP / extended hackathon)
 

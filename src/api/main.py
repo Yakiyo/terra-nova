@@ -22,7 +22,7 @@ import threading
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 
 import numpy as np
 import zarr
@@ -35,7 +35,15 @@ from starlette.staticfiles import StaticFiles
 from src.acquire import peek, sitetiles, thumbs, tiles
 from src.acquire.download import REPO_ROOT, FetchError, offline_mode
 from src.agents.rationale import explain_cell, load_targets
-from src.compute import countries, datachecks, robustness, terrain, validation
+from src.compute import (
+    countries,
+    datachecks,
+    qualification,
+    robustness,
+    terrain,
+    traverse,
+    validation,
+)
 from src.compute.gazetteer import Gazetteer, default_gazetteer
 from src.compute.similarity import (
     CRITERIA,
@@ -51,6 +59,9 @@ from src.compute.similarity import (
 )
 
 STACK_PATH = REPO_ROOT / "cache" / "predictors.zarr"
+TERRAIN_DATASET_ID = "aws_terrain_tiles_terrarium"   # as in data/normalization.json
+# Confidence assumed for values a user types into a custom profile (tolerance and noise).
+CUSTOM_CONFIDENCE = "medium"
 NORM_PATH = REPO_ROOT / "data" / "normalization.json"
 WEB_PATH = REPO_ROOT / "web"
 LST_SOURCES = {0: None, 1: "MODIS LST", 2: "NASA POWER TS_RANGE fit"}
@@ -135,7 +146,9 @@ class ScoreRequest(BaseModel):
     body: str | None = Field(
         default=None, description="Moon or Mars, for validating a custom profile."
     )
-    weights: dict[str, float] | None = Field(default=None, description="Per-criterion weights.")
+    weights: dict[str, Annotated[float, Field(le=100.0)]] | None = Field(
+        default=None, description="Per-criterion weights (each at most 100)."
+    )
     top_k: int = Field(default=20, ge=1, le=500)
     min_separation_cells: int = Field(
         default=2, ge=0, le=20, description="Suppress near-duplicate winners."
@@ -283,8 +296,8 @@ def _custom_entry(profile: dict[str, float]) -> dict[str, Any]:
             key: {
                 "value": profile[key],
                 "dataset_id": "user_entered",
-                "source_url": SOURCES[key]["source_url"],
-                "confidence": "high",
+                "source_url": "",   # typed by the user: there is no external source
+                "confidence": CUSTOM_CONFIDENCE,
                 "definition_note": "",
                 "unit": "",
             }
@@ -333,7 +346,7 @@ def _tolerances(request: ScoreRequest, target_id: str | None) -> dict[str, float
     criteria = _targets()[target_id]["criteria"] if target_id else {}
     out = {}
     for key in CRITERIA:
-        confidence = str(criteria.get(key, {}).get("confidence", "medium"))
+        confidence = str(criteria.get(key, {}).get("confidence", CUSTOM_CONFIDENCE))
         noise = robustness.NOISE.get(confidence, robustness.NOISE["medium"])
         out[key] = request.tolerance * noise * ranges[key].span
     return out
@@ -482,6 +495,12 @@ def _result_row(
         "similarities": {key: _round(result.similarities[key][row, col]) for key in CRITERIA},
         "lst_source": _lst_source(row, col),
         "rationale": rationale,
+        "readiness": {
+            cat["id"]: cat["verdict"]
+            for cat in qualification.assess(
+                {key: stack[key][row, col] for key in CRITERIA}, lat, _ranges(), SOURCES
+            )
+        },
     }
 
 
@@ -614,6 +633,27 @@ def score(request: ScoreRequest) -> dict[str, Any]:
     return payload
 
 
+def _robustness_key(request: ScoreRequest) -> str:
+    """Cache key from the *resolved* request: the profile, the full weights after the
+    target's defaults are applied, and the ranking rules. A request that spells out the
+    default weights (as the web interface does) and one that omits them share a key."""
+    profile, target_id = _target_profile(request)
+    merged = {**_target_weights(target_id), **(request.weights or {})}
+    return json.dumps(
+        {
+            "target": target_id,
+            "profile": None if target_id else profile,
+            "body": request.body,
+            "weights": {key: float(merged.get(key, 0.0)) for key in CRITERIA},
+            "rules": request.model_dump(
+                include={"top_k", "min_separation_cells", "tolerance", "new_only",
+                         "max_per_country", "min_distance_km"}
+            ),
+        },
+        sort_keys=True,
+    )
+
+
 _ROBUSTNESS_CACHE: OrderedDict[str, dict[str, Any]] = OrderedDict()
 _ROBUSTNESS_LOCK = threading.Lock()
 _ROBUSTNESS_LIMIT = 64
@@ -623,7 +663,7 @@ _ROBUSTNESS_LIMIT = 64
 def robustness_report(request: ScoreRequest) -> dict[str, Any]:
     """Uncertainty (Monte Carlo stability of the ranked sites) and sensitivity
     (validation with each criterion left out). Deterministic; cached per request."""
-    key = request.model_dump_json(exclude={"include_field"})
+    key = _robustness_key(request)
     with _ROBUSTNESS_LOCK:
         if key in _ROBUSTNESS_CACHE:
             _ROBUSTNESS_CACHE.move_to_end(key)
@@ -640,8 +680,23 @@ def robustness_report(request: ScoreRequest) -> dict[str, Any]:
     )
     sens = []
     if body:
+        first_only = request.model_copy(update={"top_k": 1})
+
+        def top_of(scored: SimilarityResult) -> int | None:
+            ranked = _rank(scored, mask, first_only)
+            return ranked[0] if ranked else None
+
         for row in robustness.sensitivity(
-            stack, profile, weights, _ranges(), body, _validation_tag(target_id), mask, _catalog()
+            stack,
+            profile,
+            weights,
+            _ranges(),
+            body,
+            _validation_tag(target_id),
+            mask,
+            _catalog(),
+            tolerance=_tolerances(request, target_id),
+            top_of=top_of,
         ):
             top = row["top_index"]
             lat, lon = (
@@ -675,24 +730,26 @@ def robustness_report(request: ScoreRequest) -> dict[str, Any]:
     return payload
 
 
-_DATACHECKS: list[dict[str, Any]] = []
+_DATACHECKS: list[list[dict[str, Any]]] = []
+_DATACHECKS_LOCK = threading.Lock()
 
 
 @app.get("/api/datachecks")
 def data_checks() -> dict[str, Any]:
     """Do independent datasets agree where physics says they must? (Spearman rho)"""
-    if not _DATACHECKS:
-        derived = REPO_ROOT / "cache" / "derived"
-        arrays = {
-            name: np.load(derived / f"{name}.npy").astype(np.float64)
-            for name in ("lst_modis", "power_ts_range")
-        }
-        arrays.update({key: STATE.arrays[key] for key in CRITERIA})
-        lat = 90.0 - (np.arange(360) + 0.5) * 0.5
-        arrays["abs_latitude"] = np.repeat(np.abs(lat)[:, None], 720, axis=1)
-        land = np.load(derived / "land_fraction.npy") >= 0.5
-        _DATACHECKS.extend(datachecks.run(arrays, land))
-    return {"method": datachecks.__doc__.strip(), "checks": _DATACHECKS}
+    with _DATACHECKS_LOCK:   # two first requests must not both compute and append
+        if not _DATACHECKS:
+            derived = REPO_ROOT / "cache" / "derived"
+            arrays = {
+                name: np.load(derived / f"{name}.npy").astype(np.float64)
+                for name in ("lst_modis", "power_ts_range")
+            }
+            arrays.update({key: STATE.arrays[key] for key in CRITERIA})
+            lat = 90.0 - (np.arange(360) + 0.5) * 0.5
+            arrays["abs_latitude"] = np.repeat(np.abs(lat)[:, None], 720, axis=1)
+            land = np.load(derived / "land_fraction.npy") >= 0.5
+            _DATACHECKS.append(datachecks.run(arrays, land))
+    return {"method": datachecks.__doc__.strip(), "checks": _DATACHECKS[0]}
 
 
 @app.post("/api/explain")
@@ -778,12 +835,24 @@ def site3d(
     a 1024 x 1024 mosaic around the site. Statistics are computed for the whole
     mosaic and for the 0.5 degree grid cell that was scored.
     """
+    STATE.load()   # place names, even when God's Eye is the first thing opened
+    return _terrain_payload(lat, lon, target_id, offline_mode())
+
+
+def _terrain_payload(
+    lat: float, lon: float, target_id: str | None, offline: bool
+) -> dict[str, Any]:
+    """The site3d payload for the scored cell containing (lat, lon)."""
     clat, clon = thumbs.cell_centre(lat, lon)
     try:
         x0, y0 = sitetiles.mosaic_origin(clat, clon)
     except sitetiles.SiteTileError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    # Invalidate whenever a source tile is added or replaced, including after prefetch.
+    return _site3d_payload(clat, clon, target_id, offline, _mosaic_revision(x0, y0))
+
+
+def _mosaic_revision(x0: int, y0: int) -> tuple:
+    """Cache key part that changes whenever a source tile is added or replaced."""
     revision = []
     for j in range(sitetiles.MOSAIC):
         for i in range(sitetiles.MOSAIC):
@@ -798,23 +867,17 @@ def site3d(
                 revision.append((stat.st_mtime_ns, stat.st_size))
             except FileNotFoundError:
                 revision.append(None)
-    return _site3d_payload(lat, lon, target_id, offline_mode(), tuple(revision))
+    return tuple(revision)
 
 
-@lru_cache(maxsize=8)
-def _site3d_payload(
-    lat: float, lon: float, target_id: str | None, offline: bool, revision: tuple
-) -> dict[str, Any]:
-    """Bounded terrain-response cache; errors never enter functools' cache."""
-    clat, clon = thumbs.cell_centre(lat, lon)
+def _load_mosaic(x0: int, y0: int, offline: bool) -> np.ndarray:
+    """The 1024 px God's Eye elevation mosaic, with the API's error messages."""
     try:
-        # Centre the mosaic on the scored cell, so the whole cell is in view.
-        x0, y0 = sitetiles.mosaic_origin(clat, clon)
-        dem = sitetiles.dem_mosaic(x0, y0, offline=offline)
+        return sitetiles.dem_mosaic(x0, y0, offline=offline)
     except sitetiles.SiteTileError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FetchError as exc:
-        if offline_mode():
+        if offline:
             raise HTTPException(
                 status_code=404,
                 detail="Terrain for this site is not cached, and the app is in offline mode. "
@@ -827,20 +890,62 @@ def _site3d_payload(
             "blocks s3.amazonaws.com). Run: python -m scripts.check_network",
         ) from exc
 
+
+@lru_cache(maxsize=4)
+def _site_block(x0: int, y0: int, offline: bool, revision: tuple) -> traverse.Block:
+    """Decoded elevation mosaic and its per-pixel slope, shared by site3d, the traverse
+    and readiness. Errors never enter functools' cache."""
+    return traverse.block_from_mosaic(_load_mosaic(x0, y0, offline), x0, y0, sitetiles.DEM_ZOOM)
+
+
+def cell_coverage(clat: float, clon: float, x0: int, y0: int, z: int, tiles: int) -> float:
+    """Share of the scored 0.5 degree cell inside the tile block (top-left tile x0, y0).
+
+    Near the poles a fixed number of Web Mercator tiles spans fewer degrees of latitude,
+    so the block can hold only part of the cell. Shares of latitude and longitude extent.
+    """
+    n = 2**z
+    block_north, block_south = terrain.tile_to_lat(y0, z), terrain.tile_to_lat(y0 + tiles, z)
+    lat_in = max(0.0, min(clat + 0.25, block_north) - max(clat - 0.25, block_south))
+    west_x = terrain.lonlat_to_tile(clat, clon - 0.25, z)[0]
+    centre = x0 + tiles / 2
+    west_x += round((centre - west_x - n / 1440) / n) * n   # the copy nearest the block
+    east_x = west_x + n / 720                                 # 0.5 degree of longitude
+    lon_in = max(0.0, min(east_x, x0 + tiles) - max(west_x, x0)) / (east_x - west_x)
+    return round(min(1.0, lat_in / 0.5) * min(1.0, lon_in), 4)
+
+
+@lru_cache(maxsize=8)
+def _site3d_payload(
+    clat: float, clon: float, target_id: str | None, offline: bool, revision: tuple
+) -> dict[str, Any]:
+    """Bounded terrain-response cache, keyed by the scored cell's centre."""
+    try:
+        # Centre the mosaic on the scored cell.
+        x0, y0 = sitetiles.mosaic_origin(clat, clon)
+    except sitetiles.SiteTileError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    block = _site_block(x0, y0, offline, revision)
+    dem, slope = block.dem, block.slope
+    lat, lon = clat, clon
+
     z, size = sitetiles.DEM_ZOOM, dem.shape[0]
     px = np.arange(size) + 0.5
     row_lat = np.array([terrain.tile_to_lat(y0 + v / 256.0, z) for v in px])
     col_lon = np.array([terrain.tile_to_lon(x0 + u / 256.0, z) for u in px])
-    slope = terrain.slope_degrees(dem, row_lat, z)
 
     south, north, west, east = clat - 0.25, clat + 0.25, clon - 0.25, clon + 0.25
     cell = terrain.cell_mask(row_lat, col_lon, south, west, north, east)
     area_stats = terrain.stats(dem, slope)
     cell_stats = terrain.stats(dem, slope, cell) if cell.any() else None
+    coverage = cell_coverage(clat, clon, x0, y0, z, sitetiles.MOSAIC)
 
-    def frac(la: float, lo: float) -> list[float]:
+    def frac(la: float, lo: float, clamp: bool = False) -> list[float]:
         fx, fy = terrain.lonlat_to_tile(la, lo, z)
-        return [round((fx - x0) / sitetiles.MOSAIC, 5), round((fy - y0) / sitetiles.MOSAIC, 5)]
+        u, v = (fx - x0) / sitetiles.MOSAIC, (fy - y0) / sitetiles.MOSAIC
+        if clamp:   # the cell outline stays on the block when the block is smaller
+            u, v = min(1.0, max(0.0, u)), min(1.0, max(0.0, v))
+        return [round(u, 5), round(v, 5)]
 
     centre_lat = float(row_lat[size // 2])
     metres = float(terrain.pixel_size_m(z, np.array([centre_lat]))[0])
@@ -869,7 +974,7 @@ def _site3d_payload(
         "ground_size_m": round(metres * size, 1),
         "pixel_m": round(metres, 2),
         "site": frac(lat, lon),
-        "cell": {"nw": frac(north, west), "se": frac(south, east)},
+        "cell": {"nw": frac(north, west, True), "se": frac(south, east, True)},
         "heightmap": {
             "shape": [size // 4, size // 4],
             "encoding": "float32-le-base64",
@@ -881,12 +986,13 @@ def _site3d_payload(
             "data": _encode(terrain.display_slopes(display_heights, round(metres * size, 1))),
         },
         "provenance": {
-            "dataset_id": "AWS_TERRAIN_TILES",
+            "dataset_id": TERRAIN_DATASET_ID,
             "source_url": "https://registry.opendata.aws/terrain-tiles/",
         },
         "stats": {
             "area": area_stats.as_dict(),
             "cell": cell_stats.as_dict() if cell_stats else None,
+            "cell_coverage": coverage,
             "slope_baseline_m": round(metres, 1),
             "trafficable_deg": terrain.TRAFFICABLE_DEG,
         },
@@ -905,6 +1011,63 @@ def _site3d_payload(
     }
 
 
+class TraverseWaypoint(BaseModel):
+    lat: float = Field(..., ge=-90.0, le=90.0)
+    lon: float = Field(..., ge=-360.0, le=360.0)
+    name: str = Field(default="", max_length=40)
+
+
+class TraverseRequest(BaseModel):
+    lat: float = Field(..., ge=-90.0, le=90.0, description="the site whose God's Eye block holds the route")
+    lon: float = Field(..., ge=-180.0, le=180.0)
+    waypoints: list[TraverseWaypoint] = Field(
+        ..., min_length=traverse.MIN_WAYPOINTS, max_length=traverse.MAX_WAYPOINTS
+    )
+
+
+@app.post("/api/traverse")
+def traverse_route(req: TraverseRequest) -> dict[str, Any]:
+    """EVA traverse analysis on the God's Eye elevation block of a site (Feature 5).
+
+    Elevation, terrain slope and grade along each leg at the full ~150 m x cos(latitude)
+    pixel spacing, per-leg and total climb, descent and walking time (Tobler), and the
+    stretches steeper than the 15 degree rover limit. See src/compute/traverse.py.
+    """
+    STATE.load()
+    clat, clon = thumbs.cell_centre(req.lat, req.lon)
+    try:
+        x0, y0 = sitetiles.mosaic_origin(clat, clon)
+    except sitetiles.SiteTileError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    waypoints = [w.model_dump() for w in req.waypoints]
+    # Check the geometry first, so a bad route fails fast without touching the tiles.
+    size = sitetiles.MOSAIC * traverse.TILE_PX
+    probe = traverse.Block(dem=np.zeros((1, 1)), slope=np.zeros((1, 1)), x0=x0, y0=y0, z=sitetiles.DEM_ZOOM)
+    for i, w in enumerate(waypoints):
+        col, row = probe.to_pixel(w["lat"], w["lon"])
+        if not (0.0 <= col <= size and 0.0 <= row <= size):
+            raise HTTPException(
+                status_code=422,
+                detail=f"waypoint {i + 1} ({w['name'] or 'unnamed'}) is outside this site's terrain block",
+            )
+    block = _site_block(x0, y0, offline_mode(), _mosaic_revision(x0, y0))
+    try:
+        result = traverse.analyse(block, waypoints)
+    except traverse.TraverseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "lat": req.lat,
+        "lon": req.lon,
+        "label": _label_for(clat, clon),
+        **result,
+        "provenance": {
+            "dataset_id": TERRAIN_DATASET_ID,
+            "source_url": "https://registry.opendata.aws/terrain-tiles/",
+            "credit": sitetiles.DEM_CREDIT,
+        },
+    }
+
+
 @app.get("/api/peek")
 def peek_info(
     lat: float = Query(..., ge=-90.0, le=90.0),
@@ -912,7 +1075,7 @@ def peek_info(
 ) -> dict[str, Any]:
     """Relief-shaded Sentinel-2 preview of a cell plus a 64 x 64 heightmap for a 3D card."""
     clat, clon = thumbs.cell_centre(lat, lon)
-    if abs(clat) > terrain.MAX_MERCATOR_LAT - 1.5:
+    if abs(clat) > sitetiles.MAX_SITE_LAT:
         raise HTTPException(status_code=422, detail="no elevation tiles this close to the pole")
     try:
         info = peek.build(clat, clon, offline=offline_mode())
@@ -929,7 +1092,7 @@ def peek_image(
     clat, clon = thumbs.cell_centre(lat, lon)
     path = peek.image_path(clat, clon)
     if not path.exists():
-        if abs(clat) > terrain.MAX_MERCATOR_LAT - 1.5:
+        if abs(clat) > sitetiles.MAX_SITE_LAT:
             raise HTTPException(status_code=422, detail="no elevation tiles this close to the pole")
         try:
             peek.build(clat, clon, offline=offline_mode())
@@ -1073,6 +1236,50 @@ def cell(lat: float, lon: float) -> dict[str, Any]:
         "novelty": validation.novelty(clat, clon, _catalog()),
         "ranges": {key: {"min": ranges[key].min, "max": ranges[key].max} for key in CRITERIA},
         "sources": SOURCES,
+    }
+
+
+@app.get("/api/qualification")
+def qualification_matrix(
+    lat: float = Query(..., ge=-90.0, le=90.0),
+    lon: float = Query(..., ge=-180.0, le=180.0),
+    terrain_detail: bool = Query(default=False, alias="terrain"),
+) -> dict[str, Any]:
+    """Hardware test readiness for the cell containing (lat, lon).
+
+    With ``terrain=1`` the rover requirement uses the share of ground under 15 degrees
+    measured on the God's Eye terrain (zoom 10, ~150 m x cos(lat) per pixel) of the scored cell, when that terrain is
+    available; otherwise it falls back to the regional slope and says so.
+    """
+    stack = STATE.arrays
+    row = min(max(int((90.0 - lat) // 0.5), 0), 359)
+    col = min(max(int((lon + 180.0) // 0.5), 0), 719)
+    clat, clon = _cell_centre(row, col)
+    values = {key: stack[key][row, col] for key in CRITERIA}
+    share, terrain_note = None, "regional slope (0.5 degree cell); open God's Eye for the site terrain"
+    if terrain_detail:
+        try:
+            # Cached tiles only: a readiness panel must never wait on the network.
+            stats = _terrain_payload(clat, clon, None, offline=True)["stats"]
+            block = stats.get("cell") or stats["area"]
+            share = float(block["share_under_15"])
+            coverage = stats.get("cell_coverage", 1.0)
+            part = "" if coverage >= 0.995 else f", covering {coverage:.0%} of the scored cell"
+            terrain_note = (
+                f"share of ground under {stats['trafficable_deg']:.0f} degrees on "
+                f"{stats['slope_baseline_m']:.0f} m terrain (AWS Terrain Tiles){part}"
+            )
+        except HTTPException:
+            terrain_note = "regional slope: the site terrain is not cached on this machine"
+    return {
+        "method": qualification.__doc__.strip(),
+        "trl_source_url": qualification.TRL_SOURCE_URL,
+        "lat": round(clat, 3),
+        "lon": round(clon, 3),
+        "label": _label_for(clat, clon),
+        "scored": bool(all(np.isfinite(values[key]) for key in CRITERIA)),
+        "terrain_basis": terrain_note,
+        "categories": qualification.assess(values, clat, _ranges(), SOURCES, share_under_15=share),
     }
 
 

@@ -39,7 +39,7 @@ Read `docs/REVIEW.md` first (10 min). It lists what's broken and why.
 **Now:** own the prescreening video end to end (`docs/VIDEO_SCRIPT.md`): collect the names, edit it and upload it.
 Then:
 - Merge PRs and keep `main` green (tests + lint).
-- Keep `docs/AI_USE.md` and `docs/REFERENCES.md` (every dataset, paper and image) up to date.
+- Keep `docs/AI_USE.md` and the README's "NASA and partner data sources" section (every dataset, paper and image) up to date.
 - Draft the project page fields (High-Level Summary, Details, NASA data used, AI use, References).
 - Keep the README aligned with the final product name and current implementation.
 **Done when:** the video is uploaded on 1 Oct and the project page draft exists by 12 Nov.

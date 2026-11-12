@@ -30,6 +30,6 @@ reference points).
 ## Production checklist
 - [ ] **By 29 Sep night:** fill in the names and roles, and lock the team and product name.
 - [ ] **30 Sep:** record the narration with one voice and a quiet room; capture the app screen at 1080p.
-- [ ] Download the images from NASA sources and write their credits in `docs/REFERENCES.md`.
+- [ ] Download the images from NASA sources and write their credits in the README's "NASA and partner data sources" section.
 - [ ] Edit (CapCut / DaVinci Resolve / Clipchamp), add English subtitles, and **check it runs ≤ 4:00**.
 - [ ] **1 Oct, before 20:00:** upload, then test the link in a private window.

@@ -14,6 +14,7 @@
       "source_label": "Gawronska et al. (2022), Planet. Sci. J., geologic context and EVA targets at the lunar south pole",
       "summary": "Artemis III candidate region on the rim of Shackleton crater: permanently shadowed volatile cold traps next to high-illumination ridges, over extremely rugged polar topography.",
       "trek_url": "https://trek.nasa.gov/moon/",
+      "validation_tag": "lunar_surface",
       "criteria": {
         "precipitation": {
           "value": 0.0,
@@ -88,6 +89,15 @@
           "baseline": null,
           "definition_note": "Not used for this target: the site is sunlit or seasonally lit, so absolute temperature is not the engineering challenge being matched.",
           "confidence": "high"
+        },
+        "basaltic_volcanic": {
+          "value": null,
+          "unit": "fraction",
+          "dataset_id": "not_used",
+          "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+          "baseline": null,
+          "definition_note": "Not used: rock type is not part of this site's signature. Only the lava-tube habitat target scores basaltic rock.",
+          "confidence": "high"
         }
       },
       "group": "Lunar south pole"
@@ -105,6 +115,7 @@
       "source_label": "NASA (28 Oct 2024): Malapert Massif is one of nine Artemis III candidate landing regions",
       "summary": "Artemis III candidate landing region on a ~5 km-high massif near the south pole, in sight of both Earth and Shackleton crater: high, sunlit and very rugged terrain.",
       "trek_url": "https://trek.nasa.gov/moon/",
+      "validation_tag": "lunar_surface",
       "criteria": {
         "precipitation": {
           "value": 0.0,
@@ -178,6 +189,15 @@
           "source_url": "https://power.larc.nasa.gov/docs/services/api/temporal/climatology/",
           "baseline": null,
           "definition_note": "Not used for this target: the site is sunlit or seasonally lit, so absolute temperature is not the engineering challenge being matched.",
+          "confidence": "high"
+        },
+        "basaltic_volcanic": {
+          "value": null,
+          "unit": "fraction",
+          "dataset_id": "not_used",
+          "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+          "baseline": null,
+          "definition_note": "Not used: rock type is not part of this site's signature. Only the lava-tube habitat target scores basaltic rock.",
           "confidence": "high"
         }
       }
@@ -272,6 +292,118 @@
           "baseline": null,
           "definition_note": "Not used: lunar heights are measured from the Moon's own datum.",
           "confidence": "high"
+        },
+        "basaltic_volcanic": {
+          "value": null,
+          "unit": "fraction",
+          "dataset_id": "not_used",
+          "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+          "baseline": null,
+          "definition_note": "Not used: rock type is not part of this site's signature. Only the lava-tube habitat target scores basaltic rock.",
+          "confidence": "high"
+        }
+      }
+    },
+    {
+      "id": "lunar_lava_tube",
+      "name": "Marius Hills Pit lava-tube skylight, Moon",
+      "short_name": "Marius Hills skylight",
+      "body": "Moon",
+      "group": "Moon subsurface",
+      "latitude": 14.0917,
+      "longitude": -56.7701,
+      "source_url": "https://lroc.im-ldi.com/atlases/pits/1",
+      "source_label": "LROC Lunar Pit Atlas: Marius Hills Pit, 14.09°N 303.23°E, 40 m deep, mare terrain",
+      "summary": "A collapse pit in the Marius Hills that opens into a lava tube: a natural shelter from radiation, micrometeoroids and the surface temperature extremes. Deep lunar lava tubes stay at about 17 °C, so the Earth match is basaltic lava-tube country in a mild, stable climate.",
+      "trek_url": "https://trek.nasa.gov/moon/",
+      "location_note": "Matched by its interior: the habitat is inside the tube, so the surface day-night swing is not used. Rock type comes from the Global Lithological Map (GLiM).",
+      "validation_tag": "lava_tube",
+      "weights": {
+        "basaltic_volcanic": 2.0,
+        "mean_annual_temperature": 1.0
+      },
+      "criteria": {
+        "precipitation": {
+          "value": 0.0,
+          "unit": "mm/yr",
+          "dataset_id": "nssdc_moon_fact_sheet",
+          "source_url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "baseline": null,
+          "definition_note": "The Moon has no atmosphere and therefore no precipitation. Scored against Earth's driest land.",
+          "confidence": "high"
+        },
+        "vegetation": {
+          "value": 0.0,
+          "unit": "NDVI",
+          "dataset_id": "nasa_moon_facts",
+          "source_url": "https://science.nasa.gov/moon/facts/",
+          "baseline": null,
+          "definition_note": "No biosphere: the surface is bare regolith. The Earth equivalent is ground with no detectable vegetation (NDVI near 0).",
+          "confidence": "high"
+        },
+        "annual_temperature_range": {
+          "value": 0.0,
+          "unit": "K",
+          "dataset_id": "wikipedia_lunar_lava_tube",
+          "source_url": "https://en.wikipedia.org/wiki/Lunar_lava_tube",
+          "baseline": "inside a deep lava tube",
+          "definition_note": "Deep lunar lava tubes keep 'a stable temperature of 17 °C (63 °F)', so the seasonal swing inside is taken as close to zero and matched to Earth's smallest annual range. An editorial reading of 'stable'.",
+          "confidence": "low"
+        },
+        "lst_diurnal_range": {
+          "value": null,
+          "unit": "K",
+          "dataset_id": "not_used",
+          "source_url": "https://en.wikipedia.org/wiki/Lunar_lava_tube",
+          "baseline": null,
+          "definition_note": "Not used: the habitat is inside the tube, which is insulated from the surface day-night swing, so the surface swing does not describe it.",
+          "confidence": "high"
+        },
+        "slope": {
+          "earth_percentile": 30,
+          "measured_value": null,
+          "unit": "degrees",
+          "dataset_id": "lroc_lunar_pit_atlas",
+          "source_url": "https://lroc.im-ldi.com/atlases/pits/1",
+          "baseline": null,
+          "definition_note": "The pit lies on mare terrain, which is gentle at regional scale. Estimated class: Earth's 30th-percentile regional slope. No slope was measured at a comparable scale.",
+          "confidence": "low"
+        },
+        "roughness": {
+          "value": null,
+          "unit": "m",
+          "dataset_id": "not_used",
+          "source_url": "https://lroc.im-ldi.com/atlases/pits/1",
+          "baseline": null,
+          "definition_note": "Not used: no roughness measured at a scale comparable with Earth's 55 km cells.",
+          "confidence": "high"
+        },
+        "elevation": {
+          "value": null,
+          "unit": "m",
+          "dataset_id": "not_used",
+          "source_url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "baseline": null,
+          "definition_note": "Not used: lunar heights are measured from the Moon's own datum.",
+          "confidence": "high"
+        },
+        "mean_annual_temperature": {
+          "value": 17.0,
+          "unit": "°C",
+          "dataset_id": "wikipedia_lunar_lava_tube",
+          "source_url": "https://en.wikipedia.org/wiki/Lunar_lava_tube",
+          "baseline": "inside a deep lava tube",
+          "definition_note": "Deep lunar lava tubes, under 40 m or more of basalt, keep 'a stable temperature of 17 °C (63 °F)'. Matched to Earth's mean annual air temperature, which selects lava fields in a mild climate.",
+          "confidence": "medium"
+        },
+        "basaltic_volcanic": {
+          "value": 1.0,
+          "unit": "fraction",
+          "dataset_id": "wikipedia_lunar_lava_tube",
+          "source_url": "https://en.wikipedia.org/wiki/Lunar_lava_tube",
+          "baseline": null,
+          "definition_note": "Lunar lava tubes 'formed during the eruption of basaltic lava flows', and the Marius Hills Pit lies on mare (basalt) terrain (LROC Lunar Pit Atlas). Earth's match is ground dominated by basaltic volcanic rock (GLiM). Weighted x2: rock type defines a lava-tube site.",
+          "confidence": "high"
         }
       }
     },
@@ -359,6 +491,15 @@
           "source_url": "https://power.larc.nasa.gov/docs/services/api/temporal/climatology/",
           "baseline": null,
           "definition_note": "Not used for this target: the site is sunlit or seasonally lit, so absolute temperature is not the engineering challenge being matched.",
+          "confidence": "high"
+        },
+        "basaltic_volcanic": {
+          "value": null,
+          "unit": "fraction",
+          "dataset_id": "not_used",
+          "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+          "baseline": null,
+          "definition_note": "Not used: rock type is not part of this site's signature. Only the lava-tube habitat target scores basaltic rock.",
           "confidence": "high"
         }
       },
@@ -449,6 +590,119 @@
           "source_url": "https://power.larc.nasa.gov/docs/services/api/temporal/climatology/",
           "baseline": null,
           "definition_note": "Not used for this target: the site is sunlit or seasonally lit, so absolute temperature is not the engineering challenge being matched.",
+          "confidence": "high"
+        },
+        "basaltic_volcanic": {
+          "value": null,
+          "unit": "fraction",
+          "dataset_id": "not_used",
+          "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+          "baseline": null,
+          "definition_note": "Not used: rock type is not part of this site's signature. Only the lava-tube habitat target scores basaltic rock.",
+          "confidence": "high"
+        }
+      }
+    },
+    {
+      "id": "utopia_permafrost",
+      "name": "Utopia Planitia ice-rich ground, Mars",
+      "short_name": "Utopia Planitia ice",
+      "body": "Mars",
+      "group": "Mars",
+      "latitude": 46.7,
+      "longitude": 117.5,
+      "source_url": "https://www.jpl.nasa.gov/news/mars-ice-deposit-holds-as-much-water-as-lake-superior/",
+      "source_label": "NASA JPL (22 Nov 2016): MRO SHARAD radar finds buried ice in Utopia Planitia, as much water as Lake Superior",
+      "summary": "A vast northern plain where radar found buried, ice-rich ground: a candidate source of water for In-Situ Resource Utilization. Mars is colder than any ice-free ground on Earth, so the match is Earth's cold, barren, dry permafrost regime.",
+      "trek_url": "https://trek.nasa.gov/mars/",
+      "location_note": "Centre of Utopia Planitia (46.7°N, 117.5°E). Ice-rich deposits and pingo-like features lie at about 35-50°N, 80-115°E (Wikipedia, Utopia Planitia).",
+      "validation_tag": "permafrost",
+      "weights": {
+        "mean_annual_temperature": 2.0
+      },
+      "criteria": {
+        "precipitation": {
+          "value": 0.0,
+          "unit": "mm/yr",
+          "dataset_id": "mars_modern_water_cycle_review",
+          "source_url": "https://www.annualreviews.org/content/journals/10.1146/annurev-earth-072420-071823",
+          "baseline": null,
+          "definition_note": "Modern Mars has no stable liquid water at the surface and no liquid-water precipitation; only vapour and ice cycle through the atmosphere.",
+          "confidence": "high"
+        },
+        "vegetation": {
+          "value": 0.0,
+          "unit": "NDVI",
+          "dataset_id": "nasa_mars_facts",
+          "source_url": "https://science.nasa.gov/mars/facts/",
+          "baseline": null,
+          "definition_note": "No known biosphere: the surface is bare rock and regolith. The Earth equivalent is ground with no detectable vegetation (NDVI near 0).",
+          "confidence": "high"
+        },
+        "annual_temperature_range": {
+          "value": null,
+          "unit": "K",
+          "dataset_id": "not_used",
+          "source_url": "https://en.wikipedia.org/wiki/Utopia_Planitia",
+          "baseline": null,
+          "definition_note": "Not used: no verified seasonal temperature range for Utopia Planitia.",
+          "confidence": "high"
+        },
+        "lst_diurnal_range": {
+          "value": 58.0,
+          "unit": "K",
+          "dataset_id": "nssdc_mars_fact_sheet",
+          "source_url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html",
+          "baseline": "Viking 1 lander site, air temperature 184 to 242 K",
+          "definition_note": "NASA's Mars fact sheet gives a diurnal range of 184 K to 242 K (-89 to -31 °C) at the Viking 1 lander site. Beyond anything on Earth, so it is matched to Earth's largest swing. Air temperature at another site, used as Mars's typical swing.",
+          "confidence": "medium"
+        },
+        "slope": {
+          "earth_percentile": 15,
+          "measured_value": null,
+          "unit": "degrees",
+          "dataset_id": "wikipedia_utopia_planitia",
+          "source_url": "https://en.wikipedia.org/wiki/Utopia_Planitia",
+          "baseline": null,
+          "definition_note": "Utopia Planitia is a large plain. Estimated class: Earth's 15th-percentile regional slope. No slope was measured at a comparable scale.",
+          "confidence": "low"
+        },
+        "roughness": {
+          "earth_percentile": 20,
+          "measured_value": null,
+          "unit": "m",
+          "dataset_id": "wikipedia_utopia_planitia",
+          "source_url": "https://en.wikipedia.org/wiki/Utopia_Planitia",
+          "baseline": null,
+          "definition_note": "A smooth plain with scalloped, ice-related hollows. Estimated class: Earth's 20th-percentile roughness.",
+          "confidence": "low"
+        },
+        "elevation": {
+          "value": null,
+          "unit": "m",
+          "dataset_id": "not_used",
+          "source_url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html",
+          "baseline": null,
+          "definition_note": "Not used: Martian heights are measured from Mars's own datum.",
+          "confidence": "high"
+        },
+        "mean_annual_temperature": {
+          "earth_percentile": 20,
+          "measured_value": -59.0,
+          "unit": "°C",
+          "dataset_id": "nssdc_mars_fact_sheet",
+          "source_url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html",
+          "baseline": "Mars average, about 214 K",
+          "definition_note": "Mars averages about -59 °C, colder than any ice-free ground on Earth. Clamping to Earth's coldest land would select the East Antarctic plateau. The target is Earth's 20th percentile instead (about -24 °C), inside the continuous-permafrost regime (mean surface temperature below -5 °C, Wikipedia: Permafrost). The model has no ice-cover layer, so coastal Antarctic ice can still match; ice-free permafrost needs that layer. Estimated class. Weighted x2: cold ground is what keeps the ice.",
+          "confidence": "low"
+        },
+        "basaltic_volcanic": {
+          "value": null,
+          "unit": "fraction",
+          "dataset_id": "not_used",
+          "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+          "baseline": null,
+          "definition_note": "Not used: rock type is not part of this site's signature. Only the lava-tube habitat target scores basaltic rock.",
           "confidence": "high"
         }
       }

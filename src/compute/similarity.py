@@ -49,6 +49,7 @@ CRITERIA: tuple[str, ...] = (
     "roughness",
     "elevation",
     "mean_annual_temperature",
+    "basaltic_volcanic",
 )
 
 QUANTILE_LEVELS: tuple[int, ...] = tuple(range(0, 101, 5))
@@ -281,7 +282,17 @@ def compute_similarity(
         if not used[key]:
             norm_weights[key] = 0.0
     if sum(norm_weights.values()) <= 0:
-        raise SimilarityError("at least one criterion with a target value must have weight > 0")
+        unweighted = [key for key in CRITERIA if used[key]]
+        hint = (
+            f" The criteria with a target value ({', '.join(unweighted)}) all have weight 0;"
+            " some (elevation, mean temperature, basaltic rock) are off by default, so give"
+            " one of them a weight."
+            if unweighted
+            else ""
+        )
+        raise SimilarityError(
+            "at least one criterion with a target value must have weight > 0." + hint
+        )
 
     weight_total = sum(norm_weights[key] for key in CRITERIA)
 

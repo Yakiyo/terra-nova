@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "purpose": "Known terrestrial analog sites. Used for (1) the novelty badge on ranked results and (2) validation: 'environment' sites are positive controls for the environmental scoring model; 'geology' sites were chosen for rocks or processes the model does not measure, so they are listed for novelty only. Negatives are densely vegetated or humid reference points that no planetary analog should resemble. A target with a 'validation_tag' (the Haworth cold trap uses 'cold_polar') counts the 'environment' sites carrying that tag as positives, whatever body they were first used for.",
-  "provenance": "Coordinates and the analog use of every site are taken from the linked English Wikipedia article (retrieved 2026-09-28). Negatives are editorial reference points, not citations. Region-sized sites carry an 'extent' so novelty is measured to the whole region, not just its centre point.",
+  "purpose": "Known terrestrial analog sites. Used for (1) the novelty badge on ranked results and (2) validation: 'environment' sites are positive controls for the environmental scoring model; 'geology' sites were chosen for rocks or processes the model does not measure, so they are listed for novelty only. Negatives are densely vegetated or humid reference points that no planetary analog should resemble. A target with a 'validation_tag' (the Haworth cold trap uses 'cold_polar', the lava-tube habitat 'lava_tube', Utopia Planitia 'permafrost') counts the 'environment' sites carrying that tag as positives, whatever body they were first used for.",
+  "provenance": "Coordinates and the analog use of every site are taken from the linked English Wikipedia article (retrieved 2026-09-28). Negatives are editorial reference points, not citations. Region-sized sites carry an 'extent' so novelty is measured to the whole region, not just its centre point. The four lava-tube sites added on 2026-11-12 (tag 'lava_tube') are described from their articles, retrieved that day; the 'permafrost' tag marks the ice-cemented permafrost sites.",
   "sites": [
     {
       "name": "Haughton impact crater, Devon Island",
@@ -14,7 +14,8 @@
       "use": "Haughton-Mars Project: polar-desert impact crater with ground ice, dubbed 'Mars on Earth'.",
       "source_url": "https://en.wikipedia.org/wiki/Haughton_impact_crater",
       "tags": [
-        "cold_polar"
+        "cold_polar",
+        "permafrost"
       ]
     },
     {
@@ -28,7 +29,8 @@
       "use": "Mars analogue for polar cryo-environments and instrument field tests.",
       "source_url": "https://en.wikipedia.org/wiki/Axel_Heiberg_Island",
       "tags": [
-        "cold_polar"
+        "cold_polar",
+        "permafrost"
       ]
     },
     {
@@ -42,7 +44,8 @@
       "use": "Ice-free polar desert used as a Mars analogue.",
       "source_url": "https://en.wikipedia.org/wiki/McMurdo_Dry_Valleys",
       "tags": [
-        "cold_polar"
+        "cold_polar",
+        "permafrost"
       ]
     },
     {
@@ -85,7 +88,9 @@
       "kind": "environment",
       "use": "Arid impact crater used for Apollo astronaut training.",
       "source_url": "https://en.wikipedia.org/wiki/Meteor_Crater",
-      "tags": []
+      "tags": [
+        "lunar_surface"
+      ]
     },
     {
       "name": "Craters of the Moon, Idaho",
@@ -97,7 +102,10 @@
       "kind": "environment",
       "use": "Basalt lava field used for Apollo astronaut geology training.",
       "source_url": "https://en.wikipedia.org/wiki/Craters_of_the_Moon_National_Monument_and_Preserve",
-      "tags": []
+      "tags": [
+        "lava_tube",
+        "lunar_surface"
+      ]
     },
     {
       "name": "Askja, Iceland",
@@ -109,7 +117,9 @@
       "kind": "environment",
       "use": "Barren volcanic highland where Apollo astronauts trained.",
       "source_url": "https://en.wikipedia.org/wiki/Askja",
-      "tags": []
+      "tags": [
+        "lunar_surface"
+      ]
     },
     {
       "name": "Kilauea, Hawaii",
@@ -121,7 +131,9 @@
       "kind": "geology",
       "use": "NASA trained Apollo astronauts here to recognise volcanic features.",
       "source_url": "https://en.wikipedia.org/wiki/K%C4%ABlauea",
-      "tags": []
+      "tags": [
+        "lunar_surface"
+      ]
     },
     {
       "name": "Sudbury Basin, Ontario",
@@ -133,7 +145,9 @@
       "kind": "geology",
       "use": "Impact structure used for Apollo astronaut geology training.",
       "source_url": "https://en.wikipedia.org/wiki/Sudbury_Basin",
-      "tags": []
+      "tags": [
+        "lunar_surface"
+      ]
     },
     {
       "name": "Nordlinger Ries, Germany",
@@ -145,7 +159,9 @@
       "kind": "geology",
       "use": "Impact crater used for Apollo astronaut geology training.",
       "source_url": "https://en.wikipedia.org/wiki/N%C3%B6rdlinger_Ries",
-      "tags": []
+      "tags": [
+        "lunar_surface"
+      ]
     },
     {
       "name": "Rio Tinto, Spain",
@@ -158,6 +174,62 @@
       "use": "Acidic, iron-rich river compared with the chemistry of Meridiani Planum on Mars.",
       "source_url": "https://en.wikipedia.org/wiki/R%C3%ADo_Tinto_%28river%29",
       "tags": []
+    },
+    {
+      "name": "Lava Beds National Monument, California",
+      "lat": 41.7139,
+      "lon": -121.5083,
+      "bodies": [
+        "moon"
+      ],
+      "kind": "environment",
+      "use": "Volcanic field with numerous lava tubes, 27 with marked entrances: an Earth example of lava-tube caves.",
+      "source_url": "https://en.wikipedia.org/wiki/Lava_Beds_National_Monument",
+      "tags": [
+        "lava_tube"
+      ]
+    },
+    {
+      "name": "Lava River Cave, Oregon",
+      "lat": 43.8954,
+      "lon": -121.3689,
+      "bodies": [
+        "moon"
+      ],
+      "kind": "environment",
+      "use": "The longest continuous lava tube in Oregon (1,588 m), left when lava drained from the tube.",
+      "source_url": "https://en.wikipedia.org/wiki/Lava_River_Cave",
+      "tags": [
+        "lava_tube"
+      ]
+    },
+    {
+      "name": "Víðgelmir, Iceland",
+      "lat": 64.7503,
+      "lon": -20.8017,
+      "bodies": [
+        "moon"
+      ],
+      "kind": "environment",
+      "use": "Lava tube in the Hallmundarhraun lava field; its collapsed roof forms skylight-like entrances.",
+      "source_url": "https://en.wikipedia.org/wiki/V%C3%AD%C3%B0gelmir",
+      "tags": [
+        "lava_tube"
+      ]
+    },
+    {
+      "name": "Undara Volcanic National Park, Queensland",
+      "lat": -18.2011,
+      "lon": 144.5961,
+      "bodies": [
+        "moon"
+      ],
+      "kind": "environment",
+      "use": "Protects Australia's longest lava tube, with collapsed sections along its length.",
+      "source_url": "https://en.wikipedia.org/wiki/Undara_Volcanic_National_Park",
+      "tags": [
+        "lava_tube"
+      ]
     }
   ],
   "negatives": [

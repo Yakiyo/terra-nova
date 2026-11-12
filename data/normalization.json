@@ -273,6 +273,40 @@
         27.0704,
         32.9067
       ]
+    },
+    "basaltic_volcanic": {
+      "label": "Basaltic volcanic rock",
+      "unit": "fraction",
+      "description": "Dominant rock class of the cell from the Global Lithological Map (GLiM, Hartmann & Moosdorf 2012, gridded to 0.5 degrees): 1 for basic volcanic rock (basalt), 0.5 for intermediate volcanic rock (andesite), 0 otherwise. Lava tubes form mainly in fluid basaltic lava. A ~55 km cell's dominant rock, not a cave map. Off by default; switched on by the lava-tube target.",
+      "min": 0.0,
+      "max": 1.0,
+      "source_dataset_id": "glim_v1_gridded_0p5deg",
+      "source_url": "https://doi.org/10.1594/PANGAEA.788537",
+      "earth_min": 0.0,
+      "earth_max": 1.0,
+      "earth_quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
     }
   },
   "weights": {
@@ -283,7 +317,8 @@
     "slope": 1.0,
     "roughness": 1.0,
     "elevation": 0.0,
-    "mean_annual_temperature": 0.0
+    "mean_annual_temperature": 0.0,
+    "basaltic_volcanic": 0.0
   },
   "calibration": {
     "scorable_cells": 78247,

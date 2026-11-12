@@ -49,7 +49,7 @@ from rasterio.transform import from_origin
 from rasterio.warp import Resampling, reproject
 from scipy.ndimage import distance_transform_edt
 
-from src.acquire import gibs_ndvi, landmask, power
+from src.acquire import gibs_ndvi, glim, landmask, power
 from src.acquire.download import REPO_ROOT, fetch, utc_now_iso
 from src.compute import terrain
 from src.compute.similarity import CRITERIA
@@ -439,6 +439,14 @@ def stage_vegetation(force: bool = False, offline: bool | None = None) -> np.nda
     return _store("vegetation", _block_mean(fine, BLOCK))
 
 
+def stage_lithology(force: bool = False, offline: bool | None = None) -> np.ndarray:
+    """Basaltic volcanic rock (GLiM, already on the 0.5 degree grid): see src/acquire/glim.py."""
+    cached = _load("basaltic_volcanic", force)
+    if cached is not None:
+        return cached
+    return _store("basaltic_volcanic", glim.build(offline=offline))
+
+
 # --------------------------------------------------------------------------
 # assemble
 # --------------------------------------------------------------------------
@@ -474,6 +482,12 @@ SOURCES: list[dict[str, str]] = [
         "title": "NASA GIBS MODIS_Terra_L3_NDVI_Monthly (MOD13C2), 2023 annual maximum",
         "url": gibs_ndvi.SOURCE_URL,
         "used_for": "vegetation",
+    },
+    {
+        "dataset_id": glim.DATASET_ID,
+        "title": glim.TITLE,
+        "url": glim.SOURCE_URL,
+        "used_for": "basaltic volcanic rock",
     },
 ]
 
@@ -553,7 +567,7 @@ def assemble() -> None:
     _log(f"wrote {STACK_PATH.relative_to(REPO_ROOT)}")
 
 
-STAGES = ("land", "dem", "power", "lst", "vegetation", "assemble")
+STAGES = ("land", "dem", "power", "lst", "vegetation", "lithology", "assemble")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -570,6 +584,7 @@ def main(argv: list[str] | None = None) -> int:
         "power": lambda: stage_power(args.force, offline),
         "lst": lambda: stage_lst(args.force, offline),
         "vegetation": lambda: stage_vegetation(args.force, offline),
+        "lithology": lambda: stage_lithology(args.force, offline),
         "assemble": assemble,
     }
     for stage in STAGES if args.stage == "all" else (args.stage,):

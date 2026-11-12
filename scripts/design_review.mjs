@@ -51,7 +51,6 @@ try {
     await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: device === "mobile" });
     for (const [name, path, condition] of [
       ["home", "index.html", "document.querySelector('#facts dd')"],
-      ["targets", "targets.html", "document.querySelectorAll('a.dest-card').length >= 6"],
       ["finder", "finder.html#target=jezero_crater", "document.querySelectorAll('.site').length >= 5"],
     ]) {
       if (process.argv[3] && process.argv[3] !== name) continue;

@@ -64,11 +64,12 @@ def run(arrays: Mapping[str, np.ndarray], land: np.ndarray) -> list[dict[str, An
         both = land & np.isfinite(a) & np.isfinite(b)
         n = int(both.sum())
         rho = float(spearmanr(a[both], b[both]).statistic) if n > 10 else float("nan")
-        passed = (rho > 0.3) if check["expect"] == "positive" else (rho < -0.3)
+        finite = bool(np.isfinite(rho))   # too few cells or constant input: no correlation
+        passed = finite and ((rho > 0.3) if check["expect"] == "positive" else (rho < -0.3))
         out.append(
             {
                 **check,
-                "rho": round(rho, 3),
+                "rho": round(rho, 3) if finite else None,
                 "cells": n,
                 "passed": bool(passed),
             }

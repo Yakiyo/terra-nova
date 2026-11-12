@@ -96,6 +96,10 @@ def _around_top(z: int, top: int) -> list[tuple[int, int]]:
         ).json()
         for r in body["results"]:
             out += tiles_in(z, r["lat"] - 2, r["lon"] - 2, r["lat"] + 2, r["lon"] + 2)
+    from src.acquire.finder_sites import finder_sites
+
+    for lat, lon in finder_sites(top):   # also the Finder's own ranking
+        out += tiles_in(z, lat - 2, lon - 2, lat + 2, lon + 2)
     return out
 
 

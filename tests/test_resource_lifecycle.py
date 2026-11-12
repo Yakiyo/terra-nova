@@ -36,8 +36,8 @@ def test_state_loading_serializes_concurrent_callers(monkeypatch):
 def test_robustness_cache_refreshes_recency_on_hits(monkeypatch):
     first = main.ScoreRequest(target_id="jezero_crater")
     second = main.ScoreRequest(target_id="lunar_south_pole")
-    first_key = first.model_dump_json(exclude={"include_field"})
-    second_key = second.model_dump_json(exclude={"include_field"})
+    first_key = main._robustness_key(first)
+    second_key = main._robustness_key(second)
     cached = {"cached": True}
     cache = OrderedDict([(first_key, cached), (second_key, cached)])
     monkeypatch.setattr(main, "_ROBUSTNESS_CACHE", cache)
@@ -56,6 +56,6 @@ def test_robustness_cache_evicts_oldest_without_flushing_recent_reports(monkeypa
     main.robustness_report(third)
 
     def key(request):
-        return request.model_dump_json(exclude={"include_field"})
+        return main._robustness_key(request)
 
     assert list(main._ROBUSTNESS_CACHE) == [key(first), key(third)]

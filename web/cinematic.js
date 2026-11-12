@@ -42,7 +42,9 @@ if (desktop.matches) {
     chapter.querySelector('.cinematic-copy').append(link);
   });
 
-  let selectedAnalog = 0, selectedMoon = 0, selectedMars = 0;
+  // The planet scene focuses each body's first target (its list items are links to the Finder).
+  let selectedAnalog = 0;
+  const selectedMoon = 0, selectedMars = 0;
   const targetLists = {Moon:[],Mars:[]};
   const detail = root.querySelector('.cinematic-analog-detail');
   const list = root.querySelector('.cinematic-analog-list');
@@ -65,19 +67,16 @@ if (desktop.matches) {
     const targets = payload.targets || [];
     for (const body of ['Moon','Mars']) {
       const box = root.querySelector(`[data-body="${body}"]`);
-      targetLists[body]=targets.filter(t=>t.body===body).slice(0,3);
-      targetLists[body].forEach((target,i)=>{
+      targetLists[body]=targets.filter(t=>t.body===body);
+      targetLists[body].forEach((target)=>{
         const row=document.createElement('div'); row.className='cinematic-target';
         const image=regionalThumb(body,target);
-        const button=document.createElement('button'); button.type='button'; button.textContent=target.name;
-        button.setAttribute('aria-pressed', String(i===0));
-        button.addEventListener('click',()=>{ if(body==='Moon') selectedMoon=i; else selectedMars=i; box.querySelectorAll('button').forEach((b,j)=>b.setAttribute('aria-pressed',String(j===i)));  });
         const link=document.createElement('a'); link.href=`finder.html#target=${encodeURIComponent(target.id)}`; link.textContent=target.name;link.className='cinematic-site-link';link.setAttribute('aria-label',`Find analogs for ${target.name}`);
         row.append(image,link); box.append(row);
       });
 
     }
-  }).catch(()=>root.querySelectorAll('.cinematic-targets').forEach(box=>box.innerHTML='<p>Target catalog is unavailable. Use View all targets to retry.</p>'));
+  }).catch(()=>root.querySelectorAll('.cinematic-targets').forEach(box=>box.innerHTML='<p>Target catalog is unavailable. <a href="finder.html">Open the Finder</a> to try again.</p>'));
 
   try {
     initPlanetJourney(root, chapter => {
