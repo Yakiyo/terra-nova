@@ -336,3 +336,7 @@ C:/Users/Saa'd/AppData/Local/Temp/codex-clipboard-49580633-9dea-49a0-beca-729264
 Reference inspected through browser skills: source_url:
 https://www.omegawatches.com/world-of-omega/sustainability/clearspace;
 dataset_id: omega_clearspace_ui_reference. No artwork or code was copied from Omega.
+
+Codex traced a local homepage fallback to the Windows MIME type for `lenis.mjs`
+and registered the JavaScript MIME type before mounting the frontend.
+source_url: ../src/api/main.py (dataset_id: terra_nova_static_module_mime).
