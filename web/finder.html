@@ -286,24 +286,37 @@
       </div>
       <div class="ge-slope-legend" id="geSlopeLegend" hidden>
         <div class="ramp"></div>
-        <div class="scale num"><span>0°</span><span>5°</span><span>15° rover limit</span><span>30°+</span></div>
+        <div class="scale num"><span>0°</span><span>5°</span><span id="geSlopeLimit">15° rover limit</span><span>30°+</span></div>
       </div>
       <label class="toggle ge-toggle"><input type="checkbox" id="geContours"><span>Contour lines <small id="geContourStep"></small></span></label>
       <label class="ge-slider">Height exaggeration <b id="geExagValue" class="num">1× true scale</b>
         <input type="range" id="geExag" min="1" max="6" step="0.5" value="1"></label>
-      <label class="toggle ge-toggle"><input type="checkbox" id="geCell" checked><span>Outline the scored cell</span></label>
+      <label class="toggle ge-toggle"><input type="checkbox" id="geCell" checked><span>Outline the scored cell (white)</span></label>
     </div>
 
     <div class="ge-section">
-      <h3>Measure</h3>
+      <h3>Measure and plan</h3>
       <div class="ge-tools">
-        <button class="ghost small" type="button" id="geProfileBtn" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-ruler"></use></svg>Measure a profile</button>
+        <button class="ghost small" type="button" id="geTraverseBtn" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-path"></use></svg>Plan a traverse</button>
         <button class="ghost small" type="button" id="geSunPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-sun"></use></svg><span>Turn the sun</span></button>
       </div>
-      <p class="hint" id="geToolHint">Click the terrain to probe any point.</p>
+      <p class="hint" id="geToolHint" aria-live="polite">Click the terrain to probe any point.</p>
       <div id="geProbe" class="ge-probe" hidden></div>
+      <div id="geRoute" class="ge-route" hidden>
+        <ol class="ge-waypoints" id="geWaypoints" aria-label="Route waypoints"></ol>
+        <div class="ge-tools">
+          <button class="ghost small" type="button" id="geAddPin"><svg class="i" aria-hidden="true"><use href="icons.svg#i-push-pin"></use></svg>Add the site pin</button>
+          <button class="ghost small" type="button" id="geClearRoute"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg>Clear route</button>
+        </div>
+      </div>
       <div id="geProfile" class="ge-profile" hidden></div>
+      <button class="primary small ge-dossier-btn" type="button" id="geDossier"><svg class="i" aria-hidden="true"><use href="icons.svg#i-download-simple"></use></svg>Export mission dossier</button>
     </div>
+
+    <details class="ge-section ge-readiness-panel" id="geReadinessPanel" open>
+      <summary>Hardware test readiness</summary>
+      <div class="readiness" id="geReadiness" aria-live="polite"><p class="hint">Checking which systems could be tested here…</p></div>
+    </details>
 
     <details class="ge-section ge-climate-panel" id="geClimatePanel">
       <summary>Climate simulation</summary>

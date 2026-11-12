@@ -81,7 +81,7 @@ if (header) {
     enhanceHeader(terrainHeader, true);
   }
   enhanceHeader(header);
-  if (document.body.matches('.page-home, .page-targets')) {
+  if (document.body.matches('.page-home')) {
     let previous = scrollY;
     window.addEventListener('scroll', () => {
       const current = scrollY;

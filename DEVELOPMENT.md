@@ -18,14 +18,15 @@ Martian target sites.
 
 ## Commands (Python 3.12, venv in .venv)
 - Setup:     `powershell -File scripts/setup.ps1`
-- Tests:     `python -m pytest tests -q`
-- Lint:      `python -m ruff check src tests scripts && python -m ruff format src tests scripts`
-- Controls:  `OFFLINE=1 python -m scripts.check_controls`
-- Run:       `OFFLINE=1 uvicorn src.api.main:app --reload`, then open http://127.0.0.1:8000/
+- Tests:     `python -m pytest tests -q` (on Windows, if the temp folder is locked: add `--basetemp .pytest-tmp`)
+- Lint:      `python -m ruff check src tests scripts conftest.py` and `python -m ruff format --check src tests scripts` (drop `--check` to reformat)
+- Controls:  PowerShell `$env:OFFLINE="1"; .venv\Scripts\python -m scripts.check_controls` (Bash: `OFFLINE=1 python -m scripts.check_controls`)
+- Run:       PowerShell `$env:OFFLINE="1"; .venv\Scripts\python -m uvicorn src.api.main:app --reload` (Bash: `OFFLINE=1 .venv/Scripts/python -m uvicorn src.api.main:app --reload`), then open http://127.0.0.1:8000/
 - Data:      `python -m src.acquire.build_predictor_stack`, `python -m src.acquire.calibrate`, `python -m src.acquire.basemaps`
-- Offline demo prefetch (gitignored caches): `python -m src.acquire.tiles --level 1`, `python -m src.acquire.tiles --level 2 --around-top 20`, `python -m src.acquire.sitetiles --top 5`, `python -m src.acquire.peek`
+- Offline demo prefetch (gitignored caches): `python -m src.acquire.tiles --level 1`, `python -m src.acquire.tiles --level 2 --around-top 20`, `python -m src.acquire.sitetiles` (top 20 of every target, as the Finder lists them), `python -m src.acquire.peek`
 - God's Eye default-results preparation: `python -m src.acquire.sitetiles` caches elevation and satellite imagery using Finder's discovery filters. `--terrain-only` skips satellite imagery and leaves uncached sites in shaded relief. The acquisition command downloads explicitly even from an `OFFLINE=1` shell; the running offline server stays offline. Copy `cache/sitetiles` with the app for an offline demo.
-- UI smoke test (app running on :8000): `node scripts/ui_smoke.mjs`
+- UI smoke test (app running on :8000): `node scripts/ui_smoke.mjs` (another port: `node scripts/ui_smoke.mjs http://127.0.0.1:8020`)
+- Visual review scripts (need `playwright-cli` on PATH, with a browser session open on the app): `playwright-cli -s=rocket-review run-code --filename=scripts/rocket_review.js` and `playwright-cli -s=chapter-review run-code --filename=scripts/chapter_review.js`.
 - JS syntax check: `node --input-type=module --check < web/app.js` (plain `node --check` misses module errors)
 
 ## Adding a criterion

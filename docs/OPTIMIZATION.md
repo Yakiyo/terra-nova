@@ -36,7 +36,7 @@ this report does not claim a measured change to GPU memory or page-load timings.
 
 ## Verification
 
-- Offline Python suite: 79 passed. Existing dependency deprecation warnings remain.
+- Offline Python suite: 79 passed at the time (121 tests as of 2026-11-12). Existing dependency deprecation warnings remain.
 - JavaScript resource/cache tests: 4 passed, including stale-request eviction.
 - Complete browser smoke suite passed, covering native fallback, navigation,
   ranking, controls, terrain, responsive interactions and motion.

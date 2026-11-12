@@ -31,7 +31,7 @@ def test_prefetch_uses_finder_filters_and_reports_missing_terrain(monkeypatch, a
         def get(self, url, params=None):
             assert os.environ["OFFLINE"] == "0"
             if url == "/api/targets":
-                return Response({"targets": [{"id": "jezero_crater"}]})
+                return Response({"targets": [{"id": "jezero_crater", "default_weights": {"slope": 2.0}}]})
             return Response({"imagery": {}} if available else {"detail": "download failed"})
 
         def post(self, url, json):
@@ -40,5 +40,6 @@ def test_prefetch_uses_finder_filters_and_reports_missing_terrain(monkeypatch, a
 
     monkeypatch.setattr(fastapi.testclient, "TestClient", Client)
     assert sitetiles.main(["--terrain-only"]) == (0 if available else 1)
-    assert requests == [{**UI_DEFAULTS, "target_id": "jezero_crater"}]
+    # the Finder's own request: its filters and the target's default weights
+    assert requests == [{**UI_DEFAULTS, "target_id": "jezero_crater", "weights": {"slope": 2.0}, "top_k": 20}]
     assert os.environ["OFFLINE"] == "1"

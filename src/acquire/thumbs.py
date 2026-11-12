@@ -81,6 +81,9 @@ def main() -> int:
             json={"target_id": target["id"], "top_k": 60, "min_separation_cells": 3},
         ).json()
         points += [(r["lat"], r["lon"]) for r in body["results"]]
+    from src.acquire.finder_sites import finder_sites
+
+    points += finder_sites(20)   # the Finder's own ranking (discovery filters, target weights)
     points += [(s["lat"], s["lon"]) for s in client.get("/api/analogs").json()["sites"]]
     unique = sorted({cell_centre(lat, lon) for lat, lon in points})
     for done, (lat, lon) in enumerate(unique, start=1):

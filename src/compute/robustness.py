@@ -18,7 +18,7 @@ Sensitivity (leave one criterion out)
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import numpy as np
@@ -83,22 +83,26 @@ def sensitivity(
     tag: str | None,
     mask: np.ndarray,
     catalog: Mapping[str, Any] | None = None,
+    tolerance: Mapping[str, float] | None = None,
+    top_of: Callable[[Any], int | None] | None = None,
 ) -> list[dict[str, Any]]:
-    """Validation AUC and top cell with each active criterion removed in turn."""
+    """Validation AUC and top cell with each active criterion removed in turn.
+
+    ``tolerance`` and ``top_of`` (the caller's own ranking rule, given a scoring result)
+    keep the "without X" results comparable with the headline ranking.
+    """
     out = []
     active = [k for k in CRITERIA if weights.get(k, 0) > 0 and profile.get(k) is not None]
     for key in active:
         if len(active) == 1:
             break
         reduced = {**weights, key: 0.0}
-        result = compute_similarity(stack, profile, reduced, ranges)
+        result = compute_similarity(stack, profile, reduced, ranges, tolerance)
         report = validation.validate(result.score, body, catalog, tag)
-        top = rank_top(result.score, mask, k=1)
-        out.append(
-            {
-                "without": key,
-                "auc": report["auc"],
-                "top_index": top[0] if top else None,
-            }
-        )
+        if top_of is not None:
+            top_index = top_of(result)
+        else:
+            top = rank_top(result.score, mask, k=1)
+            top_index = top[0] if top else None
+        out.append({"without": key, "auc": report["auc"], "top_index": top_index})
     return out

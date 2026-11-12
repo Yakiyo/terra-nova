@@ -116,6 +116,9 @@ def format_value(value: float, unit: str) -> str:
     text = f"{value:,.0f}" if magnitude >= 100 else f"{value:.2f}".rstrip("0").rstrip(".")
     if unit == "1":
         return text
+    if unit == "fraction":   # basaltic_volcanic: three rock classes (see src/acquire/glim.py)
+        rock = "basaltic" if value >= 1 else "intermediate volcanic" if value >= 0.5 else "not volcanic"
+        return f"{rock} ({text})"
     if unit == "degrees":
         return f"{text} degrees"
     return f"{text} {unit}"
