@@ -38,13 +38,6 @@ function enhanceHeader(header, terrain = false) {
 @media (max-width:760px){.learn-pill{left:96px;padding:6px 10px}.learn-pill small{display:none}}`;
     document.head.append(st);
   }
-  if (!terrain && !location.pathname.endsWith('learn.html') && !header.querySelector('.learn-pill')) {
-    const pill = document.createElement('a');
-    pill.href = 'learn.html'; pill.className = 'learn-pill';
-    pill.innerHTML = '<span aria-hidden="true">🪐</span>Learn<small>Moon &amp; Mars</small>';
-    if (getComputedStyle(header).position === 'static') header.style.position = 'relative';
-    header.append(pill);
-  }
   document.body.append(dialog);
   header.prepend(trigger);
   header.classList.add('site-header');

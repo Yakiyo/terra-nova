@@ -39,5 +39,5 @@
 .tn-num span { font: 10.5px/1.4 "IBM Plex Mono", monospace; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.65); }
 @media (max-width: 700px) { .tn-numbers { grid-template-columns: 1fr 1fr; } }
 
-.tn-learn { display: block; width: max-content; margin: 16px auto 0; font: 500 14px/1 "Roboto", sans-serif; color: #fff; text-decoration: none; padding: 11px 18px; border-radius: 999px; border: 1px solid rgba(255,140,90,.7); background: rgba(255,106,61,.12); pointer-events: auto; }
-.tn-learn:hover { background: #ff6a3d; }
+.cinematic-copy .tn-learn { display: inline-block; margin: 20px 0 20px 10px; padding: 19px 29px; border: 1px solid rgba(255,255,255,.6); background: transparent; color: #fff; text-decoration: none; text-transform: uppercase; letter-spacing: .06em; font-size: 13px; pointer-events: auto; }
+.cinematic-copy .tn-learn:hover { background: #fff; color: #111; }

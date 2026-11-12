@@ -48,7 +48,7 @@
     const launch = document.querySelector("#cinematic-finale .cinematic-launch");
     if (!launch || launch.parentElement.querySelector(".tn-learn")) return !!launch;
     const a = document.createElement("a");
-    a.href = "learn.html"; a.className = "tn-learn"; a.textContent = "First, learn about the Moon & Mars";
+    a.href = "learn.html"; a.className = "tn-learn"; a.textContent = "Learn about Moon & Mars";
     launch.after(a); return true;
   };
   if (!addLearn()) { const mo2 = new MutationObserver(() => { if (addLearn()) mo2.disconnect(); }); mo2.observe(document.body, { childList: true, subtree: true }); setTimeout(() => mo2.disconnect(), 15000); }

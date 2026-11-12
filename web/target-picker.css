@@ -168,3 +168,11 @@
 .ti-show-place { font-size: 12px; }
 .marker.tag-hide .mk-tag { opacity: 0; transition: opacity var(--t-fast); }
 .marker.tag-hide:hover .mk-tag, .marker.tag-hide:focus-visible .mk-tag { opacity: 1; z-index: 3; }
+
+.tp-learn { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 12px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; text-decoration: none; color: inherit;
+  border: 1px solid rgba(255,140,90,.55); background: linear-gradient(90deg, rgba(255,106,61,.14), rgba(255,106,61,.03)); transition: background .2s, border-color .2s; }
+.tp-learn:hover { background: rgba(255,106,61,.22); border-color: #ff7a4a; }
+.tp-learn-ball { width: 38px; height: 38px; border-radius: 50%; background: center/cover; box-shadow: inset -6px -4px 10px rgba(0,0,0,.7), 0 0 12px rgba(255,120,70,.35); }
+.tp-learn b { display: block; font-size: 13.5px; }
+.tp-learn small { display: block; font-size: 11.5px; color: #c9c9d2; line-height: 1.35; margin-top: 2px; }
+.tp-learn em { font-style: normal; font-size: 18px; color: #ff7a4a; }
