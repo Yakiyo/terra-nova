@@ -176,3 +176,6 @@
 .tp-learn b { display: block; font-size: 13.5px; }
 .tp-learn small { display: block; font-size: 11.5px; color: #c9c9d2; line-height: 1.35; margin-top: 2px; }
 .tp-learn em { font-style: normal; font-size: 18px; color: #ff7a4a; }
+
+.tp-tour { width: 100%; margin: 6px 0 4px; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.04); color: #fff; font: 600 13px Roboto, system-ui, sans-serif; cursor: pointer; text-align: left; }
+.tp-tour:hover { background: #fff; color: #111; }

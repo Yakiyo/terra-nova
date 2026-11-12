@@ -133,6 +133,7 @@ export function renderTargetPicker(root, { targets, selectedId, custom, onChoose
       </div>
       <p class="tp-blurb">${esc(BLURB[body] || "")}</p>
       <a class="tp-learn" href="learn.html?world=${body === "Mars" ? "mars" : "moon"}"><span class="tp-learn-ball" style="background-image:url('assets/${body === "Mars" ? "mars" : "moon"}_sm.jpg')"></span><span><b>New to ${body === "Moon" ? "the Moon" : "Mars"}?</b><small>Interactive 2-minute intro: feel a day there, see what was tested on Earth</small></span><em aria-hidden="true">→</em></a>
+      <button type="button" class="tp-tour" onclick="document.getElementById('startTour')?.click()">▶ Take the 60-second guided tour</button>
     </div>
     <ol class="tp-list" role="radiogroup" aria-label="${esc(body)} sites">
       ${sites.map((t) => `

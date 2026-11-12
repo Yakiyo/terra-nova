@@ -42,6 +42,33 @@ const PROCESSES = [
   { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes used for astronaut and robot training.", q: "Mars pit crater skylight|Mars pit crater|Arsia Mons pit", qe: "Lava Beds National Monument|lava tube|cave" },
 ];
 
+
+const CHALLENGE = {
+  mars: { ask: "A rover must be tested for Jezero Crater: almost no rain, no plants, freezing nights, flat dusty ground. Where on Earth would you test it?",
+    options: [
+      ["Atacama Desert, Chile", true, "Right. The Atacama gets almost no rain and has almost no plant life, which is why NASA tests life-detection drills there. TerraNova ranks deserts like it near the top for Mars."],
+      ["Amazon rainforest, Brazil", false, "The Amazon is the opposite of Mars: heavy rain and dense plants. TerraNova uses it as a non-analog: it must score low, and it does."],
+      ["Dhaka, Bangladesh", false, "Dhaka is wet, green and crowded: about 2,000 mm of rain a year. A useful non-analog reference, not a test site."],
+      ["Iceland lava fields", "partly", "Partly. Iceland has Mars-like basalt and volcanic ground, but it's wet and green. A good geology analog, a weak climate analog: no place matches everything."]] },
+  moon: { ask: "Artemis crews will land near the lunar south pole: no air, no rain, extreme cold, rugged ground. Where on Earth would you train them?",
+    options: [
+      ["Devon Island, Canadian Arctic", true, "Good choice. Devon Island is cold, dry, barren and has an impact crater; NASA's Haughton-Mars Project has worked there for years."],
+      ["Iceland lava fields", "partly", "Partly. Apollo crews trained there for the volcanic rock, but the climate is mild and wet compared with the Moon."],
+      ["Sahara Desert", "partly", "Partly. Dry and bare like the Moon, but far too hot, and the Moon has no wind-blown sand."],
+      ["Amazon rainforest, Brazil", false, "The Amazon is wet and full of life, the opposite of the Moon. TerraNova checks that places like this score low."]] },
+};
+const QUIZ = {
+  mars: [
+    ["How strong is gravity on Mars compared with Earth?", ["About 38%", "About 90%", "About 10%"], 0, "Mars gravity is about 38% of Earth's, one thing no place on Earth can copy."],
+    ["Why do rover teams test in the Atacama?", ["It's one of the driest places on Earth", "It's the coldest place on Earth", "It has Mars-like gravity"], 0, "Almost no rain and almost no life make it a good stand-in for Mars soil and for testing life detection."],
+    ["What does a Martian dust storm do to temperature?", ["Days get cooler and nights warmer", "Days get hotter", "Nothing changes"], 0, "Dust blocks sunlight by day and traps heat at night: try the dust slider above."],
+    ["What can Earth NOT reproduce for Mars?", ["Thin air and low gravity", "Dry ground", "Cold nights"], 0, "That's why TerraNova shows, for each site, what matches and what doesn't."]],
+  moon: [
+    ["How long is one day on the Moon?", ["About 29.5 Earth days", "24 hours", "About 7 Earth days"], 0, "Two weeks of sun, then two weeks of night."],
+    ["Why is the lunar south pole interesting?", ["Dark craters can trap water ice", "It's the warmest place", "It has an atmosphere"], 0, "Craters that never see sunlight stay below −230 °C and can hold ice."],
+    ["Where did Apollo crews train for lunar geology?", ["Iceland, Hawaii and Arizona", "The Amazon", "Antarctica only"], 0, "Volcanic ground taught them the rocks they'd see on the Moon."],
+    ["What can Earth NOT reproduce for the Moon?", ["Vacuum and low gravity", "Bare rock", "Cold"], 0, "Earth analogs test a few conditions at a time, never all of them."]],
+};
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const worldId = new URLSearchParams(location.search).get("world") === "moon" ? "moon" : "mars";
 const w = W[worldId];
@@ -49,7 +76,7 @@ document.title = `Learn: ${w.name} · TerraNova`;
 document.documentElement.style.setProperty("--tint", w.tint);
 document.querySelector(`[data-world="${worldId}"]`)?.setAttribute("aria-current", "page");
 
-const chapters = ["Meet " + w.name, "Feel a day", "Tested on Earth", "Processes", "Find your own"];
+const chapters = ["Meet " + w.name, "Feel a day", "Tested on Earth", "Processes", "Be the scientist", "Find your own"];
 const pad = (n) => String(n).padStart(2, "0");
 
 document.getElementById("learn").innerHTML = `
@@ -107,8 +134,17 @@ document.getElementById("learn").innerHTML = `
   <p class="ln-note">Earth can't copy everything: low gravity, vacuum, thin air and space radiation stay out of reach. TerraNova shows, for every site, what matches and what doesn't.</p>
 </section>
 
-<section class="ln-sec ln-end" id="ch5">
-  <header class="ln-h"><span class="ln-mono">05</span><h2>Find your own analog/</h2></header>
+
+<section class="ln-sec" id="ch5">
+  <header class="ln-h"><span class="ln-mono">05</span><h2>Be the scientist/</h2><span class="ln-mono ln-tag">Try it</span></header>
+  <p class="ln-ask">${esc(CHALLENGE[worldId].ask)}</p>
+  <div class="ln-choices">${CHALLENGE[worldId].options.map(([n], i) => `<button type="button" class="ln-choice" data-i="${i}">${esc(n)}</button>`).join("")}</div>
+  <p class="ln-verdict" id="lnVerdict" aria-live="polite"></p>
+  <h3 class="ln-qh">Quick quiz <span class="ln-mono" id="lnScore"></span></h3>
+  <ol class="ln-quiz">${QUIZ[worldId].map(([q, opts], i) => `<li data-q="${i}"><p>${esc(q)}</p><div>${opts.map((o, j) => `<button type="button" data-j="${j}">${esc(o)}</button>`).join("")}</div><small></small></li>`).join("")}</ol>
+</section>
+<section class="ln-sec ln-end" id="ch6">
+  <header class="ln-h"><span class="ln-mono">06</span><h2>Find your own analog/</h2></header>
   <p>TerraNova scored all <b>78,247</b> land cells on Earth against ${esc(w.name)}. Only <b>16</b> of them are catalogued analog sites today; the rest are waiting to be explored.</p>
   <a class="ln-btn" href="finder.html#target=${w.target}">Search Earth for ${esc(w.name)} →</a>
 </section>`;
@@ -158,3 +194,25 @@ async function loadPhoto(el) {
   } catch { el.style.background = `center/cover url('${w.tex}')`; }
 }
 document.querySelectorAll(".ln-ph").forEach((el) => loadPhoto(el));
+
+// ---- challenge
+document.querySelectorAll(".ln-choice").forEach((b) => b.addEventListener("click", () => {
+  const [, ok, why] = CHALLENGE[worldId].options[+b.dataset.i];
+  document.querySelectorAll(".ln-choice").forEach((x) => x.classList.remove("is-ok", "is-no", "is-part"));
+  b.classList.add(ok === true ? "is-ok" : ok === false ? "is-no" : "is-part");
+  const v = document.getElementById("lnVerdict");
+  v.className = `ln-verdict ${ok === true ? "is-ok" : ok === false ? "is-no" : "is-part"}`;
+  v.innerHTML = `${esc(why)} <a href="finder.html#target=${w.target}">See TerraNova's real ranking →</a>`;
+}));
+// ---- quiz
+let right = 0, done = 0;
+document.querySelectorAll(".ln-quiz li").forEach((li) => li.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+  if (li.classList.contains("is-done")) return;
+  const [, , ans, why] = QUIZ[worldId][+li.dataset.q];
+  const ok = +b.dataset.j === ans;
+  li.classList.add("is-done"); b.classList.add(ok ? "is-ok" : "is-no");
+  li.querySelectorAll("button")[ans].classList.add("is-ok");
+  li.querySelector("small").textContent = (ok ? "Correct. " : "Not quite. ") + why;
+  done++; if (ok) right++;
+  document.getElementById("lnScore").textContent = `${right} / ${done}`;
+})));
