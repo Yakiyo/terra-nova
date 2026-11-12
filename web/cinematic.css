@@ -151,3 +151,9 @@
   .chapter-hero h1{font-size:clamp(36px,9vw,56px)}
   .chapter-orbit .cinematic-copy{width:86vw}
 }
+
+/* Selected analog site label on the Earth (planet-journey.js). */
+.cinematic-site-label { position: fixed; z-index: 60; transform: translate(18px, -50%); pointer-events: none; white-space: nowrap;
+  padding: 5px 11px; border-radius: 8px; background: rgba(5,5,7,.82); border: 1px solid rgba(255,196,92,.6);
+  color: #fff; font: 600 14px/1.2 "Roboto", system-ui, sans-serif; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+.cinematic-site-label::before { content: ""; position: absolute; right: 100%; top: 50%; width: 14px; height: 1px; background: rgba(255,196,92,.7); }

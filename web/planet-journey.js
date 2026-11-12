@@ -155,10 +155,24 @@ export function initPlanetJourney(root, getSelection) {
   }));
   sun.position.z = -9; scene.add(sun);
 
-  const ring = new THREE.Mesh(new THREE.RingGeometry(.018, .024, 48), new THREE.MeshBasicMaterial({
-    color: 0xff5b5b, side: THREE.DoubleSide, depthWrite: false,
+  // Selected-site highlight: a glowing amber ring, a bright core and a repeating pulse.
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.045, .056, 64), new THREE.MeshBasicMaterial({
+    color: 0xffc45c, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: .95,
   }));
-  ring.add(new THREE.Mesh(new THREE.SphereGeometry(.006, 12, 8), new THREE.MeshBasicMaterial({color: 0xffffff})));
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(.045, 48), new THREE.MeshBasicMaterial({
+    color: 0xffb038, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: .22,
+  }));
+  const pulse = new THREE.Mesh(new THREE.RingGeometry(.05, .058, 64), new THREE.MeshBasicMaterial({
+    color: 0xffc45c, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: .8,
+  }));
+  ring.add(glow, pulse);
+  ring.add(new THREE.Mesh(new THREE.CircleGeometry(.014, 24), new THREE.MeshBasicMaterial({color: 0xffffff, side: THREE.DoubleSide})));
+  ring.visible = false;
+  const siteLabel = document.createElement('div');
+  siteLabel.className = 'cinematic-site-label';
+  siteLabel.hidden = true;
+  root.appendChild(siteLabel);
+  const labelPos = new THREE.Vector3();
 
   const chapters = [...root.querySelectorAll('.cinematic-chapter')];
   const copies = chapters.map(c => c.querySelector('.cinematic-copy'));
@@ -245,6 +259,7 @@ export function initPlanetJourney(root, getSelection) {
     }
     const chosen = getSelection(index);
     ring.visible = false;
+    siteLabel.hidden = true;
     if (chosen && index === 4) {
       const name = index === 2 ? 'moon' : index === 3 ? 'mars' : 'earth', w = worlds[name];
       const key = `${name}:${chosen.lat},${chosen.lon}`, normal = surfacePoint(chosen.lat, chosen.lon);
@@ -258,6 +273,22 @@ export function initPlanetJourney(root, getSelection) {
         if (arrive < .1) w.surface.quaternion.copy(targetQ);
       }
       w.surface.quaternion.slerp(targetQ, reduced.matches ? 1 : 1 - Math.exp(-dt * 3));
+      ring.visible = visibility > .05;
+      // Pulse: expand and fade every 1.8 s.
+      const ph = reduced.matches ? .3 : (now / 1800) % 1;
+      pulse.scale.setScalar(1 + ph * 1.6);
+      pulse.material.opacity = .8 * (1 - ph);
+      // Name label beside the marker, in screen space.
+      ring.getWorldPosition(labelPos);
+      const facingCam = labelPos.clone().sub(w.group.position).dot(camera.position.clone().sub(labelPos)) > 0;
+      labelPos.project(camera);
+      if (ring.visible && facingCam && Math.abs(labelPos.x) < 1 && Math.abs(labelPos.y) < 1) {
+        siteLabel.hidden = false;
+        siteLabel.textContent = chosen.name || '';
+        siteLabel.style.left = `${((labelPos.x + 1) / 2) * 100}%`;
+        siteLabel.style.top = `${((1 - labelPos.y) / 2) * 100}%`;
+        siteLabel.style.opacity = String(visibility);
+      }
     }
     if (!reduced.matches && index < 2) earthMaterial.uniforms.cloudDrift.value += dt * .00035;
     renderer.render(scene, camera);
