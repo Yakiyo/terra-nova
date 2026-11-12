@@ -42,6 +42,15 @@ export function zoneDecorator(field, sorted, share = ZONE_SHARE) {
   const { cells, segs } = cache;
   return (ctx, s) => {
     ctx.save();
+    // Spotlight: fade the heatmap outside the zones so the zones carry the eye.
+    // (Path = whole map + each zone cell; even-odd fill punches the zones out.)
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
+    ctx.beginPath();
+    ctx.rect(0, 0, 720 * s, 360 * s);
+    for (const i of cells) ctx.rect((i % 720) * s, Math.floor(i / 720) * s, s, s);
+    ctx.fill("evenodd");
+    ctx.globalCompositeOperation = "source-over";
     ctx.beginPath();
     for (let i = 0; i < segs.length; i += 4) {
       ctx.moveTo(segs[i] * s, segs[i + 1] * s);
@@ -49,8 +58,8 @@ export function zoneDecorator(field, sorted, share = ZONE_SHARE) {
     }
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     // A fine amber line with a soft glow: reads as an outline at any zoom without hiding the map.
-    ctx.shadowColor = "rgba(255, 170, 40, 0.85)"; ctx.shadowBlur = 1.2 * s;
-    ctx.strokeStyle = "rgb(255, 205, 96)"; ctx.lineWidth = 0.32 * s;
+    ctx.shadowColor = "rgba(255, 170, 40, 0.85)"; ctx.shadowBlur = 1.6 * s;
+    ctx.strokeStyle = "rgb(255, 205, 96)"; ctx.lineWidth = 0.42 * s;
     ctx.stroke();
     ctx.restore();
   };

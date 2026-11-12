@@ -491,7 +491,7 @@ function paintLayer() {
       <div class="scale abs num"><span style="left:0">top 50%</span><span style="left:80%">top 10%</span><span style="left:98%">1%</span></div>
       ${histogram()}
       <div class="marks"><span><i class="mk zone"></i>analog zone (best ${Math.round(ZONE_SHARE * 100)}% of land)</span><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span><span><i class="mk known" aria-hidden="true">${icon("mountains")}</i>geology only</span></div>
-      <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Bars: how many land cells
+      <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Outside the amber analog zones the colours are faded so the best regions stand out. Bars: how many land cells
         reach each score (red = top 10%, at least ${fmtPct(q(0.9))}).</div>
       <div class="credit-line">Earth: <a href="${esc(state.sources.basemaps.earth.url)}" target="_blank" rel="noopener">${esc(state.sources.basemaps.earth.credit)}</a></div>`;
   } else {
