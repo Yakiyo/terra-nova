@@ -1320,6 +1320,11 @@ async function loadAnalogValues() {
   return analogValuesJob;
 }
 
+const exploreFields = new Map();
+function exploreField(key) {
+  if (!exploreFields.has(key)) exploreFields.set(key, api(`/api/predictor?key=${encodeURIComponent(key)}`).then(decode).catch((e) => { exploreFields.delete(key); throw e; }));
+  return exploreFields.get(key);
+}
 async function renderExplore() {
   const box = $("explore");
   const d = state.data;
@@ -1340,13 +1345,16 @@ async function renderExplore() {
     ...analogs.filter((a) => a.cell?.candidate).map((a) => ({ kind: "analog", a, x: a.cell.values[xKey], y: a.cell.values[yKey] })),
   ].filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
   const tx = d.effective_profile[xKey], ty = d.effective_profile[yKey];
-  const xs = pts.map((p) => p.x).concat(Number.isFinite(tx) ? [tx] : []);
-  const ys = pts.map((p) => p.y).concat(Number.isFinite(ty) ? [ty] : []);
-  // Pad the domain, but never below zero for quantities that cannot be negative.
-  const pad = (lo, hi) => { const m = (hi - lo || 1) * 0.08; return [lo >= 0 ? Math.max(0, lo - m) : lo - m, hi + m]; };
+  // Every land cell on Earth, as a faint density cloud behind the sites.
+  let fx = null, fy = null;
+  try { [fx, fy] = await Promise.all([exploreField(xKey), exploreField(yKey)]); } catch { /* cloud is optional */ }
+  if (d !== state.data || state.awaitingCustom) return;
+  const xs = pts.map((p) => p.x).concat(Number.isFinite(tx) ? [tx] : [], [X.earth_min, X.earth_max].filter(Number.isFinite));
+  const ys = pts.map((p) => p.y).concat(Number.isFinite(ty) ? [ty] : [], [Y.earth_min, Y.earth_max].filter(Number.isFinite));
+  const pad = (lo, hi) => { const m = (hi - lo || 1) * 0.05; return [lo >= 0 ? Math.max(0, lo - m) : lo - m, hi + m]; };
   const [x0, x1] = pad(Math.min(...xs), Math.max(...xs));
   const [y0, y1] = pad(Math.min(...ys), Math.max(...ys));
-  const W = 360, H = 290, L = 40, R = 12, T = 22, B = 38;
+  const W = 380, H = 320, L = 40, R = 40, T = 40, B = 38;
   const sx = (v) => L + ((v - x0) / (x1 - x0)) * (W - L - R);
   const sy = (v) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
   const ticks = (lo, hi) => [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
@@ -1357,36 +1365,68 @@ async function renderExplore() {
     if (a >= 10) return v.toFixed(0);
     return v.toFixed(a >= 1 ? 1 : 2);
   };
-  const unitOf = (c) => (c.unit === "1" || c.unit === "NDVI" ? "" : ` (${c.unit})`);
+  const unitOf = (c) => (c.unit === "1" || c.unit === "NDVI" || c.unit === "fraction" ? "" : ` (${c.unit})`);
   const grid = ticks(x0, x1).map((v) => `<line x1="${sx(v)}" x2="${sx(v)}" y1="${T}" y2="${H - B}" class="g"/><text x="${sx(v)}" y="${H - B + 14}" text-anchor="middle">${fmtT(v)}</text>`).join("")
     + ticks(y0, y1).map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" class="g"/><text x="${L - 5}" y="${sy(v) + 3}" text-anchor="end">${fmtT(v)}</text>`).join("");
+  let cloud = "", edges = "", pctX = null, pctY = null, landN = 0;
+  if (fx && fy) {
+    const NX = 48, NY = 36, bins = new Uint32Array(NX * NY), hx = new Uint32Array(NX), hy = new Uint32Array(NY);
+    let belowX = 0, belowY = 0;
+    for (let i = 0; i < fx.length; i++) {
+      const vx = fx[i], vy = fy[i];
+      if (!Number.isFinite(vx) || !Number.isFinite(vy)) continue;
+      landN++;
+      if (vx < tx) belowX++; if (vy < ty) belowY++;
+      const bx = Math.floor(((vx - x0) / (x1 - x0)) * NX), by = Math.floor(((vy - y0) / (y1 - y0)) * NY);
+      if (bx < 0 || bx >= NX || by < 0 || by >= NY) continue;
+      bins[by * NX + bx]++; hx[bx]++; hy[by]++;
+    }
+    const mx = Math.max(...bins) || 1, cw = (W - L - R) / NX, ch = (H - T - B) / NY;
+    for (let by = 0; by < NY; by++) for (let bx = 0; bx < NX; bx++) {
+      const n = bins[by * NX + bx]; if (!n) continue;
+      cloud += `<rect x="${(L + bx * cw).toFixed(1)}" y="${(H - B - (by + 1) * ch).toFixed(1)}" width="${(cw + .3).toFixed(1)}" height="${(ch + .3).toFixed(1)}" fill-opacity="${(0.08 + 0.55 * Math.sqrt(n / mx)).toFixed(2)}"/>`;
+    }
+    const mhx = Math.max(...hx) || 1, mhy = Math.max(...hy) || 1;
+    edges = [...hx].map((n, i) => `<rect x="${(L + i * cw).toFixed(1)}" y="${(T - 4 - 26 * n / mhx).toFixed(1)}" width="${(cw - .6).toFixed(1)}" height="${(26 * n / mhx).toFixed(1)}"/>`).join("")
+      + [...hy].map((n, i) => `<rect x="${W - R + 4}" y="${(H - B - (i + 1) * ch).toFixed(1)}" width="${(26 * n / mhy).toFixed(1)}" height="${(ch - .6).toFixed(1)}"/>`).join("");
+    if (landN) { pctX = (100 * belowX) / landN; pctY = (100 * belowY) / landN; }
+  }
+  const edgeMarks = Number.isFinite(tx) && Number.isFinite(ty)
+    ? `<line x1="${sx(tx)}" x2="${sx(tx)}" y1="${T - 32}" y2="${T - 2}" class="tm"/><line x1="${W - R + 2}" x2="${W - R + 34}" y1="${sy(ty)}" y2="${sy(ty)}" class="tm"/>` : "";
   const target = Number.isFinite(tx) && Number.isFinite(ty)
     ? `<line x1="${sx(tx)}" x2="${sx(tx)}" y1="${T}" y2="${H - B}" class="t"/><line x1="${L}" x2="${W - R}" y1="${sy(ty)}" y2="${sy(ty)}" class="t"/>
        <circle cx="${sx(tx)}" cy="${sy(ty)}" r="8" class="target"/><text x="${sx(tx) + 11}" y="${sy(ty) - 8}" class="tl">target</text>` : "";
+  const maxScore = Math.max(...d.results.map((r) => r.score)) || 1;
   const marks = pts.map((p, i) => p.kind === "site"
-    ? `<circle data-i="${i}" tabindex="0" role="button" aria-label="#${p.r.rank} ${esc(p.r.label.text)}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
-    : `<svg data-i="${i}" tabindex="0" role="button" aria-label="${esc(p.a.site.name)}" data-analog-role="${catalogRole(p.a.site) || ''}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-${ANALOG_ROLES[catalogRole(p.a.site)]?.icon || 'rocket'}"></use></svg>`).join("");
+    ? `<circle data-i="${i}" tabindex="0" role="button" aria-label="#${p.r.rank} ${esc(p.r.label.text)}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 5.5 : 4}" class="site" style="fill-opacity:${(0.35 + 0.65 * p.r.score / maxScore).toFixed(2)}"/>`
+    : `<polygon data-i="${i}" tabindex="0" role="button" aria-label="${esc(p.a.site.name)}" points="${sx(p.x)},${sy(p.y) - 6} ${sx(p.x) + 6},${sy(p.y) + 5} ${sx(p.x) - 6},${sy(p.y) + 5}" class="analog-tri ${catalogRole(p.a.site) || ""}" data-cx="${sx(p.x)}" data-cy="${sy(p.y)}"/>`).join("");
+  const sitePts = pts.filter((p) => p.kind === "site"), anPts = pts.filter((p) => p.kind === "analog");
+  const side = (v, lab, pct) => pct == null ? "" : pct >= 99.5 ? `higher ${lab} than anywhere on Earth's land` : pct <= 0.5 ? `lower ${lab} than anywhere on Earth's land` : pct >= 50 ? `higher ${lab} than ${pct.toFixed(0)}% of Earth's land` : `lower ${lab} than ${(100 - pct).toFixed(0)}% of Earth's land`;
+  const reading = pctX != null ? `The target has ${side(tx, X.label.toLowerCase(), pctX)} and ${side(ty, Y.label.toLowerCase(), pctY)}. ${sitePts.length} ranked sites sit near it; ${anPts.length} known analogs spread ${anPts.length > 3 ? "wider" : "around it"}.` : "";
+  const PRESETS = [["Climate", "precipitation", "mean_annual_temperature"], ["Thermal", "annual_temperature_range", "lst_diurnal_range"], ["Terrain", "slope", "roughness"]];
   box.innerHTML = `
-    <p class="hint">Compare two criteria. Dots are ranked sites; icons are catalogued analogs. Hover for details or click to explore.</p>
+    <p class="hint">Where does the target sit in Earth's climate space? The grey cloud is every land cell on Earth.</p>
+    <div class="ex-presets" role="group" aria-label="Axis presets">${PRESETS.map(([n, a, b2]) => `<button type="button" class="ex-pre${a === xKey && b2 === yKey ? " is-on" : ""}" data-x="${a}" data-y="${b2}">${n}</button>`).join("")}</div>
     <div class="axes">
       <label>X <select id="exX">${opts(xKey)}</select></label>
       <label>Y <select id="exY">${opts(yKey)}</select></label>
     </div>
     <div class="scatter-wrap">
-      <svg class="scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter of ${esc(X.label)} against ${esc(Y.label)} for ranked sites and known analogs">
+      <svg class="scatter ex-v2" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter of ${esc(X.label)} against ${esc(Y.label)}: Earth's land cells, ranked sites and known analogs">
+        <g class="cloud">${cloud}</g><g class="edge">${edges}</g>${edgeMarks}
         ${grid}${target}${marks}
         <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" class="axis">${esc(X.label + unitOf(X))}</text>
-        <text x="${L}" y="${T - 8}" class="axis">${esc(Y.label + unitOf(Y))}</text>
+        <text x="${L}" y="12" class="axis">${esc(Y.label + unitOf(Y))}</text>
       </svg>
       <div class="scatter-tip" id="exTip" hidden></div>
     </div>
     <div class="scatter-legend">
-      <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site</span>
-      <span>${icon("rocket")} known analog</span><span>${icon("mountains")} geology only</span>
+      <span><svg width="14" height="10"><rect width="14" height="10" class="cloud-sw"/></svg> Earth's land (${fmtInt(landN)} cells)</span>
+      <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site (brighter = better)</span>
+      <span><svg width="12" height="12"><polygon points="6,1 11,11 1,11" class="analog-tri positive"/></svg> known analog</span>
       <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" class="target"/></svg> target</span>
     </div>
-    <p class="hint">${pts.filter((p) => p.kind === "site").length} ranked sites · ${pts.filter((p) => p.kind === "analog").length} known analogs with data.
-      Distance from the crosshair on these two axes is part of each site's score.</p>`;
+    ${reading ? `<p class="ex-read">${esc(reading)}</p>` : ""}`;
   const svg = box.querySelector("svg");
   const tip = $("exTip");
   svg.querySelectorAll("[data-i]").forEach((el) => {
@@ -1397,8 +1437,8 @@ async function renderExplore() {
       tip.hidden = false;
       const rect = svg.getBoundingClientRect();
       const k = rect.width / W;
-      tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || el.getAttribute("x")) * k + 10)}px`;
-      tip.style.top = `${Number(el.getAttribute("cy") || el.getAttribute("y")) * k - 10}px`;
+      tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || el.dataset.cx) * k + 10)}px`;
+      tip.style.top = `${Number(el.getAttribute("cy") || el.dataset.cy) * k - 10}px`;
     };
     const open = () => (p.kind === "site" ? selectResult(p.r) : flyToPlace(p.a.site.lat, p.a.site.lon));
     el.addEventListener("mouseenter", show);
@@ -1408,6 +1448,7 @@ async function renderExplore() {
     el.addEventListener("click", open);
     el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
   });
+  box.querySelectorAll(".ex-pre").forEach((b) => b.addEventListener("click", () => { box.dataset.x = b.dataset.x; box.dataset.y = b.dataset.y; renderExplore(); }));
   $("exX").addEventListener("change", (e) => { box.dataset.x = e.target.value; renderExplore(); });
   $("exY").addEventListener("change", (e) => { box.dataset.y = e.target.value; renderExplore(); });
 }
