@@ -5,12 +5,30 @@
   const panel = document.querySelector(".ge-console");
   if (!panel) return;
   const tabs = [...panel.querySelectorAll("[data-getab]")];
+  const bar = panel.querySelector(".ge-tabs");
+  const close = document.createElement("button");
+  close.type = "button"; close.className = "ge-fold"; close.title = "Fold panel away"; close.setAttribute("aria-label", "Fold panel away");
+  close.textContent = "\u2715"; bar.appendChild(close);
+  const hint = document.createElement("div");
+  hint.className = "ge-hint"; hint.textContent = "Tap a tab to open terrain tools";
+  bar.after(hint);
+  let current = "overview";
+  const setCollapsed = (on) => {
+    panel.classList.toggle("is-collapsed", on);
+    if (on) for (const t of tabs) t.setAttribute("aria-selected", "false");
+    else for (const t of tabs) t.setAttribute("aria-selected", String(t.dataset.getab === current));
+  };
+  close.addEventListener("click", () => setCollapsed(true));
   const show = (name) => {
+    current = name; panel.classList.remove("is-collapsed");
     for (const t of tabs) t.setAttribute("aria-selected", String(t.dataset.getab === name));
     for (const p of panel.querySelectorAll("[data-getab-panel]")) p.hidden = p.dataset.getabPanel !== name;
     panel.scrollTop = 0;
   };
-  tabs.forEach((t) => t.addEventListener("click", () => show(t.dataset.getab)));
+  tabs.forEach((t) => t.addEventListener("click", () => {
+    if (!panel.classList.contains("is-collapsed") && current === t.dataset.getab) setCollapsed(true);
+    else show(t.dataset.getab);
+  }));
   panel.addEventListener("keydown", (e) => {
     if (!e.target.matches("[data-getab]") || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
     const i = tabs.indexOf(e.target), next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
@@ -25,5 +43,5 @@
   watch("geProbe", "plan"); watch("geRoute", "plan"); watch("geProfile", "plan");
   // Each time God's Eye opens, start on the overview.
   const root = document.getElementById("godseye");
-  if (root) new MutationObserver(() => { if (!root.hidden) show("overview"); }).observe(root, { attributes: true, attributeFilter: ["hidden"] });
+  if (root) new MutationObserver(() => { if (!root.hidden) { show("overview"); setCollapsed(true); } }).observe(root, { attributes: true, attributeFilter: ["hidden"] });
 })();

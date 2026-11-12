@@ -1113,7 +1113,7 @@ export class GodsEye {
       this.scene.add(this.rover);
     }
     // Shown far larger than life (a real rover is ~3 m on a ~128 km block) so it reads on screen.
-    this.rover.scale.setScalar(this.sizeKm * 0.0045);
+    this.rover.scale.setScalar(this.sizeKm * 0.011);
     this.drive = { t0: performance.now(), dur: REDUCED ? 1 : Math.min(16000, 6000 + 1500 * (this.route.legs.length - 1)) };
   }
 
