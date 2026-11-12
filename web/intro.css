@@ -1,5 +1,5 @@
 /* Opening frame ("Voyager"): a glowing Mars rim, a line of analog sites, vertical wordmark. */
-.tn-intro { position: fixed; inset: 0; z-index: 200; background: radial-gradient(120% 90% at 70% 50%, #1d1715 0%, #0b0a0a 55%, #050505 100%); overflow: hidden; cursor: pointer;
+.tn-intro { position: fixed; inset: 0; z-index: 99999; background: radial-gradient(120% 90% at 70% 50%, #1d1715 0%, #0b0a0a 55%, #050505 100%); overflow: hidden; cursor: pointer;
   transition: opacity 1s ease, visibility 1s; }
 .tn-intro.is-gone { opacity: 0; visibility: hidden; }
 .tn-intro::before { content: ""; position: absolute; inset: 0; opacity: .06; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
@@ -29,11 +29,10 @@
 @media (max-width: 700px) { .tn-rim { left: 40%; } .tn-copy { left: 56px; right: 20px; bottom: 18vh; } .tn-word { left: 18px; letter-spacing: .9em; } }
 @media (prefers-reduced-motion: reduce) { .tn-intro *, .tn-intro > * { animation: none !important; opacity: 1; } }
 
-/* By the numbers */
-.tn-numbers { padding: 90px clamp(16px, 6vw, 80px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid rgba(255,255,255,.08); position: relative; z-index: 2; }
-.tn-numbers > h2 { grid-column: 1 / -1; margin: 0 0 10px; font: 400 clamp(30px, 4.6vw, 60px)/1.02 "Anton", system-ui, sans-serif; }
-.tn-numbers > h2 b { color: #ff4961; font-weight: 400; }
-.tn-num { border-top: 1px solid rgba(255,255,255,.25); padding-top: 14px; }
-.tn-num b { display: block; font: 400 clamp(44px, 6.5vw, 92px)/1 "Anton", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-.tn-num span { font: 12px/1.5 "IBM Plex Mono", monospace; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.6); }
-@media (max-width: 700px) { .tn-numbers { grid-template-columns: 1fr; } }
+/* By the numbers (inside the orbit chapter) */
+.tn-numbers { display: grid; grid-template-columns: repeat(3, auto); gap: 22px; margin-top: 26px; pointer-events: none; }
+.tn-num { border-top: 1px solid rgba(255,255,255,.3); padding-top: 8px; }
+.tn-num b { display: block; font: 400 clamp(28px, 3.6vw, 48px)/1 "Anton", system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #fff; }
+.tn-num:last-child b { color: #ff4961; }
+.tn-num span { font: 10.5px/1.4 "IBM Plex Mono", monospace; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.65); }
+@media (max-width: 700px) { .tn-numbers { grid-template-columns: 1fr 1fr; } }

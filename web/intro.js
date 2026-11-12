@@ -25,21 +25,30 @@
     addEventListener("wheel", close, { passive: true }); addEventListener("keydown", close); addEventListener("touchmove", close, { passive: true });
   }
 
-  // By the numbers, placed right after the first screen.
-  const sec = document.createElement("section");
+  // By the numbers: placed inside the "Earth from orbit" chapter of the cinematic page
+  // (or before #mission on the plain page), so no new scroll chapter is added.
+  const sec = document.createElement("div");
   sec.className = "tn-numbers"; sec.setAttribute("aria-label", "TerraNova by the numbers");
-  sec.innerHTML = `<h2>We searched the whole planet.<br><b>Not just the famous places.</b></h2>
-    <div class="tn-num"><b data-to="259200">0</b><span>pieces Earth is divided into (0.5° grid, ~55 km each)</span></div>
-    <div class="tn-num"><b data-to="78247">0</b><span>land cells, each scored against every target</span></div>
-    <div class="tn-num"><b data-to="7">0</b><span>Moon and Mars sites · 9 conditions · 16 known analogs to validate</span></div>`;
-  const anchor = document.getElementById("mission");
-  if (anchor) anchor.before(sec);
+  sec.innerHTML = `<div class="tn-num"><b data-to="259200">259,200</b><span>pieces of Earth (0.5° grid)</span></div>
+    <div class="tn-num"><b data-to="78247">78,247</b><span>land cells scored</span></div>
+    <div class="tn-num"><b data-to="16">16</b><span>known analogs, until now</span></div>`;
   const run = (b) => {
     const to = +b.dataset.to, t0 = performance.now(), dur = 1600;
+    const fin = setTimeout(() => { b.textContent = to.toLocaleString("en-US"); }, dur + 200);
     const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-      b.textContent = Math.round(to * e).toLocaleString("en-US"); if (k < 1) requestAnimationFrame(step); };
+      b.textContent = Math.round(to * e).toLocaleString("en-US"); if (k < 1) requestAnimationFrame(step); else clearTimeout(fin); };
     requestAnimationFrame(step);
   };
-  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); run(e.target); } }), { threshold: .4 });
-  sec.querySelectorAll("b[data-to]").forEach((b) => io.observe(b));
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); run(e.target); } }), { threshold: .3 });
+  const observe = () => sec.querySelectorAll("b[data-to]").forEach((b) => io.observe(b));
+  const orbitHost = () => document.querySelector("#cinematic-orbit .cinematic-copy");
+  const mission = document.getElementById("mission");
+  if (orbitHost()) { orbitHost().appendChild(sec); observe(); }
+  else {
+    if (mission) { mission.before(sec); observe(); }
+    // The cinematic landing builds its chapters later; move the counters into it then.
+    const mo = new MutationObserver(() => { const h = orbitHost(); if (h) { h.appendChild(sec); mo.disconnect(); } });
+    mo.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => mo.disconnect(), 15000);
+  }
 })();
