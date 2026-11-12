@@ -1,12 +1,18 @@
 // Run: playwright-cli -s=rocket-review run-code --filename=scripts/rocket_review.js
 async page => {
-  const base = 'http://127.0.0.1:8000';
-  const checks = [], errors = [];
+  const base = new URL(page.url()).origin;
+  const checks = [], errors = [], gates = [];
   const onError = error => errors.push(error.message);
   page.on('pageerror', onError);
-  const assert = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
+  const assert = (value, name) => { if (!value) throw new Error(name); checks.push(name); console.log('PASS ' + name); };
   const go = async path => { await page.goto('about:blank'); await page.goto(`${base}/${path}`); };
   const eye = () => page.waitForSelector('#godseye[data-status="ready"], #godseye[data-status="error"]', {timeout:30000});
+  const finder = async () => {
+    await page.waitForURL('**/finder.html*');
+    await page.waitForSelector('#loading.done', {state:'attached'});
+    await page.waitForSelector('.rocket-overlay', {state:'detached'});
+    assert(await page.locator('#godseye').isHidden(), 'launch reveals Finder without opening terrain');
+  };
   const home = async () => {
     await page.emulateMedia({reducedMotion:'no-preference'});
     await go('index.html');
@@ -32,14 +38,16 @@ async page => {
     await page.evaluate(() => {
       const link = document.querySelector('.cinematic-launch'); link.click(); link.click();
     });
-    await page.waitForURL('**/finder.html#**'); await eye();
-    assert(await page.locator('.rocket-overlay').count() === 0, 'repeated activation completes a single flyby and releases the overlay');
+    await finder();
+    assert(await page.locator('.rocket-overlay').count() === 0, 'repeated activation completes a single page turn and releases the overlay');
     assert(await page.evaluate(() => !document.documentElement.classList.contains('rocket-busy') && !document.querySelector('body>[inert]')), 'arrival restores scrolling and interaction');
-    await page.reload(); await eye();
+    assert(await page.evaluate(() => document.activeElement.id === 'results'), 'animated arrival focuses results without scrolling');
+    assert(await page.evaluate(() => !performance.getEntriesByType('resource').some(r => r.name.includes('/api/site3d?'))), 'Finder arrival does not request terrain');
+    await page.reload(); await finder();
     assert(await page.locator('.rocket-overlay').count() === 0, 'reload does not replay the handoff');
     await page.goBack();
     assert(await page.locator('.rocket-overlay').count() === 0, 'browser Back does not retain a rocket cover');
-    await page.goForward(); await eye();
+    await page.goForward(); await finder();
     assert(await page.locator('.rocket-overlay').count() === 0, 'browser Forward does not replay the handoff');
 
     for (const mode of ['reduced', 'storage', 'animation', 'resize', 'preference', 'hidden']) {
@@ -47,11 +55,11 @@ async page => {
       if (mode === 'reduced') await page.emulateMedia({reducedMotion:'reduce'});
       if (mode === 'storage') await page.evaluate(() => {
         const original = Storage.prototype.setItem;
-        Storage.prototype.setItem = function(key, value) { if (key === 'terranova-rocket-handoff') throw new Error('test: storage blocked'); return original.call(this,key,value); };
+        Storage.prototype.setItem = function(key, value) { if (key === 'terranova-page-handoff-v3') throw new Error('test: storage blocked'); return original.call(this,key,value); };
       });
       if (mode === 'animation') await page.evaluate(() => {
         const original = Element.prototype.animate;
-        Element.prototype.animate = function(...args) { if (this.matches('.rocket-sprite')) throw new Error('test: motion unavailable'); return original.apply(this,args); };
+        Element.prototype.animate = function(...args) { if (this.matches('.page-leaf')) throw new Error('test: motion unavailable'); return original.apply(this,args); };
       });
       await page.locator('.cinematic-launch').focus();
       await page.keyboard.press('Enter');
@@ -60,20 +68,48 @@ async page => {
       if (mode === 'hidden') await page.evaluate(() => {
         Object.defineProperty(document,'hidden',{configurable:true,value:true}); document.dispatchEvent(new Event('visibilitychange'));
       }).catch(() => {}); // The document may already have navigated.
-      await page.waitForURL('**/finder.html#**'); await eye();
+      await finder();
       assert(await page.locator('.rocket-overlay').count() === 0, `${mode} fallback preserves keyboard navigation`);
       await page.setViewportSize({width:1440,height:900});
     }
     await page.emulateMedia({reducedMotion:'no-preference'});
 
+    await home();
+    let releaseFinder;
+    const finderGate = new Promise(resolve => { releaseFinder = resolve; gates.push(resolve); });
+    await page.route('**/api/health', async route => { await finderGate; await route.continue(); });
+    await page.locator('.cinematic-launch').click();
+    await page.waitForURL('**/finder.html*', {waitUntil:'domcontentloaded'});
+    await page.waitForSelector('.rocket-overlay', {state:'detached'});
+    assert(await page.locator('#loading:not(.done)').isVisible(), 'slow startup releases the red cover into Finder loading');
+    assert(await page.evaluate(() => !document.querySelector('body>[inert]')), 'slow startup releases interaction locks');
+    releaseFinder(); await finder(); await page.unroute('**/api/health');
+
+    for (const endpoint of ['health', 'score']) {
+      await home();
+      await page.route(`**/api/${endpoint}`, route => route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({detail:'Page-turn startup failure fixture'})}));
+      await page.locator('.cinematic-launch').click();
+      await page.waitForURL('**/finder.html*', {waitUntil:'domcontentloaded'});
+      await page.waitForSelector('#loading.failed');
+      await page.waitForSelector('.rocket-overlay', {state:'detached'});
+      assert(await page.locator('#loadingRetry').isVisible() && await page.locator('#godseye').isHidden(), `${endpoint} failure reveals Finder Retry`);
+      await page.unroute(`**/api/${endpoint}`);
+      await page.locator('#loadingRetry').click(); await finder();
+    }
+
+    await home();
+    await page.evaluate(() => sessionStorage.setItem('terranova-rocket-handoff', JSON.stringify({destination:new URL('finder.html',location.href).href,created:Date.now()})));
+    await page.goto(`${base}/finder.html`); await finder();
+    assert(await page.evaluate(() => !sessionStorage.getItem('terranova-rocket-handoff') && !document.querySelector('.rocket-overlay')), 'legacy handoff markers cannot replay the old rocket');
+
     let release;
-    const gate = new Promise(resolve => { release = resolve; });
+    const gate = new Promise(resolve => { release = resolve; gates.push(resolve); });
     await page.route('**/api/health', async route => { await gate; await route.continue(); });
     await go('finder.html#eye=1');
     assert(await page.locator('#geArrival').isVisible(), 'loading shell paints while startup is delayed');
     await page.locator('#geArrivalBack').click(); release();
-    await page.unroute('**/api/health');
     await page.waitForSelector('#loading.done', {state:'attached'});
+    await page.unroute('**/api/health');
     assert(await page.locator('#godseye').isHidden(), 'leaving the loading shell cancels automatic opening');
 
     for (const endpoint of ['health','score']) {
@@ -111,12 +147,12 @@ async page => {
     assert(await page.locator('#geBadges').textContent().then(t => t.includes('#2 of')), 'explicit-site links retain their selected rank');
 
     let releaseTerrain;
-    const terrainGate = new Promise(resolve => { releaseTerrain = resolve; });
+    const terrainGate = new Promise(resolve => { releaseTerrain = resolve; gates.push(resolve); });
     await page.route('**/api/site3d?*', async route => { await terrainGate; await route.continue(); });
     await go('finder.html#eye=1');
     await page.waitForSelector('#godseye[data-status="loading"]');
     assert(await page.locator('#geLoading').isVisible() && await page.locator('.rocket-overlay').count() === 0, 'delayed terrain uses the existing visible loading interface');
-    releaseTerrain(); await page.unroute('**/api/site3d?*'); await eye();
+    releaseTerrain(); await eye(); await page.unroute('**/api/site3d?*');
 
     await page.route('**/api/site3d?*', route => route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({detail:'Terrain is not cached in offline mode'})}));
     await go('finder.html#eye=1'); await page.waitForSelector('#godseye[data-status="error"]');
@@ -140,6 +176,7 @@ async page => {
     return {passed:checks};
   } finally {
     page.off('pageerror',onError);
-    await page.unrouteAll({behavior:'ignoreErrors'});
+    gates.forEach(releaseGate => releaseGate());
+    await page.unrouteAll({behavior:'wait'});
   }
 }

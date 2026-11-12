@@ -315,3 +315,24 @@ waits made the motion smoke rerun pass (`artifacts/cinematic-motion-smoke.txt`).
 `nHome space refinement: integrated user-supplied Lucide chevron SVG, brighter screen-sized stars, longer chapters and bounded wheel deltas. Enlarged destination/analog lists and removed divider lines and red arrows. Site names now link directly to Finder. Compared large-wheel input on Omega using Playwright; timing is tuned to the reference rather than copied from its implementation.
 `nSpace color polish: replaced the navy Home background with neutral near-black and neutralized the star tint while preserving visibility, motion and planetary atmospheric lighting.
 `nRestored the original Anton display typography at user request; existing Roboto body text and Panchang supporting styles remain. Preserved the current layout, colors and motion.
+
+
+## Diagonal rocket and chapter navigation (implementation in progress)
+
+Implemented the user-approved storyboard as a local crimson SVG/CSS sweep from
+bottom-left to top-right, with a growing white outline rocket and the same covered
+composition on Home and Finder. Added a shared Lenis chapter controller for wheel
+bursts, trackpad momentum, keyboard navigation and down chevrons on all Home
+chapters. Explicit terrain deep links retain their existing entry flow. No
+scientific calculations were introduced by this interface work. Concurrent science
+and data edits in the workspace belong to separate work and are preserved.
+
+Verification is in progress; final results will be recorded in the rocket handoff.
+source_url: ../web/rocket-transition.js, ../web/chapter-navigation.js,
+../scripts/rocket_review.js, ../scripts/chapter_review.js
+(dataset_id: terra_nova_motion_implementation_review).
+User storyboard dataset_id: user_transition_storyboard; source_url:
+C:/Users/Saa'd/AppData/Local/Temp/codex-clipboard-49580633-9dea-49a0-beca-729264985ff8.png.
+Reference inspected through browser skills: source_url:
+https://www.omegawatches.com/world-of-omega/sustainability/clearspace;
+dataset_id: omega_clearspace_ui_reference. No artwork or code was copied from Omega.
