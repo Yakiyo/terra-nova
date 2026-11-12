@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import math
+import mimetypes
 import os
 import re
 import threading
@@ -49,6 +50,12 @@ from src.compute.similarity import (
     rank_top,
     valid_mask,
 )
+
+# Windows can map .js to text/plain in the registry, which browsers reject for
+# module scripts and which silently disables the cinematic Home. Pin the types.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("text/css", ".css")
 
 STACK_PATH = REPO_ROOT / "cache" / "predictors.zarr"
 NORM_PATH = REPO_ROOT / "data" / "normalization.json"
