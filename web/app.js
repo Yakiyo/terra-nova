@@ -15,6 +15,7 @@ import { fetchReadiness, readinessHtml } from "./readiness.js";
 import { renderTargetPicker, installTabIntros } from "./target-picker.js";
 import { enhanceTargetDetail, refreshComparison, syncActiveLayer } from "./target-insights.js";
 import { zoneDecorator, ZONE_SHARE, startTagDeclutter } from "./analog-zones.js";
+import { headlineHtml, listHtml } from "./results-view.js";
 queueMicrotask(() => { installTabIntros(esc); const l = document.getElementById("labels"); if (l) startTagDeclutter(l); });
 
 const starfield = initStarfield("starfield");
@@ -965,17 +966,23 @@ function renderResults(fresh = false) {
   if (d.filters?.min_distance_km) bits.push(`${fmtInt(d.filters.min_distance_km)} km minimum spacing`);
   if (d.filters?.max_per_country) bits.push(`${d.filters.max_per_country} per country maximum`);
   if (d.filters?.tolerance) bits.push(`error band ×${d.filters.tolerance}`);
-  $("resultsSummary").innerHTML = `Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.`
-    + (d.shortfall ? `<br><span class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</span>` : "");
+  const SHORT = { precipitation: "Rain", vegetation: "Green", annual_temperature_range: "Seasons", lst_diurnal_range: "Day/night",
+    slope: "Slope", roughness: "Rough", elevation: "Height", mean_annual_temperature: "Temp", basaltic_volcanic: "Basalt" };
+  const view = {
+    esc, icon, fmtPct, fmtValue, stabilityOf, criteria: state.criteria, coord: fmtCoord,
+    label: (k) => state.criteria.find((c) => c.key === k)?.label || k,
+    short: (c) => SHORT[c.key] || c.label.split(" ")[0],
+    pinned: (r) => state.pins.some((x) => x.index === r.index),
+    selected: state.selected?.index,
+  };
+  $("resultsSummary").innerHTML = headlineHtml(d, view)
+    + `<p class="rv-filters">Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.</p>`
+    + (d.shortfall ? `<p class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</p>` : "");
+  $("resultsSummary").querySelector(".rv-known-toggle")?.addEventListener("click", () => {
+    const box = $("newOnly"); box.checked = false; box.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   $("siteList").classList.toggle("fresh", fresh);
-  $("siteList").innerHTML = d.results.map((r, n) => `
-    <li style="--n: ${n}"><button class="site ${state.selected?.index === r.index ? "active" : ""}" data-index="${r.index}" type="button">
-      <span class="rank num">${r.rank}</span>
-      <span class="name">${esc(r.label.text)}</span>
-      <span class="score"><span class="score-meter" style="--score-value:${r.score}" role="img" aria-label="${fmtPct(r.score)} match" data-source-url="/api/score" data-dataset-id="terra_nova_predictor_stack"><b aria-hidden="true">${fmtPct(r.score)}</b></span><small>match</small></span>
-      <span class="meta"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(r.novelty)}${state.pins.some((x) => x.index === r.index) ? `<span class="pin-star" title="Pinned">pinned</span>` : ""}${stabilityOf(r) !== null ? `<span class="stable" title="Stays in the top 1% of land in ${fmtPct(stabilityOf(r))} of ${state.robust.runs} simulated runs">stable ${fmtPct(stabilityOf(r))}</span>` : ""}</span>
-      <span class="bar" aria-hidden="true"><i style="width:${(r.score * 100).toFixed(1)}%"></i></span>
-    </button></li>`).join("");
+  $("siteList").innerHTML = listHtml(d, view);
   $("siteList").querySelectorAll(".site").forEach((b) => {
     const r = d.results.find((x) => String(x.index) === b.dataset.index);
     b.addEventListener("click", () => { hidePeek(); selectResult(r); });
