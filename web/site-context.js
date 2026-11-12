@@ -31,3 +31,34 @@ export async function fillProcesses(box) {
       <li>Earth can't reproduce low gravity, vacuum, the thin Martian air or space radiation.</li></ul>
       <p class="hint">${d.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`).join(" · ")}</p></details>`;
 }
+
+// Drag-to-compare: the target's surface (NASA Image Library) wiped against this place.
+const TWIN_Q = { gale_crater: "Curiosity Mount Sharp landscape", jezero_crater: "Jezero Crater Perseverance", utopia_permafrost: "Utopia Planitia Mars surface",
+  lunar_south_pole: "lunar south pole", malapert_massif: "lunar south pole mountains", haworth_psr: "lunar south pole crater shadow", lunar_lava_tube: "lunar pit Marius Hills" };
+const twinCache = new Map();
+export async function fillTwin(det, target) {
+  const head = det?.querySelector(".sd-twin-head"), hero = det?.querySelector(".sd-hero");
+  if (!head || !hero || !target) return;
+  const box = document.createElement("div");
+  box.className = "sd-wipe"; box.setAttribute("aria-label", `Drag to compare ${target.short_name} with this place`);
+  box.innerHTML = `<div class="sd-wipe-earth"></div><div class="sd-wipe-alien"></div><i class="sd-wipe-bar"></i>
+    <span class="sd-wipe-l">${esc(target.short_name)}</span><span class="sd-wipe-r">Earth</span>
+    <input type="range" min="0" max="100" value="50" aria-label="Compare slider"><small class="sd-wipe-hint">◀ drag to compare ▶</small>`;
+  head.after(box);
+  const earth = box.querySelector(".sd-wipe-earth"), alien = box.querySelector(".sd-wipe-alien"), bar = box.querySelector(".sd-wipe-bar");
+  const syncEarth = () => { earth.style.backgroundImage = hero.style.backgroundImage; };
+  syncEarth(); new MutationObserver(syncEarth).observe(hero, { attributes: true, attributeFilter: ["style"] });
+  const set = (v) => { alien.style.clipPath = `inset(0 ${100 - v}% 0 0)`; bar.style.left = `${v}%`; };
+  box.querySelector("input").addEventListener("input", (e) => { set(+e.target.value); box.classList.add("is-used"); });
+  set(50);
+  const q = TWIN_Q[target.id] || `${target.short_name} ${target.body}`;
+  let url = twinCache.get(q);
+  if (!url) {
+    try {
+      const r = await fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=image`);
+      url = (await r.json()).collection.items.find((x) => x.links?.[0]?.href)?.links[0].href;
+      if (url) twinCache.set(q, url);
+    } catch { /* fall back to the planet texture */ }
+  }
+  alien.style.backgroundImage = `url('${url || `assets/${target.body.toLowerCase()}.jpg`}')`;
+}

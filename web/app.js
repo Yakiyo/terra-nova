@@ -8,7 +8,7 @@ import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
 import { initStarfield } from "./starfield.js";
 import { validationHtml } from "./validation-view.js";
-import { fillProcesses } from "./site-context.js";
+import { fillProcesses, fillTwin } from "./site-context.js";
 import { closeMenus, icon, menu, toast, ANALOG_ROLES, analogRoleBadge, catalogRole, download } from "./ui.js";
 import { breadcrumbs, targetTrail } from "./navigation.js";
 import { escapeHtml as esc, decodeFloat32 as decode, formatCoord, topShareText } from './format.js';
@@ -1152,6 +1152,7 @@ function renderDetail(r) {
     worldview, gmaps, moreHtml,
   });
   fillProcesses(det.querySelector("#sdProc"));
+  fillTwin(det, t);
   $("resultsSummary").hidden = true;
   document.querySelector("#results > .advanced-settings")?.setAttribute("hidden", "");
   {

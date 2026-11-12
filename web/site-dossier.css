@@ -166,3 +166,15 @@
 .sd-proc-gap summary { cursor: pointer; color: #9aa4b2; }
 .sd-proc-gap ul { margin: 6px 0; padding-left: 18px; color: #c9d1dc; }
 @media (max-width: 480px) { .sd-proc-m { grid-template-columns: 1fr; } }
+
+/* Drag-to-compare wipe */
+.sd-wipe { position: relative; height: 170px; margin: 10px 0 12px; border-radius: 10px; overflow: hidden; background: #111; user-select: none; }
+.sd-wipe > div { position: absolute; inset: 0; background: center/cover no-repeat; }
+.sd-wipe-alien { filter: saturate(1.05); }
+.sd-wipe-bar { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 10px rgba(0,0,0,.6); pointer-events: none; }
+.sd-wipe-bar::after { content: "⟷"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font-size: 14px; }
+.sd-wipe span { position: absolute; top: 8px; padding: 2px 8px; border-radius: 4px; background: rgba(0,0,0,.6); font: 11px var(--mono, monospace); text-transform: uppercase; letter-spacing: .05em; pointer-events: none; }
+.sd-wipe-l { left: 8px; } .sd-wipe-r { right: 8px; }
+.sd-wipe input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+.sd-wipe-hint { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); font: 11px var(--mono, monospace); color: #fff; background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 4px; pointer-events: none; transition: opacity .4s; }
+.sd-wipe.is-used .sd-wipe-hint { opacity: 0; }
