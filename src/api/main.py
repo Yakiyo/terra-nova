@@ -1221,6 +1221,104 @@ def predictor(key: str) -> dict[str, Any]:
     return {"key": key, **_field(stack[key])}
 
 
+# ---------------------------------------------------------------- context layers
+# Dust (NASA MERRA-2) and snow/ice months (NASA MODIS) from src/acquire/context_layers.py,
+# plus a curated list of analog caves and lava tubes. Shown with a site, never scored.
+
+_CONTEXT: dict[str, Any] = {}
+
+
+def _context_grids() -> dict[str, np.ndarray] | None:
+    path = REPO_ROOT / "cache" / "context.npz"
+    if not path.exists():
+        return None
+    stamp = path.stat().st_mtime
+    if _CONTEXT.get("stamp") != stamp:
+        with np.load(path) as z:
+            grids = {k: z[k] for k in z.files}
+        land = np.isfinite(STATE.arrays["vegetation"])
+        _CONTEXT.update(stamp=stamp, grids=grids,
+                        dust_land=np.sort(grids["dust"][land & np.isfinite(grids["dust"])]))
+    return _CONTEXT["grids"]
+
+
+@lru_cache(maxsize=1)
+def _caves() -> list[dict[str, Any]]:
+    return json.loads((REPO_ROOT / "data" / "caves.json").read_text(encoding="utf-8"))["sites"]
+
+
+def _processes(values: dict[str, Any], dust_pct: float | None, snow: float | None) -> list[dict[str, str]]:
+    """Plain-language Earth processes at a cell and why they matter for the Moon or Mars."""
+    out: list[dict[str, str]] = []
+    def num(key: str) -> float | None:
+        v = values.get(key)
+        return None if v is None or (isinstance(v, float) and math.isnan(v)) else float(v)
+    if dust_pct is not None and dust_pct >= 85:
+        out.append({"icon": "wind", "title": "Dust and wind",
+                    "text": f"Dustier air than {dust_pct:.0f}% of Earth's land. Mars has planet-wide dust storms: good for testing seals, solar panels and filters."})
+    if snow is not None and snow >= 4:
+        out.append({"icon": "snow", "title": "Ice and freeze-thaw",
+                    "text": f"Snow or ice in {snow:.0f} of 12 months. Relevant to ice at the Martian poles and lunar cold traps, and to drilling for water."})
+    precip, veg = num("precipitation"), num("vegetation")
+    if precip is not None and precip < 100 and veg is not None and veg < 0.15:
+        out.append({"icon": "drop", "title": "Hyper-arid, almost lifeless",
+                    "text": "Very little rain or plant life. Tests how well instruments detect faint signs of life, as rovers must on Mars."})
+    mat = num("mean_annual_temperature")
+    if mat is not None and mat <= -2:
+        out.append({"icon": "snow", "title": "Likely permafrost",
+                    "text": f"Mean air temperature {mat:.0f} °C, cold enough for permanently frozen ground. Mars has ground ice under much of its surface."})
+    basalt = num("basaltic_volcanic")
+    if basalt is not None and basalt >= 0.3:
+        out.append({"icon": "volcano", "title": "Volcanic basalt",
+                    "text": "Basaltic rock like the lunar maria and the Martian plains: useful for regolith handling, building materials and sampling tools."})
+    swing = num("lst_diurnal_range")
+    if swing is not None and swing >= 18:
+        out.append({"icon": "thermo", "title": "Big day-night swings",
+                    "text": f"Ground temperature swings about {swing:.0f} °C between day and night. Stresses materials and batteries the way Mars and Moon nights do."})
+    return out
+
+
+@app.get("/api/context")
+def context(lat: float = Query(..., ge=-90.0, le=90.0), lon: float = Query(..., ge=-180.0, le=180.0)) -> dict[str, Any]:
+    """Unscored context for a site: dust, snow/ice, Earth processes and nearby caves."""
+    row = min(max(int((90.0 - lat) // 0.5), 0), 359)
+    col = min(max(int((lon + 180.0) // 0.5), 0), 719)
+    values = {key: _round(STATE.arrays[key][row, col]) for key in CRITERIA}
+    grids = _context_grids()
+    dust = snow = dust_pct = None
+    if grids is not None:
+        d = float(grids["dust"][row, col])
+        if math.isfinite(d):
+            dust = round(d, 1)
+            ref = _CONTEXT["dust_land"]
+            dust_pct = round(100.0 * np.searchsorted(ref, d, side="left") / max(ref.size, 1), 1)
+        snow = float(grids["snow_months"][row, col])
+    caves = sorted(({**c, "km": round(validation.haversine_km(lat, lon, c["lat"], c["lon"]))} for c in _caves()),
+                   key=lambda c: c["km"])
+    return {
+        "available": grids is not None,
+        "dust_ugm3": dust,
+        "dust_percentile": dust_pct,
+        "snow_months": snow,
+        "processes": _processes(values, dust_pct, snow),
+        "nearest_caves": caves[:2],
+        "not_covered": ["caves and lava tubes are not mapped globally, so they are listed, not scored",
+                        "groundwater, permafrost depth and microbial life have no global open dataset here"],
+        "sources": [
+            {"title": "NASA MERRA-2 dust surface mass concentration, monthly 2023 (via NASA GIBS)",
+             "url": "https://gmao.gsfc.nasa.gov/reanalysis/MERRA-2/"},
+            {"title": "NASA MODIS Terra monthly snow cover, 2023 (via NASA GIBS)",
+             "url": "https://nasa-gibs.github.io/gibs-api-docs/available-visualizations/"},
+        ],
+    }
+
+
+@app.get("/api/caves")
+def caves() -> dict[str, Any]:
+    """Curated analog caves and lava tubes (context only)."""
+    return {"sites": _caves()}
+
+
 @app.get("/api/cell")
 def cell(lat: float, lon: float) -> dict[str, Any]:
     """Predictors, label, novelty and provenance for a single coordinate."""

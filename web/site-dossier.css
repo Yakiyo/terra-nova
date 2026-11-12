@@ -146,3 +146,23 @@
   transform: translateX(-50%); z-index: 3; padding: 3px 9px; border-radius: 999px; background: rgba(5,5,7,.7); color: rgba(255,255,255,.75);
   font-size: 10px; white-space: nowrap; }
 .sd-hero.is-loading::after { z-index: 3; }
+
+/* What happens here: unscored Earth processes */
+.sd-proc { margin: 14px 0; padding: 14px; border: 1px solid rgba(255,176,56,.28); border-radius: 12px; background: linear-gradient(180deg, rgba(255,176,56,.06), transparent); }
+.sd-proc h4 { margin: 0 0 10px; font-size: 14px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sd-proc h4 small { font-weight: 400; font-size: 11px; color: #ffcf7a; text-transform: uppercase; letter-spacing: .05em; }
+.sd-proc-m { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.sd-proc-m span { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.04); font-size: 12px; color: #c9d1dc; }
+.sd-proc-m small { display: block; font-size: 10.5px; color: #8d97a5; margin-bottom: 2px; }
+.sd-proc-m b { font-size: 18px; color: #fff; }
+.sd-proc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sd-proc-list li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; }
+.sd-proc-i { font-size: 18px; line-height: 1.2; }
+.sd-proc-list b { font-size: 13px; }
+.sd-proc-list p { margin: 2px 0 0; font-size: 12.5px; color: #c9d1dc; line-height: 1.45; }
+.sd-proc-cave { margin: 10px 0 0; font-size: 12.5px; color: #c9d1dc; }
+.sd-proc-cave small { color: #8d97a5; }
+.sd-proc-gap { margin-top: 10px; font-size: 12px; }
+.sd-proc-gap summary { cursor: pointer; color: #9aa4b2; }
+.sd-proc-gap ul { margin: 6px 0; padding-left: 18px; color: #c9d1dc; }
+@media (max-width: 480px) { .sd-proc-m { grid-template-columns: 1fr; } }

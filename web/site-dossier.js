@@ -91,6 +91,9 @@ export function dossierHtml(r, ctx) {
       <details class="drawer sd-why"><summary>Why these ratings</summary><div class="readiness" id="readiness" data-key="${r.lat},${r.lon}" aria-live="polite"><p class="hint">Loading…</p></div></details></section>`
       : `<div class="readiness" id="readiness" data-key="${r.lat},${r.lon}" hidden></div>`}
 
+    <section class="sd-proc" id="sdProc" data-lat="${r.lat}" data-lon="${r.lon}" aria-live="polite">
+      <h4>What happens here <small>Earth processes · not scored</small></h4><p class="hint">Loading…</p></section>
+
     <div class="sd-actions">
       <button class="godseye-button" type="button" id="openEye" ${Math.abs(r.lat) > 84 ? "disabled title=\"Elevation tiles stop at about 84 degrees latitude\"" : ""}>${icon("cube-focus")}Explore in 3D</button>
       <button class="ghost small" type="button" id="pinSite">${icon("push-pin")}${pinned ? "Unpin" : "Compare"}</button>
