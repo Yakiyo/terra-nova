@@ -50,3 +50,9 @@
 .fp-d { background: #e5484d; }
 .fp-d b { color: rgba(255,255,255,.9) !important; }
 .rv-best b { background: none !important; color: var(--ink) !important; padding: 0; }
+.rv-score { display: grid; justify-items: end; gap: 2px; }
+.rv-move { font: 700 10.5px var(--mono); padding: 1px 5px; border-radius: 4px; }
+.rv-up { color: var(--ok); background: rgba(63,182,139,.12); }
+.rv-down { color: var(--accent); background: var(--accent-tint); }
+.rv-change { margin: 10px 0 0; padding: 7px 10px; border-radius: 8px; background: rgba(124,183,255,.1); color: var(--ink-2); font-size: 12px; }
+.rv-change b { color: var(--ink); }

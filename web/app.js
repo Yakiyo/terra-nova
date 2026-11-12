@@ -975,6 +975,7 @@ function renderResults(fresh = false) {
     short: (c) => SHORT[c.key] || c.label.split(" ")[0],
     pinned: (r) => state.pins.some((x) => x.index === r.index),
     selected: state.selected?.index,
+    rankingKey: state.mode === "custom" ? "custom" : state.targetId,
   };
   if ($("detail").hidden) $("resultsSummary").hidden = false;
   $("resultsSummary").innerHTML = headlineHtml(d, view)
