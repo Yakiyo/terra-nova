@@ -713,17 +713,8 @@ function renderTargetDetail() {
       state.placePin = pin;
       renderMarkers();
       if (!pin || !fly) return;
-      const top = state.data?.results?.[0];
       if (state.view === "map") { flat.flyTo(pin.lat, pin.lon, 3); return; }
       globe.flyTo(pin.lat, pin.lon);
-      if (!top) return;
-      // Then pull back to frame home and the #1 match together.
-      const v = (la, lo) => [Math.cos(la * Math.PI / 180) * Math.cos(lo * Math.PI / 180), Math.cos(la * Math.PI / 180) * Math.sin(lo * Math.PI / 180), Math.sin(la * Math.PI / 180)];
-      const a = v(pin.lat, pin.lon), b = v(top.lat, top.lon), m = a.map((x, i) => x + b[i]);
-      const len = Math.hypot(...m) || 1;
-      const lat = Math.asin(m[2] / len) * 180 / Math.PI, lon = Math.atan2(m[1], m[0]) * 180 / Math.PI;
-      const sep = Math.acos(Math.max(-1, Math.min(1, a.reduce((t, x, i) => t + x * b[i], 0)))) * 180 / Math.PI;
-      setTimeout(() => globe.flyTo(lat, lon, Math.min(5.2, 2.4 + sep / 40)), 1500);
     },
   });
   const caption = $("twinCaption");
