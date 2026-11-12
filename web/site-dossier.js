@@ -102,5 +102,78 @@ export function dossierHtml(r, ctx) {
       <a href="${esc(ctx.gmaps)}" target="_blank" rel="noopener">Satellite map ${icon("arrow-square-out")}</a>
       ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
     </div>
-    <details class="drawer sd-data"><summary>Data, sources and caveats</summary><div>${ctx.moreHtml}</div></details>`;
+    <details class="drawer sd-data"><summary>How this score was built · data, sources, caveats</summary><div>${ctx.moreHtml}</div></details>`;
+}
+
+/* ---------- "How this score was built": the folded data section, organised ---------- */
+const SOURCE_NAME = [
+  [/^nasa_power/, "NASA POWER"], [/^gibs_modis/, "NASA MODIS"], [/modis_lst/, "MODIS LST"],
+  [/^aws_terrain/, "AWS Terrain"], [/^glim/, "GLiM geology"], [/^ne_|natural_earth/, "Natural Earth"],
+];
+const sourceName = (id) => (SOURCE_NAME.find(([re]) => re.test(id || "")) || [null, id])[1];
+const firstSentence = (t) => { const m = String(t).match(/^.*?[.!?](\s|$)/); return m ? m[0].trim() : String(t); };
+
+export function dataFoldHtml(r, ctx) {
+  const { esc, icon, fmtValue, fmtPct, fmtInt, data, criteria } = ctx;
+  const eff = data.effective_profile;
+  const used = [], unused = [];
+  for (const c of criteria) {
+    const sim = r.similarities?.[c.key];
+    if (sim === null || sim === undefined || (data.weights?.[c.key] ?? 0) === 0) unused.push(c);
+    else used.push({ c, sim });
+  }
+  const rows = used.map(({ c, sim }) => `
+    <tr>
+      <th scope="row"><span>${icon(ICON[c.key] || "info")}${esc(PLAIN[c.key] || c.label)}</span>
+        <a class="sd-src" href="${esc(c.source_url)}" target="_blank" rel="noopener" title="${esc(c.dataset_id)}">${esc(sourceName(c.dataset_id))}</a></th>
+      <td class="num">${esc(fmtValue(r.values[c.key], c.unit))}</td>
+      <td class="num sd-dim">${esc(fmtValue(eff[c.key], c.unit))}</td>
+      <td><span class="sd-mini ${band(sim)}" title="${Math.round(sim * 100)}% alike"><i style="width:${(sim * 100).toFixed(0)}%"></i></span></td>
+    </tr>`).join("");
+  const off = unused.map((c) => `${esc(PLAIN[c.key] || c.label)} <b class="num">${esc(fmtValue(r.values[c.key], c.unit))}</b>`).join(" · ");
+  const stab = ctx.stability, runs = ctx.runs;
+  const nov = r.novelty;
+  // Plain-language gist of each caveat, from what actually applies to that condition.
+  const gist = (k) => {
+    const m = ctx.target.criteria?.[k] || {};
+    const realV = data.profile?.[k], effV = eff[k];
+    if ("earth_percentile" in m) return `Measured on ${ctx.target.body === "Moon" ? "the Moon" : ctx.target.body} at a much finer scale than our 55 km cells, so we match a terrain class instead: Earth's ${m.earth_percentile}th percentile.`;
+    if (realV !== undefined && realV !== null && Math.abs(realV - effV) > 1e-9) return `The real value is more extreme than anywhere on Earth, so we match Earth's closest value (${fmtValue(effV, criteria.find((c) => c.key === k)?.unit)}).`;
+    return firstSentence(String((r.rationale?.caveats || []).find((c) => c.criterion === k)?.text || "").replace(/^[^:]+:\s*/, ""));
+  };
+  const caveats = (r.rationale?.caveats || []).map((c) => `
+    <li><b>${esc(PLAIN[c.criterion] || c.criterion)}:</b> ${esc(gist(c.criterion))}
+      <details><summary>more</summary><p>${esc(c.text)}${c.source_url ? ` <a href="${esc(c.source_url)}" target="_blank" rel="noopener">source</a>` : ""}</p></details></li>`).join("");
+  const datasets = [...new Set(used.map(({ c }) => sourceName(c.dataset_id)))];
+
+  return `
+    <ol class="sd-flow" aria-label="How the score is built">
+      <li>${icon("stack")}<b>${datasets.length} open datasets</b><small>${esc(datasets.join(", "))}</small></li>
+      <li>${icon("ruler")}<b>${used.length} conditions</b><small>measured for this 55 km cell</small></li>
+      <li>${icon("compass")}<b>Compared</b><small>with ${esc(ctx.target.short_name)}</small></li>
+      <li>${icon("sliders-horizontal")}<b>Weighted</b><small>by the sliders in Filters</small></li>
+      <li class="sd-flow-end"><b class="num">${fmtPct(r.score)}</b><small>match</small></li>
+    </ol>
+
+    <table class="sd-table">
+      <thead><tr><th>Condition · data</th><th>Here</th><th>Target</th><th>Alike</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${off ? `<p class="sd-off">Not scored for this target: ${off}</p>` : ""}
+
+    <div class="sd-conf">
+      ${stab !== null ? `<span class="${stab >= 0.999 ? "sd-ok" : "sd-warn"}" title="Target values randomly perturbed within their stated confidence; the site must stay in Earth's top 1%">${icon("check-circle")}Stable in ${Math.round(stab * runs)}/${runs} robustness runs</span>` : ""}
+      ${nov ? `<span title="${esc(nov.nearest_known)}">${icon("crosshair")}${fmtInt(Math.round(nov.distance_km))} km from the nearest known test site</span>` : ""}
+      ${ctx.lstNote ? `<span class="sd-warn">${icon("warning")}Day–night swing estimated (no MODIS data here)</span>` : ""}
+    </div>
+
+    ${caveats ? `<h5 class="sd-h">Good to know</h5><ul class="sd-caveats">${caveats}</ul>` : ""}
+
+    <h5 class="sd-h">More views of the place</h5>
+    ${ctx.viewsHtml}
+
+    <div class="sd-foot">
+      <button type="button" class="link-button" id="sdRaw">${icon("download-simple")}Download the raw numbers (JSON)</button>
+      ${ctx.target.source_url ? `<a href="${esc(ctx.target.source_url)}" target="_blank" rel="noopener">Target reference ${icon("arrow-square-out")}</a>` : ""}
+    </div>`;
 }

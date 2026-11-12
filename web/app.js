@@ -16,7 +16,7 @@ import { renderTargetPicker, installTabIntros } from "./target-picker.js";
 import { enhanceTargetDetail, refreshComparison, syncActiveLayer } from "./target-insights.js";
 import { zoneDecorator, ZONE_SHARE, startTagDeclutter } from "./analog-zones.js";
 import { headlineHtml, listHtml } from "./results-view.js";
-import { dossierHtml } from "./site-dossier.js";
+import { dossierHtml, dataFoldHtml } from "./site-dossier.js";
 queueMicrotask(() => { installTabIntros(esc); const l = document.getElementById("labels"); if (l) startTagDeclutter(l); });
 
 const starfield = initStarfield("starfield");
@@ -1101,19 +1101,12 @@ function renderDetail(r) {
   $("siteList").hidden = true;
   const det = $("detail");
   det.hidden = false;
-  const moreHtml = `
-    ${robustLine(r)}
-    ${lstNote}
-    <p class="notice">${novText}</p>
-    <h4 class="section-title">More views of the place</h4>
-    ${viewsStrip(r)}
-    <h4 class="section-title">Each condition and its dataset</h4>
-    ${crits}
-    ${t.source_url ? `<p class="hint">Target reference: <a href="${esc(t.source_url)}" target="_blank" rel="noopener">${esc(t.source_label || "source")}</a></p>` : ""}
-    <details class="drawer"><summary>Why, in words (with sources)</summary><div><ul>${claims}</ul></div></details>
-    <details class="drawer"><summary>Caveats</summary><div><ul>${caveats}</ul></div></details>
-    <details class="drawer"><summary>Raw data behind these numbers</summary><div>
-      <pre class="json">${esc(JSON.stringify({ lat: r.lat, lon: r.lon, score: r.score, percentile: r.percentile, values: r.values, similarities: r.similarities, weights: d.weights, target: d.profile, effective_target: eff, lst_source: r.lst_source, novelty: nov }, null, 2))}</pre></div></details>`;
+  const rawData = { lat: r.lat, lon: r.lon, score: r.score, percentile: r.percentile, values: r.values, similarities: r.similarities, weights: d.weights, target: d.profile, effective_target: eff, lst_source: r.lst_source, novelty: nov };
+  const moreHtml = dataFoldHtml(r, {
+    esc, icon, fmtValue, fmtPct, fmtInt, data: d, criteria: state.criteria, target: t,
+    stability: stabilityOf(r), runs: state.robust?.runs || 0, lstNote: !!lstNote, viewsHtml: viewsStrip(r),
+  });
+  void crits; void claims; void caveats;
   void title;
   det.innerHTML = dossierHtml(r, {
     esc, icon, fmtValue, fmtPct, fmtInt, target: t, data: d, criteria: state.criteria,
@@ -1127,6 +1120,7 @@ function renderDetail(r) {
   document.querySelector("#results > .advanced-settings")?.setAttribute("hidden", "");
   det.querySelector(".back").addEventListener("click", showList);
   det.querySelector("#openEye").addEventListener("click", () => openGodsEye(r));
+  det.querySelector("#sdRaw")?.addEventListener("click", () => download(`terranova-site-${r.lat}_${r.lon}.json`, JSON.stringify(rawData, null, 2), "application/json"));
   det.querySelector("#pinSite").addEventListener("click", () => togglePin(r));
   det.querySelector("[data-copy]").addEventListener("click", async (e) => {
     const b = e.currentTarget;
