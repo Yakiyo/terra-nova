@@ -444,7 +444,7 @@ export class GodsEye {
       this._loadReadiness(site, generation);
       this.root.dataset.status = "ready";
       this.root.querySelector(".ge-panel").inert = false;
-      $("geCredit").innerHTML = `Terrain: ${esc(data.credits.elevation)} · Imagery: ${esc(data.credits.imagery)} (${esc(data.imagery.s2.licence)})`;
+      $("geCredit").innerHTML = `Terrain: AWS Terrain Tiles · Imagery: <a href="https://cloudless.eox.at" target="_blank" rel="noopener">EOX Sentinel-2 cloudless</a> (${esc(data.imagery.s2.licence)})`;
       $("geLoading").hidden = true;
       $("geStatus").textContent = reuse ? (this.imageryMessage || "") : "Terrain ready. Loading satellite imagery…";
       this._introFlight(true);
@@ -1113,7 +1113,7 @@ export class GodsEye {
       this.scene.add(this.rover);
     }
     // Shown far larger than life (a real rover is ~3 m on a ~128 km block) so it reads on screen.
-    this.rover.scale.setScalar(this.sizeKm * 0.011);
+    this.rover.scale.setScalar(this.sizeKm * 0.007);
     this.drive = { t0: performance.now(), dur: REDUCED ? 1 : Math.min(16000, 6000 + 1500 * (this.route.legs.length - 1)) };
   }
 
