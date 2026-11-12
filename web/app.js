@@ -16,6 +16,7 @@ import { renderTargetPicker, installTabIntros } from "./target-picker.js";
 import { enhanceTargetDetail, refreshComparison, syncActiveLayer } from "./target-insights.js";
 import { zoneDecorator, ZONE_SHARE, startTagDeclutter } from "./analog-zones.js";
 import { headlineHtml, listHtml } from "./results-view.js";
+import { dossierHtml } from "./site-dossier.js";
 queueMicrotask(() => { installTabIntros(esc); const l = document.getElementById("labels"); if (l) startTagDeclutter(l); });
 
 const starfield = initStarfield("starfield");
@@ -975,6 +976,7 @@ function renderResults(fresh = false) {
     pinned: (r) => state.pins.some((x) => x.index === r.index),
     selected: state.selected?.index,
   };
+  if ($("detail").hidden) $("resultsSummary").hidden = false;
   $("resultsSummary").innerHTML = headlineHtml(d, view)
     + `<p class="rv-filters">Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.</p>`
     + (d.shortfall ? `<p class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</p>` : "");
@@ -1055,6 +1057,8 @@ function showList() {
   state.card = null;
   $("detail").hidden = true;
   $("siteList").hidden = false;
+  $("resultsSummary").hidden = false;
+  document.querySelector("#results > .advanced-settings")?.removeAttribute("hidden");
   $("siteList").querySelectorAll(".site").forEach((b) => b.classList.remove("active"));
   renderMarkers();
 }
@@ -1096,46 +1100,36 @@ function renderDetail(r) {
   $("siteList").hidden = true;
   const det = $("detail");
   det.hidden = false;
-  det.innerHTML = `
-    <button class="ghost small back" type="button">${icon("arrow-left")}All ranked sites</button>
-    <h3>${title}</h3>
-    <div class="coords"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(nov)}
-      <button class="link-button" type="button" data-copy="${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}">Copy coordinates</button></div>
-    <div class="hero">
-      <div class="big num">${(r.score * 100).toFixed(0)}<small>%</small></div>
-      <div class="what">match to <b>${esc(t.short_name)}</b><br>
-        ${topShare(r.percentile)} of ${fmtInt(state.sorted.length)} land cells</div>
-    </div>
-    <div class="detail-actions">
-      <button class="godseye-button" type="button" id="openEye" ${Math.abs(r.lat) > 84 ? "disabled title=\"Elevation tiles stop at about 84 degrees latitude\"" : ""}>
-        ${icon("cube-focus")}Open in God's Eye 3D</button>
-      <button class="ghost small" type="button" id="pinSite">${state.pins.some((x) => x.index === r.index) ? "Unpin" : "Pin to compare"}</button>
-    </div>
-    <p class="notice">${novText}</p>
+  const moreHtml = `
     ${robustLine(r)}
     ${lstNote}
-    <h4 class="section-title">See the place</h4>
+    <p class="notice">${novText}</p>
+    <h4 class="section-title">More views of the place</h4>
     ${viewsStrip(r)}
-    <h4 class="section-title">Criterion by criterion</h4>
+    <h4 class="section-title">Each condition and its dataset</h4>
     ${crits}
-    <h4 class="section-title">Hardware test readiness</h4>
-    <div class="readiness" id="readiness" data-key="${r.lat},${r.lon}" aria-live="polite"><p class="hint">Checking which systems could be tested here…</p></div>
-    <h4 class="section-title">Verify it yourself</h4>
-    <div class="verify">
-      <a href="${esc(worldview)}" target="_blank" rel="noopener">NASA Worldview ${icon("arrow-square-out")}<small>MODIS true colour here</small></a>
-      <a href="${esc(gmaps)}" target="_blank" rel="noopener">Satellite view ${icon("arrow-square-out")}<small>Google Maps imagery</small></a>
-      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}<small>the target site</small></a>` : ""}
-      ${t.source_url ? `<a href="${esc(t.source_url)}" target="_blank" rel="noopener">Target reference ${icon("arrow-square-out")}<small>${esc(t.source_label || "")}</small></a>` : ""}
-    </div>
+    ${t.source_url ? `<p class="hint">Target reference: <a href="${esc(t.source_url)}" target="_blank" rel="noopener">${esc(t.source_label || "source")}</a></p>` : ""}
     <details class="drawer"><summary>Why, in words (with sources)</summary><div><ul>${claims}</ul></div></details>
     <details class="drawer"><summary>Caveats</summary><div><ul>${caveats}</ul></div></details>
     <details class="drawer"><summary>Raw data behind these numbers</summary><div>
       <pre class="json">${esc(JSON.stringify({ lat: r.lat, lon: r.lon, score: r.score, percentile: r.percentile, values: r.values, similarities: r.similarities, weights: d.weights, target: d.profile, effective_target: eff, lst_source: r.lst_source, novelty: nov }, null, 2))}</pre></div></details>`;
+  void title;
+  det.innerHTML = dossierHtml(r, {
+    esc, icon, fmtValue, fmtPct, fmtInt, target: t, data: d, criteria: state.criteria,
+    coord: fmtCoord, topShare: topShare(r.percentile), cells: state.sorted.length,
+    stability: stabilityOf(r), pinned: state.pins.some((x) => x.index === r.index),
+    bodyImage: `assets/${t.body.toLowerCase()}_sm.jpg`,
+    heroUrl: `/api/peek.jpg?lat=${r.lat}&lon=${r.lon}`, fallbackUrl: `/api/thumb?lat=${r.lat}&lon=${r.lon}`,
+    worldview, gmaps, moreHtml,
+  });
+  $("resultsSummary").hidden = true;
+  document.querySelector("#results > .advanced-settings")?.setAttribute("hidden", "");
   det.querySelector(".back").addEventListener("click", showList);
   det.querySelector("#openEye").addEventListener("click", () => openGodsEye(r));
   det.querySelector("#pinSite").addEventListener("click", () => togglePin(r));
   det.querySelector("[data-copy]").addEventListener("click", async (e) => {
-    try { await navigator.clipboard.writeText(e.target.dataset.copy); e.target.textContent = "Copied"; } catch { e.target.textContent = e.target.dataset.copy; }
+    const b = e.currentTarget;
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.lastChild.textContent = "Copied"; } catch { b.lastChild.textContent = b.dataset.copy; }
   });
   // Hardware test readiness (src/compute/qualification.py), filled in when it arrives.
   const readinessKey = `${r.lat},${r.lon}`;
