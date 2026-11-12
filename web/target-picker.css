@@ -68,8 +68,7 @@
 .tp-custom small { display: block; color: var(--ink-3); font-size: 11.5px; font-weight: 400; }
 
 /* Selected target: summary, glance chips, folded full profile. */
-.tp-summary { margin: 18px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.5;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tp-summary { margin: 18px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 #targetDetail .tp-chips-head { margin: 16px 0 8px; color: var(--ink-3); font: 500 12px/1.3 var(--font); letter-spacing: 0; text-transform: none; }
 .tp-chips { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .tp-chips li { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); min-width: 0; }
@@ -77,3 +76,39 @@
 .tp-chips b { display: block; margin-top: 2px; color: var(--ink); font-size: 14px; font-weight: 600; }
 .tp-more { margin-top: 12px; }
 .tp-more > summary { cursor: pointer; color: var(--ink-2); font-size: 13px; padding: 8px 0; }
+
+/* Plain what / why. */
+.tp-plain { margin: 18px 0 0; display: grid; gap: 4px 0; }
+.tp-plain dt { color: var(--ink-3); font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+.tp-plain dd { margin: 0 0 8px; color: var(--ink); font-size: 13.5px; line-height: 1.5; }
+
+/* Full matching profile. */
+.pf-intro { margin: 4px 0 10px; color: var(--ink-2); font-size: 12.5px; }
+.pf-legend { list-style: none; margin: 0 0 12px; padding: 10px; display: grid; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.pf-legend li { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: center; color: var(--ink-3); font-size: 11.5px; line-height: 1.35; }
+.pf-legend .pf-tag { justify-self: start; }
+.pf-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pf-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center;
+  padding: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.pf-row.is-off { background: none; padding: 7px 10px; }
+.pf-row.is-off .pf-label { color: var(--ink-3); }
+.pf-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.pf-value { font-size: 14px; color: var(--ink); justify-self: end; }
+.pf-bar { grid-column: 1 / -1; position: relative; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--surface-3), var(--line-2)); }
+.pf-bar i { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%);
+  background: var(--accent); box-shadow: 0 0 0 3px rgba(242,29,56,.25); }
+.pf-ends { grid-column: 1 / -1; display: flex; justify-content: space-between; color: var(--ink-3); font: 10.5px var(--mono); margin-top: -2px; }
+.pf-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; border: 1px solid; }
+.pf-row > .pf-tag { justify-self: start; }
+.pf-exact { color: var(--ok); border-color: rgba(63,182,139,.45); background: rgba(63,182,139,.1); }
+.pf-edge { color: var(--warn); border-color: rgba(232,176,75,.45); background: rgba(232,176,75,.1); }
+.pf-est { color: var(--tool); border-color: rgba(124,183,255,.45); background: var(--tool-tint); }
+.pf-off { color: var(--ink-3); border-color: var(--line-2); background: none; }
+.pf-detail { justify-self: end; color: var(--ink-3); font-size: 11.5px; text-align: right; }
+.pf-note, .pf-sources { margin-top: 12px; padding: 10px; border-left: 2px solid var(--line-2); }
+.pf-note b, .pf-sources b { display: block; color: var(--ink-3); font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+.pf-note p { margin: 4px 0 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.45; }
+.pf-sources a { display: block; margin-top: 6px; color: var(--ink); font-size: 12.5px; line-height: 1.4; }
+.pf-sources .i { width: 12px; height: 12px; vertical-align: -1px; }

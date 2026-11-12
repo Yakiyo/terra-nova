@@ -607,46 +607,73 @@ function renderTargets() {
   });
 }
 
+// Plain-language "what / why" for each built-in target, for first-time visitors.
+// Facts are taken from each target's summary and source in data/targets.json.
+const TARGET_PLAIN = {
+  lunar_south_pole: ["The rim of Shackleton crater, at the Moon's south pole.", "Sunlit ridges for solar power sit right next to dark craters that trap water ice. It is a candidate Artemis III landing region."],
+  malapert_massif: ["A mountain about 5 km high near the Moon's south pole.", "It is high, sunlit and always in sight of Earth for radio contact. NASA lists it as an Artemis III candidate landing region."],
+  haworth_psr: ["A crater near the south pole that never sees sunlight.", "It is among the coldest places on the Moon and traps water ice. Nothing on Earth is that cold, so we look for Earth's coldest, driest, steadiest land."],
+  lunar_lava_tube: ["A pit in the Marius Hills that opens into an underground lava tube.", "A natural shelter from radiation, micrometeoroids and temperature swings. Inside it stays near 17 °C, so we look for volcanic basalt land with a mild, steady climate."],
+  jezero_crater: ["Where NASA's Perseverance rover landed: an ancient lake bed with two river deltas.", "Old lake sediments are one of the best places to search for signs of past life on Mars."],
+  gale_crater: ["Where NASA's Curiosity rover explores, at the foot of a layered mountain called Mount Sharp.", "Its rock layers record how Mars changed from wet to dry. We match its climate and terrain."],
+  utopia_permafrost: ["A huge northern plain with ice buried under the ground.", "Radar found about as much water as Lake Superior: a possible water supply for a base. Mars is colder than any ice-free ground on Earth, so we look for Earth's cold, dry permafrost."],
+};
+
 function renderTargetDetail() {
   const selectedTarget = target();
   breadcrumbs($("finderBreadcrumbs"), [...targetTrail(selectedTarget), { label: state.mode === "custom" ? "Custom profile · Finder" : `${selectedTarget?.short_name || "Target"} · Finder` }]);
   if (state.mode === "custom") { renderCustomForm(); return; }
   const t = target();
+  // One row per condition: the value Earth is matched against, where it sits in
+  // Earth's own range, and a single plain-language status.
+  const STATUS = {
+    exact: ["Exact", "measured on the site and inside Earth's range"],
+    edge: ["Beyond Earth", "more extreme than any land on Earth, so Earth's closest value is used"],
+    est: ["Estimated", "a terrain class judged from finer-scale measurements"],
+    off: ["Not used", "this condition does not decide the match for this site"],
+  };
   const rows = state.criteria.map((c) => {
     const m = t.criteria[c.key];
-    if (m.value === null || m.value === undefined) {
-      return `<tr class="unused"><th scope="row">${esc(c.label)}</th><td><span class="tag" title="${esc(m.definition_note || "")}">not used for this site</span></td></tr>`;
+    const unusable = m.value === null || m.value === undefined;
+    const kind = unusable || (state.weights[c.key] ?? 0) === 0 ? "off"
+      : "earth_percentile" in m ? "est"
+        : Math.abs(m.effective_value - m.value) > 1e-9 ? "edge" : "exact";
+    if (kind === "off") {
+      return `<li class="pf-row is-off"><span class="pf-label">${esc(c.label)}</span><span class="pf-tag pf-off">Not used</span></li>`;
     }
-    const off = (state.weights[c.key] ?? 0) === 0;
-    let used = fmtValue(m.effective_value, c.unit);
-    let note = "";
-    if ("earth_percentile" in m) {
-      const measured = m.measured_value === null || m.measured_value === undefined
-        ? "qualitative" : `measured ${esc(fmtValue(m.measured_value, c.unit))} at ${esc(m.baseline || "a finer scale")}`;
-      note = `<span class="note"><span class="tag" title="A judgement-call terrain class, not a measurement at this scale">estimated</span> Earth's ${m.earth_percentile}th percentile (${measured})</span>`;
-    } else if (Math.abs(m.effective_value - m.value) > 1e-9) {
-      note = `<span class="note">real value ${esc(fmtValue(m.value, c.unit))} lies outside the range of 99% of Earth's land; matched to that range's edge</span>`;
-    }
-    if (off) { used = `<span class="tag">not scored</span>`; note = ""; }
-    return `<tr><th scope="row">${esc(c.label)}</th><td>${used}${note}</td></tr>`;
+    const lo = Number(c.earth_min), hi = Number(c.earth_max);
+    const pos = hi > lo ? Math.max(0, Math.min(1, (m.effective_value - lo) / (hi - lo))) : 0.5;
+    const detail = kind === "edge" ? `Real value ${esc(fmtValue(m.value, c.unit))}`
+      : kind === "est" ? `Earth's ${m.earth_percentile}th percentile${m.measured_value != null ? ` · measured ${esc(fmtValue(m.measured_value, c.unit))}` : ""}`
+        : "";
+    return `<li class="pf-row">
+      <span class="pf-label">${esc(c.label)}</span>
+      <b class="pf-value num">${esc(fmtValue(m.effective_value, c.unit))}</b>
+      <span class="pf-bar" role="img" aria-label="${Math.round(pos * 100)}% of the way through Earth's range"><i style="left:${(pos * 100).toFixed(1)}%"></i></span>
+      <span class="pf-ends"><span>${esc(fmtValue(lo, c.unit))}</span><span>${esc(fmtValue(hi, c.unit))}</span></span>
+      <span class="pf-tag pf-${kind}" title="${esc(STATUS[kind][1])}">${STATUS[kind][0]}</span>
+      ${detail ? `<span class="pf-detail">${detail}</span>` : ""}
+    </li>`;
   }).join("");
-  // A glance strip of the conditions Earth is matched against; the full profile folds away.
+  const plain = TARGET_PLAIN[t.id];
   const chips = state.criteria.filter((c) => {
     const m = t.criteria[c.key];
     return m.value !== null && m.value !== undefined && (state.weights[c.key] ?? 0) !== 0;
   }).map((c) => `<li><small>${esc(c.label)}</small><b class="num">${esc(fmtValue(t.criteria[c.key].effective_value, c.unit))}</b></li>`).join("");
   $("targetDetail").innerHTML = `
-    <p class="tp-summary">${esc(t.summary)}</p>
+    ${plain ? `<dl class="tp-plain"><dt>What it is</dt><dd>${esc(plain[0])}</dd><dt>Why it matters</dt><dd>${esc(plain[1])}</dd></dl>`
+      : `<p class="tp-summary">${esc(t.summary)}</p>`}
     <h3 class="tp-chips-head">What Earth must look like to match</h3>
     <ul class="tp-chips">${chips}</ul>
     <details class="tp-more"><summary>Full matching profile and sources</summary>
-      <div class="target-links">
-        <a href="${esc(t.source_url)}" target="_blank" rel="noopener">Source: ${esc(t.source_label || "reference")}</a>
-        ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
+      <p class="pf-intro">Each bar runs from Earth's lowest to highest value. The dot is what we look for.</p>
+      <ul class="pf-legend">${Object.entries(STATUS).map(([k, [name, why]]) => `<li><span class="pf-tag pf-${k}">${name}</span>${esc(why)}</li>`).join("")}</ul>
+      <ul class="pf-list">${rows}</ul>
+      ${t.location_note ? `<div class="pf-note"><b>About the pin</b><p>${esc(t.location_note)}</p></div>` : ""}
+      <div class="pf-sources"><b>Where this comes from</b>
+        <a href="${esc(t.source_url)}" target="_blank" rel="noopener">${esc(t.source_label || "Reference")} ${icon("arrow-square-out")}</a>
+        ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">See it on NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
       </div>
-      <p class="how">Earth cells are matched against this site's measured conditions using your weights.</p>
-      ${t.location_note ? `<p class="hint">${esc(t.location_note)}</p>` : ""}
-      <table class="profile"><caption>What Earth is matched against</caption>${rows}</table>
     </details>`;
   const caption = $("twinCaption");
   caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} · ${fmtCoord(t.latitude, t.longitude)}`;
