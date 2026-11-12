@@ -15,6 +15,15 @@ const PLACES = [
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 let deps = null;
 let funnelRun = 0;
+let pinOn = false;            // the "place you know" pin is shown after the first pick
+let placeCache = null;        // { id, values }
+
+function pinFor(place, values) {
+  const key = deps.currentLayer();
+  const c = key !== "score" ? deps.criterion(key) : null;
+  const v = c ? values?.[key] : null;
+  return { lat: place.lat, lon: place.lon, name: place.name, value: v != null ? deps.fmtValue(v, c.unit) : "" };
+}
 
 function savedPlace() {
   try { return localStorage.getItem("tn-place") || "dhaka"; } catch { return "dhaka"; }
@@ -29,6 +38,10 @@ export function syncActiveLayer(layerKey) {
   root.querySelectorAll("[data-layer]").forEach((el) => el.classList.toggle("is-active", el.dataset.layer === layerKey));
   const back = root.querySelector(".ti-back");
   if (back) back.hidden = layerKey === "score";
+  if (pinOn && deps && placeCache) {
+    const place = PLACES.find((p) => p.id === placeCache.id);
+    if (place) deps.setPlacePin(pinFor(place, placeCache.values), false);
+  }
 }
 
 /* ------------------------------------------------ 2. comparison markers */
@@ -56,6 +69,8 @@ export async function refreshComparison() {
     top ? cellValues(top.lat, top.lon) : null,
     cellValues(place.lat, place.lon),
   ]);
+  placeCache = { id: place.id, values: placeVals };
+  if (pinOn) deps.setPlacePin(pinFor(place, placeVals), false);
   if (!root.isConnected) return;
   root.querySelectorAll(".pf-row[data-key]").forEach((row) => {
     const bar = row.querySelector(".pf-bar"), key = row.dataset.key;
@@ -150,7 +165,15 @@ export function enhanceTargetDetail(d) {
   if (sel) {
     sel.innerHTML = PLACES.map((p) => `<option value="${p.id}">${deps.esc(p.name)}</option>`).join("");
     sel.value = savedPlace();
-    sel.addEventListener("change", () => { savePlace(sel.value); refreshComparison(); });
+    const show = async () => {
+      savePlace(sel.value);
+      await refreshComparison();
+      const place = PLACES.find((p) => p.id === sel.value);
+      pinOn = true;
+      deps.setPlacePin(pinFor(place, placeCache?.values), true);
+    };
+    sel.addEventListener("change", show);
+    root.querySelector(".ti-show-place")?.addEventListener("click", show);
   }
   refreshComparison();
 

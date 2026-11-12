@@ -14,7 +14,8 @@ import { BoundedCache } from './bounded-cache.js';
 import { fetchReadiness, readinessHtml } from "./readiness.js";
 import { renderTargetPicker, installTabIntros } from "./target-picker.js";
 import { enhanceTargetDetail, refreshComparison, syncActiveLayer } from "./target-insights.js";
-queueMicrotask(() => installTabIntros(esc));
+import { zoneDecorator, ZONE_SHARE, startTagDeclutter } from "./analog-zones.js";
+queueMicrotask(() => { installTabIntros(esc); const l = document.getElementById("labels"); if (l) startTagDeclutter(l); });
 
 const starfield = initStarfield("starfield");
 
@@ -53,6 +54,7 @@ const state = {
   tolerance: 0,        // permissible error multiplier (0 = exact targets)
   robust: null,        // /api/robustness payload for the current ranking
   analogValues: null,  // predictor values of the known analog sites (Explore tab)
+  placePin: null,      // {lat, lon, name, value}: "a place you know" on the map
 };
 const MAX_PINS = 3;
 
@@ -357,7 +359,11 @@ function renderMarkers() {
       const active = state.selected && state.selected.index === r.index;
       const pinned = state.pins.some((x) => x.index === r.index);
       el.className = "marker" + (active ? " active" : "") + (r.rank > 10 && !active ? " minor" : "") + (pinned ? " pinned" : "");
-      el.textContent = r.rank;
+      // The top 3 carry their name on the map, so a first look reads as places, not numbers.
+      el.innerHTML = r.rank <= 3
+        ? `${r.rank}<span class="mk-tag">${esc(r.label.text.replace(/^near /, ""))} <b>${fmtPct(r.score)}</b></span>`
+        : String(r.rank);
+      if (r.rank <= 3) el.classList.add("named");
       el.dataset.key = `site-${r.index}`;
       el.setAttribute("aria-label", `#${r.rank} ${r.label.text}, ${fmtPct(r.score)} match`);
       el.addEventListener("click", () => { hidePeek(); selectResult(r); });
@@ -366,6 +372,15 @@ function renderMarkers() {
       labels.appendChild(el);
       markers.push({ lat: r.lat, lon: r.lon, el });
     }
+  }
+  if (state.placePin) {
+    const p = state.placePin, el = document.createElement("div");
+    el.className = "marker place-pin";
+    el.innerHTML = `<i aria-hidden="true"></i><span>${esc(p.name)}${p.value ? ` <b>${esc(p.value)}</b>` : ""}</span>`;
+    el.setAttribute("role", "img");
+    el.setAttribute("aria-label", `${p.name}${p.value ? `: ${p.value}` : ""}`);
+    labels.appendChild(el);
+    markers.push({ lat: p.lat, lon: p.lon, el });
   }
   if (state.pick) {
     const el = document.createElement("div");
@@ -475,7 +490,7 @@ function paintLayer() {
       <div class="ramp" style="background:${cssGradient("score")}"></div>
       <div class="scale abs num"><span style="left:0">top 50%</span><span style="left:80%">top 10%</span><span style="left:98%">1%</span></div>
       ${histogram()}
-      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span><span><i class="mk known" aria-hidden="true">${icon("mountains")}</i>geology only</span></div>
+      <div class="marks"><span><i class="mk zone"></i>analog zone (best ${Math.round(ZONE_SHARE * 100)}% of land)</span><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span><span><i class="mk known" aria-hidden="true">${icon("mountains")}</i>geology only</span></div>
       <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Bars: how many land cells
         reach each score (red = top 10%, at least ${fmtPct(q(0.9))}).</div>
       <div class="credit-line">Earth: <a href="${esc(state.sources.basemaps.earth.url)}" target="_blank" rel="noopener">${esc(state.sources.basemaps.earth.credit)}</a></div>`;
@@ -497,8 +512,10 @@ function paintLayer() {
         Source:
         <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.dataset)}</a></div>`;
   }
-  globe.setOverlay(image);
-  flat.setOverlay(image);
+  // Analog zones: glowing outlines around the best share of land, on the score layer only.
+  const zones = state.layer === "score" ? zoneDecorator(state.field, state.sorted) : null;
+  globe.setOverlay(image, zones);
+  flat.setOverlay(image, zones);
   $("legend").classList.toggle("collapsed", ui.legend === false);
   $("legend").querySelector(".box-toggle").addEventListener("click", () => setUi("legend", ui.legend === false));
 }
@@ -684,6 +701,7 @@ function renderTargetDetail() {
       <div class="ti-compare">
         <span class="ti-keys"><span><i class="k-target"></i>this site</span><span><i class="k-match"></i><span class="ti-key-match">#1 match</span></span><span><i class="k-place"></i>a place you know:</span></span>
         <select class="ti-place-select" aria-label="Compare with a place you know"></select>
+        <button type="button" class="ti-show-place link-button">Show on globe</button>
       </div>
       <ul class="pf-legend">${Object.entries(STATUS).map(([k, [name, why]]) => `<li><span class="pf-tag pf-${k}">${name}</span>${esc(why)}</li>`).join("")}</ul>
       <ul class="pf-list">${rows}</ul>
@@ -701,6 +719,22 @@ function renderTargetDetail() {
     setOverlay: (img) => { globe.setOverlay(img); flat.setOverlay(img); },
     restoreOverlay: () => paintLayer(),
     setLegend: (html) => { $("legend").innerHTML = html; },
+    setPlacePin: (pin, fly) => {
+      state.placePin = pin;
+      renderMarkers();
+      if (!pin || !fly) return;
+      const top = state.data?.results?.[0];
+      if (state.view === "map") { flat.flyTo(pin.lat, pin.lon, 3); return; }
+      globe.flyTo(pin.lat, pin.lon);
+      if (!top) return;
+      // Then pull back to frame home and the #1 match together.
+      const v = (la, lo) => [Math.cos(la * Math.PI / 180) * Math.cos(lo * Math.PI / 180), Math.cos(la * Math.PI / 180) * Math.sin(lo * Math.PI / 180), Math.sin(la * Math.PI / 180)];
+      const a = v(pin.lat, pin.lon), b = v(top.lat, top.lon), m = a.map((x, i) => x + b[i]);
+      const len = Math.hypot(...m) || 1;
+      const lat = Math.asin(m[2] / len) * 180 / Math.PI, lon = Math.atan2(m[1], m[0]) * 180 / Math.PI;
+      const sep = Math.acos(Math.max(-1, Math.min(1, a.reduce((t, x, i) => t + x * b[i], 0)))) * 180 / Math.PI;
+      setTimeout(() => globe.flyTo(lat, lon, Math.min(5.2, 2.4 + sep / 40)), 1500);
+    },
     funnelQuery: () => `target_id=${encodeURIComponent(state.targetId)}&weights=${encodeURIComponent(Object.entries(state.weights).map(([k, v]) => `${k}:${v}`).join(","))}`,
   });
   const caption = $("twinCaption");
