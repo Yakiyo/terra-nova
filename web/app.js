@@ -12,6 +12,8 @@ import { breadcrumbs, targetTrail } from "./navigation.js";
 import { escapeHtml as esc, decodeFloat32 as decode, formatCoord, topShareText } from './format.js';
 import { BoundedCache } from './bounded-cache.js';
 import { fetchReadiness, readinessHtml } from "./readiness.js";
+import { renderTargetPicker, installTabIntros } from "./target-picker.js";
+queueMicrotask(() => installTabIntros(esc));
 
 const starfield = initStarfield("starfield");
 
@@ -599,30 +601,10 @@ async function setLayer(key) {
 /* ----------------------------------------------------------------- targets */
 
 function renderTargets() {
-  const groups = [];
-  for (const t of state.targets) {
-    let g = groups.find((x) => x.name === t.group);
-    if (!g) groups.push((g = { name: t.group, items: [] }));
-    g.items.push(t);
-  }
-  const card = (t) => `
-    <button class="target-card" role="radio" aria-checked="${state.mode === "target" && t.id === state.targetId}" data-id="${esc(t.id)}" type="button">
-      <span class="planet" style="background-image:url(assets/${esc(t.body.toLowerCase())}_sm.jpg)"></span>
-      <strong>${esc(t.short_name)}</strong>
-      <small>${Math.abs(t.latitude).toFixed(1)}°${t.latitude >= 0 ? "N" : "S"} ${Math.abs(t.longitude).toFixed(1)}°${t.longitude >= 0 ? "E" : "W"}</small>
-    </button>`;
-  const html = groups.map((g) => `
-    <p class="group-label">${esc(g.name)}</p>
-    <div class="target-grid">${g.items.map(card).join("")}</div>`).join("") + `
-    <p class="group-label">Your own</p>
-    <div class="target-grid">
-      <button class="target-card custom" role="radio" aria-checked="${state.mode === "custom"}" data-id="${CUSTOM_ID}" type="button">
-        <span class="planet planet-custom" aria-hidden="true">${icon("sliders-horizontal")}</span>
-        <strong>Your own profile</strong><small>type the values</small>
-      </button>
-    </div>`;
-  $("targets").innerHTML = html;
-  $("targets").querySelectorAll(".target-card").forEach((b) => b.addEventListener("click", () => chooseTarget(b.dataset.id)));
+  renderTargetPicker($("targets"), {
+    targets: state.targets, selectedId: state.targetId, custom: state.mode === "custom",
+    onChoose: chooseTarget, customId: CUSTOM_ID, esc, icon,
+  });
 }
 
 function renderTargetDetail() {
@@ -648,15 +630,24 @@ function renderTargetDetail() {
     if (off) { used = `<span class="tag">not scored</span>`; note = ""; }
     return `<tr><th scope="row">${esc(c.label)}</th><td>${used}${note}</td></tr>`;
   }).join("");
+  // A glance strip of the conditions Earth is matched against; the full profile folds away.
+  const chips = state.criteria.filter((c) => {
+    const m = t.criteria[c.key];
+    return m.value !== null && m.value !== undefined && (state.weights[c.key] ?? 0) !== 0;
+  }).map((c) => `<li><small>${esc(c.label)}</small><b class="num">${esc(fmtValue(t.criteria[c.key].effective_value, c.unit))}</b></li>`).join("");
   $("targetDetail").innerHTML = `
-    <p>${esc(t.summary)}</p>
-    <div class="target-links">
-      <a href="${esc(t.source_url)}" target="_blank" rel="noopener">Source: ${esc(t.source_label || "reference")}</a>
-      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
-    </div>
-    <details><summary>How matching works</summary><p class="how">Earth cells are matched against this site's measured conditions using your weights.</p></details>
-    ${t.location_note ? `<p class="hint">${esc(t.location_note)}</p>` : ""}
-    <table class="profile"><caption>What Earth is matched against</caption>${rows}</table>`;
+    <p class="tp-summary">${esc(t.summary)}</p>
+    <h3 class="tp-chips-head">What Earth must look like to match</h3>
+    <ul class="tp-chips">${chips}</ul>
+    <details class="tp-more"><summary>Full matching profile and sources</summary>
+      <div class="target-links">
+        <a href="${esc(t.source_url)}" target="_blank" rel="noopener">Source: ${esc(t.source_label || "reference")}</a>
+        ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
+      </div>
+      <p class="how">Earth cells are matched against this site's measured conditions using your weights.</p>
+      ${t.location_note ? `<p class="hint">${esc(t.location_note)}</p>` : ""}
+      <table class="profile"><caption>What Earth is matched against</caption>${rows}</table>
+    </details>`;
   const caption = $("twinCaption");
   caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} · ${fmtCoord(t.latitude, t.longitude)}`;
   $("twin").hidden = !twin;

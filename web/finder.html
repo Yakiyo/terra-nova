@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="shared-controls.css">
 <link rel="stylesheet" href="rocket-transition.css">
+<link rel="stylesheet" href="target-picker.css">
 <script src="rocket-transition.js"></script>
 <script type="importmap">
   { "imports": { "three": "./vendor/three/three.module.min.js" } }
@@ -74,13 +75,15 @@
 
     <section id="target" role="tabpanel" aria-labelledby="tabTarget">
       <div class="block">
-        <h2 class="eyebrow">Target site</h2>
+        <p class="tab-intro"><b>1</b><span>Pick a place on the Moon or Mars<small>Each dot is a planned base or landing site. We search Earth for its twin.</small></span></p>
+        <h2 class="eyebrow visually-hidden">Target site</h2>
         <div id="targets" role="radiogroup" aria-label="Target site"></div>
         <div class="target-detail" id="targetDetail"></div>
       </div>
     </section>
 
     <section id="results" role="tabpanel" aria-labelledby="tabResults" tabindex="-1" hidden>
+      <p class="tab-intro"><b>2</b><span>The Earth places most like it<small>Every land cell on Earth is scored. These are the closest matches.</small></span></p>
       <details class="advanced-settings">
         <summary>Filters and weights</summary>
         <div class="block">
