@@ -2,6 +2,7 @@
 //
 //   1. start the app:   OFFLINE=1 .venv/Scripts/uvicorn src.api.main:app --port 8000
 //   2. run:             node scripts/ui_smoke.mjs [http://127.0.0.1:8000]
+//   Home layout only:   node scripts/ui_smoke.mjs http://127.0.0.1:8000 --home-layout-only
 //
 // Drives a headless Chrome over the DevTools protocol (Node 22+ has WebSocket
 // built in; no npm install). Fails with exit code 1 on any JavaScript error or
@@ -35,11 +36,18 @@ const pending = new Map();
 const errors = [];
 ws.addEventListener("message", (m) => {
   const msg = JSON.parse(m.data);
-  if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+  if (msg.id && pending.has(msg.id)) {
+    const entry = pending.get(msg.id); pending.delete(msg.id); clearTimeout(entry.timer);
+    if (msg.error) entry.reject(new Error(JSON.stringify(msg.error))); else entry.resolve(msg);
+  }
   if (msg.method === "Runtime.exceptionThrown") errors.push(msg.params.exceptionDetails.exception?.description || msg.params.exceptionDetails.text);
   if (msg.method === 'Fetch.requestPaused') setTimeout(() => send('Fetch.continueRequest', {requestId:msg.params.requestId}), 800);
 });
-const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+const send = (method, params = {}) => new Promise((resolve, reject) => {
+  const i = ++id;
+  const timer = setTimeout(() => { pending.delete(i); reject(new Error(`Browser command timed out: ${method}`)); }, 30000);
+  pending.set(i, {resolve, reject, timer}); ws.send(JSON.stringify({ id: i, method, params }));
+});
 const js = async (expr) => (await send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true })).result?.result?.value;
 const ready = async (expression) => {
   for (let i = 0; i < 150; i++) {
@@ -57,7 +65,7 @@ const page = async (path, wait) => {
 };
 
 const checks = [];
-const check = (name, ok, detail = "") => { checks.push({ name, ok: !!ok, detail }); };
+const check = (name, ok, detail = "") => { checks.push({ name, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); };
 
 await send("Runtime.enable");
 await send("Page.enable");
@@ -113,9 +121,6 @@ if (process.argv.includes('--blink-only')) {
     await page('index.html',1000);
     await ready(`document.readyState === 'complete' && document.querySelector('.home-copy h1')?.dataset.inView === 'true'`);
     check(`Home stays visible after delayed initialization at ${width}px`, await js(`arrivalMasks.length===0 && getComputedStyle(document.querySelector('.home-copy h1')).clipPath === 'none'`));
-    await js(`document.querySelector('.site-menu-trigger').click(); document.querySelector('#siteNavigation a[href="targets.html"]').click()`);
-    await ready(`location.pathname.endsWith('/targets.html') && document.readyState === 'complete' && !!document.querySelector('a.dest-card')`);
-    check(`Targets stays visible after real navigation at ${width}px`, await js(`arrivalMasks.length===0 && getComputedStyle(document.querySelector('.dest-head h1')).clipPath === 'none'`));
     await js(`document.querySelector('.site-menu-trigger').click(); document.querySelector('#siteNavigation a[href="index.html"]').click()`);
     await ready(`location.pathname.endsWith('/index.html') && document.readyState === 'complete' && document.querySelector('.home-copy h1')?.dataset.inView === 'true'`);
     check(`returning Home does not restart an arrival mask at ${width}px`,await js(`arrivalMasks.length===0 && getComputedStyle(document.querySelector('.home-copy h1')).clipPath === 'none'`));
@@ -123,7 +128,7 @@ if (process.argv.includes('--blink-only')) {
   await send('Fetch.disable');
   finish();
 }
-if (!process.argv.includes("--motion-only")) {
+if (!process.argv.includes("--motion-only") && !process.argv.includes('--home-layout-only') && !process.argv.includes('--chapter-only')) {
 await send('Emulation.setScriptExecutionDisabled', {value:true});
 await page('index.html', 400);
 await ready(`document.querySelector('.home-copy') && getComputedStyle(document.querySelector('.topbar')).display === 'grid'`);
@@ -216,6 +221,8 @@ await sleep(1200);
 check("site card opens", !!(await js(`document.querySelector('#detail h3')`)));
 check("a click shows the small info card", !!(await js(`document.querySelector('.info-card')`)));
 check("a click does not open God's Eye", await js(`document.getElementById('godseye').hidden`));
+for (let i = 0; i < 20 && !(await js(`document.querySelectorAll('#readiness .rd-cat').length`)); i++) await sleep(300);
+check("site card shows the 4-category hardware readiness matrix with sourced thresholds", await js(`document.querySelectorAll('#readiness .rd-cat').length === 4 && [...document.querySelectorAll('#readiness .rd-reqs a')].every(a => a.href.startsWith('https://')) && [...document.querySelectorAll('#readiness .rd-verdict')].every(v => v.textContent.trim().length > 0)`));
 check("rank 11+ markers look different from known analogs", await js(`(() => {
   const a = document.querySelector('.marker.minor'), b = document.querySelector('.marker.known');
   return !!a && !!b && getComputedStyle(a).backgroundColor !== getComputedStyle(b).backgroundColor; })()`));
@@ -323,9 +330,45 @@ check("God's Eye takes focus", await js(`document.getElementById('godseye').cont
 check("God's Eye includes its Finder return breadcrumb", await js(`!!document.querySelector('#terrainBreadcrumbs [data-crumb-action=finder]')`));
 const terrainUnavailable = await js(`document.getElementById('godseye').dataset.status === 'error'`);
 check("God's Eye renders terrain for the prepared top result", await js(`document.getElementById('godseye').dataset.status === 'ready' && !!document.querySelector('#geStats .ge-stat')`));
+if (!terrainUnavailable) {
+  for (let i = 0; i < 20 && !(await js(`document.querySelectorAll('#geReadiness .rd-cat').length`)); i++) await sleep(300);
+  check("God's Eye readiness uses the site terrain for the rover", await js(`document.querySelectorAll('#geReadiness .rd-cat').length === 4 && /under 15 degrees on [0-9]+ m terrain/.test(document.querySelector('#geReadiness .rd-note')?.textContent || '')`));
+}
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 await sleep(600);
 check(terrainUnavailable ? "Esc closes unavailable terrain" : "Esc closes the controls guide first", terrainUnavailable ? await js(`document.getElementById('godseye').hidden`) : (await js(`document.getElementById('geGuide').hidden`)) && !(await js(`document.getElementById('godseye').hidden`)));
+if (!terrainUnavailable) {
+  // Feature 5: plan a 3-waypoint traverse, measured on the server, then export the dossier.
+  await js(`document.getElementById('geTraverseBtn').click()`);
+  const box = await js(`(() => { const r = document.getElementById('geCanvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  for (const [dx, dy] of [[-160, 40], [-20, 110], [110, -20]]) {
+    for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: box[0] + dx, y: box[1] + dy, button: "left", clickCount: 1 });
+    await sleep(250);
+  }
+  for (let i = 0; i < 30 && !(await js(`!!document.querySelector('#geProfile .ge-chart')`)); i++) await sleep(300);
+  check("traverse: 3 clicks give 3 named waypoints and a measured profile", await js(`document.querySelectorAll('#geWaypoints li').length === 3 && document.querySelector('#geWaypoints input').value === 'Basecamp' && !!document.querySelector('#geProfile .ge-chart') && /km/.test(document.querySelector('#geProfile .ge-route-stats')?.textContent || '')`));
+  check("traverse: hazard legend and walking-model source shown", await js(`!!document.querySelector('.ge-route-legend .lg-hz') && [...document.querySelectorAll('#geProfile a')].some(a => a.href.startsWith('https://'))`));
+  await js(`document.getElementById('godseye').focus()`);
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+  await sleep(300);
+  check("traverse: Backspace removes the last waypoint", (await js(`document.querySelectorAll('#geWaypoints li').length`)) === 2);
+  for (let i = 0; i < 30 && !(await js(`!!document.querySelector('#geProfile .ge-chart')`)); i++) await sleep(300);
+  // Capture downloads instead of saving them.
+  await js(`(() => { window.__downloads = []; window.__anchorClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { if (!this.download) return window.__anchorClick.call(this);
+      const item = { name: this.download }; window.__downloads.push(item); fetch(this.href).then(r => r.text()).then(t => { item.text = t; }); }; })()`);
+  await js(`document.getElementById('geRouteGeojson').click()`);
+  await js(`document.getElementById('geDossier').click()`);
+  for (let i = 0; i < 30 && !(await js(`window.__downloads.length === 2 && window.__downloads.every(d => d.text)`)); i++) await sleep(300);
+  check("dossier export saves the route GeoJSON and a cited, self-contained HTML dossier", await js(`(() => { const [geo, doc] = window.__downloads;
+    const site = document.getElementById('geTitle').textContent;
+    return /^TerraNova_route_.+\\.geojson$/.test(geo?.name) && JSON.parse(geo.text).features.length === 3
+      && /^TerraNova_dossier_.+\\.html$/.test(doc?.name) && doc.text.includes('Citations') && doc.text.includes(site) && doc.text.includes('data:image/jpeg'); })()`));
+  await js(`HTMLAnchorElement.prototype.click = window.__anchorClick`);
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(300);
+  check("Esc ends the traverse tool and keeps the route", await js(`document.getElementById('geTraverseBtn').getAttribute('aria-pressed') === 'false' && !document.getElementById('godseye').hidden && document.querySelectorAll('#geWaypoints li').length === 2`));
+}
 await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 for (let i = 0; i < 10 && !(await js(`document.getElementById('godseye').hidden`)); i++) await sleep(300);
 check("a second Esc closes God's Eye", await js(`document.getElementById('godseye').hidden`));
@@ -346,42 +389,96 @@ await ready(`document.querySelector('#manualBody + .wm-select')`);
 check("custom profile selector uses disclosure", await js(`document.getElementById('manualBody').hidden`));
 check("all current selects share one adapter", await js(`[...document.querySelectorAll('select')].every(select=>select.hidden && select.nextElementSibling?.matches('.wm-select'))`));
 await page("index.html", 3000);
-check("home links to the targets page", !!(await js(`document.querySelector('a.btn-primary[href="targets.html"]')`)));
+check("home primary action opens a target in the Finder", !!(await js(`document.querySelector('a.btn-primary[href="finder.html#target=lunar_south_pole"]')`)));
+// The Targets page is retired: its URL lands in the Finder.
 await page("targets.html", 3000);
-await ready(`document.querySelectorAll('a.dest-card[href^="finder.html#target="]').length >= 6`);
-check("target cards are keyboard links", (await js(`document.querySelectorAll('a.dest-card[href^="finder.html#target="]').length`)) >= 6);
-
-for (const [path, body] of [["targets.html?body=moon", "Moon"], ["targets.html?body=mars", "Mars"], ["targets.html#Moon", "Moon"], ["targets.html#Mars", "Mars"]]) {
-  await page(path, 700);
-  await ready(`document.querySelector('#${body} .dest-card')`);
-  check(`${path} shows only its planet`, await js(`document.querySelectorAll('.planet-group').length === 1 && !!document.getElementById('${body}') && !document.getElementById('g-custom')`));
-  check(`${path} heading and breadcrumb`, await js(`document.title.includes('${body}') && document.querySelector('h1').textContent.includes('${body}') && document.querySelector('#targetBreadcrumbs [aria-current]').textContent === '${body}'`));
-  check(`${path} credits and breadcrumbs use a single underline`, await js(`[...document.querySelectorAll('.planet-credit, .breadcrumbs a')].every(a=>getComputedStyle(a).textDecorationLine === 'underline' && getComputedStyle(a).backgroundImage === 'none')`));
-}
-await page("targets.html?body=unknown", 700);
-await ready(`document.getElementById('g-custom')`);
-check("invalid body keeps full index", await js(`document.querySelectorAll('.planet-group').length === 2`));
-await js(`document.querySelector('.body-switch [data-body=moon]').click()`);
-await ready(`document.querySelectorAll('.planet-group').length === 1 && document.getElementById('Moon')`);
-await send("Page.reload");
-await ready(`document.querySelectorAll('.planet-group').length === 1 && document.getElementById('Moon')`);
-check("planet filter survives refresh", await js(`location.search === '?body=moon'`));
-await js(`document.querySelector('.body-switch [data-body=mars]').click()`);
-await ready(`!!document.getElementById('Mars') && !document.getElementById('Moon')`);
-await js(`history.back()`);
-await ready(`!!document.getElementById('Moon') && !document.getElementById('Mars')`);
-check("planet filter follows browser history", await js(`document.querySelector('.body-switch [aria-current]').textContent === 'Moon'`));
-await js(`history.forward()`);
-await ready(`!!document.getElementById('Mars') && !document.getElementById('Moon')`);
-const destination = await js(`document.querySelector('#Mars .dest-card').getAttribute('href')`);
-await page(destination, 2000);
+await ready(`location.pathname.endsWith('/finder.html') && document.querySelectorAll('.site').length`);
+check("the retired targets.html redirects to the Finder", await js(`location.pathname.endsWith('/finder.html')`));
+await page("finder.html#target=mars", 12000);
 await ready(`document.querySelector('#finderBreadcrumbs [aria-current]') && document.querySelectorAll('.site').length`);
-check("target-specific Finder breadcrumb", await js(`document.querySelector('#finderBreadcrumbs a[href="targets.html?body=mars"]') && document.querySelector('#finderBreadcrumbs [aria-current]').textContent.includes(document.querySelector('.target-card[aria-checked=true] strong').textContent)`));
+check("Finder breadcrumb: Home > planet > target, with no Targets page", await js(`!!document.querySelector('#finderBreadcrumbs a[href="index.html"]') && !!document.querySelector('#finderBreadcrumbs a[href="finder.html#target=mars"]') && !document.querySelector('a[href^="targets.html"]') && document.querySelector('#finderBreadcrumbs [aria-current]').textContent.includes(document.querySelector('.target-card[aria-checked=true] strong').textContent)`));
 
 }
+// Desktop Home stays cinematic when DevTools or a narrow window reduces its width.
+await send('Emulation.setDeviceMetricsOverride', {width:1600,height:900,deviceScaleFactor:1,mobile:false});
+await page('index.html', 1000);
+await ready(`document.querySelector('.cinematic-site-link') && document.querySelector('.cinematic')?.dataset.chapter === '0'`);
+check('desktop cinematic Home lists every Moon and Mars target as a Finder link', await js(`(async () => {
+  const targets = (await fetch('/api/targets').then(r=>r.json())).targets.filter(t=>t.body==='Moon'||t.body==='Mars');
+  const links = [...document.querySelectorAll('.cinematic-site-link')];
+  return !!document.querySelector('.cinematic-canvas') && links.length === targets.length && links.every(a=>a.getAttribute('href').startsWith('finder.html#target='));
+})()`));
+await js(`window.homeResizeSentinel = true`);
+await send('Emulation.setDeviceMetricsOverride', {width:723,height:1018,deviceScaleFactor:1,mobile:false});
+await ready(`innerWidth === 723 && document.querySelector('.cinematic')?.dataset.chapter === '0'`);
+check('docked DevTools keeps cinematic Home without a reload', await js(`window.homeResizeSentinel === true && getComputedStyle(document.querySelector('.home')).display === 'none' && document.querySelector('.cinematic h1').textContent.includes('Our next frontier') && document.documentElement.scrollWidth <= innerWidth`));
+await page('index.html', 1000);
+await ready(`document.querySelector('.cinematic')?.dataset.chapter === '0'`);
+check('narrow desktop cold load uses cinematic Home', await js(`document.body.classList.contains('cinematic-active') && getComputedStyle(document.querySelector('.home')).display === 'none'`));
+if (process.argv.includes('--home-layout-only')) {
+  await send('Emulation.setTouchEmulationEnabled', {enabled:true});
+  await send('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await page('index.html', 1000);
+  await ready(`document.querySelector('#facts dd')`);
+  check('touch phone retains mobile Home', await js(`!document.body.classList.contains('cinematic-active') && getComputedStyle(document.querySelector('.home')).display !== 'none' && !matchMedia('(pointer:fine)').matches`));
+  finish();
+}
+await send('Emulation.setDeviceMetricsOverride', {width:1600,height:900,deviceScaleFactor:1,mobile:false});
+await js(`window.scrollTo(0,document.querySelector('.chapter-hero').offsetHeight*.97)`);
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`);
+check('chapter transition reaches full black', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`));
+await js(`{const el=document.querySelector('.chapter-orbit');window.scrollTo(0,el.getBoundingClientRect().top+scrollY+el.offsetHeight*.32)}`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '1' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
+check('Earth orbit emerges with centered quote', await js(`document.querySelector('.cinematic').dataset.chapter === '1' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && getComputedStyle(document.querySelector('.chapter-orbit .cinematic-copy')).textAlign === 'center' && !!document.querySelector('.chapter-orbit blockquote')`));
+await js(`{const el=document.querySelector('.chapter-analogs');window.scrollTo(0,el.offsetTop+el.offsetHeight*.8)}`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '4'`);
+check('shared space stays behind the outgoing Earth', await js(`getComputedStyle(document.querySelector('.cinematic-space-media')).position === 'fixed' && Number(getComputedStyle(document.querySelector('.cinematic-space-media')).zIndex) < Number(getComputedStyle(document.querySelector('.cinematic-canvas')).zIndex)`));
+await js(`{const el=document.querySelector('.chapter-analogs');window.scrollTo(0,el.offsetTop+el.offsetHeight*.97)}`);
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1'`);
+check('Earth exit reaches full black before finale', await js(`document.querySelector('.cinematic').dataset.chapter === '4' && getComputedStyle(document.querySelector('.cinematic-space-media')).visibility === 'visible'`));
+await js(`window.scrollTo(0,document.querySelector('.chapter-finale').offsetTop)`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '5'`);
+check('finale scene swaps beneath full black', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '1' && getComputedStyle(document.querySelector('.cinematic-space-media')).visibility === 'visible' && Number(document.querySelector('.chapter-finale .cinematic-copy').style.opacity) === 0`));
+await js(`window.scrollTo(0,document.querySelector('.chapter-finale').offsetTop+innerHeight*.32)`);
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
+check('finale reveals full viewport and readable copy', await js(`getComputedStyle(document.querySelector('.cinematic-space-media')).position === 'fixed' && document.querySelector('.cinematic-space-media').getBoundingClientRect().top === 0 && document.querySelector('.cinematic-space-media').getBoundingClientRect().height === innerHeight && Number(document.querySelector('.chapter-finale .cinematic-copy').style.opacity) === 1`));
+await js(`{const el=document.querySelector('.chapter-analogs');window.scrollTo(0,el.offsetTop+el.offsetHeight*.32)}`);
+await ready(`document.querySelector('.cinematic').dataset.chapter === '4' && getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0'`);
+check('reverse scroll retains the shared space background', await js(`getComputedStyle(document.querySelector('.cinematic-space-media')).visibility === 'visible'`));
+check('restored focus does not rewind to an earlier chapter', await js(`(async () => {
+  const before = scrollY;
+  document.querySelector('.cinematic-scroll').focus({preventScroll:true});
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  return scrollY === before && document.querySelector('.cinematic').dataset.chapter === '4';
+})()`));
+check('tab visibility cancels easing without changing the scroll position', await js(`(async () => {
+  document.querySelector('.cinematic-scroll').click();
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
+  document.dispatchEvent(new Event('visibilitychange'));
+  const before = scrollY;
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});
+  document.dispatchEvent(new Event('visibilitychange'));
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  delete document.hidden;
+  return scrollY === before;
+})()`));
+await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+await ready(`document.querySelector('.cinematic').dataset.chapter === '2'`);
+check('intentional keyboard navigation still reveals the focused chapter', await js(`document.activeElement.matches('.chapter-moon .cinematic-site-link') && Number(document.querySelector('.chapter-moon .cinematic-copy').style.opacity) > .9`));
+await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+await ready(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && !document.documentElement.classList.contains('lenis')`);
+check('cinematic reduced motion removes blackout and smoothing', await js(`getComputedStyle(document.querySelector('.cinematic-blackout')).opacity === '0' && !document.documentElement.classList.contains('lenis')`));
+if (process.argv.includes('--chapter-only')) finish();
+await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+await send('Emulation.setDeviceMetricsOverride', {width:1000,height:900,deviceScaleFactor:1,mobile:false});
+// Explicitly emulate touch: width alone no longer identifies a mobile device.
+await send('Emulation.setTouchEmulationEnabled', {enabled:true});
 await page("index.html", 1000);
 await ready(`document.querySelector('#facts dd')`);
-check("home planetary links are filtered", await js(`document.querySelector('.mission-world.moon').getAttribute('href') === 'targets.html?body=moon' && document.querySelector('.mission-world.mars').getAttribute('href') === 'targets.html?body=mars'`));
+check("home planet links open each planet's target in the Finder", await js(`document.querySelector('.mission-world.moon').getAttribute('href') === 'finder.html#target=lunar_south_pole' && document.querySelector('.mission-world.mars').getAttribute('href') === 'finder.html#target=jezero_crater'`));
 check("counter values and provenance match API", await js(`(async () => {
   const [health, targets, analogs] = await Promise.all(['/api/health','/api/targets','/api/analogs'].map(url=>fetch(url).then(r=>r.json())));
   const expected = [Number(health.candidate_cells).toLocaleString('en-US'), String(targets.targets.length), String(analogs.sites.length)];
@@ -447,7 +544,7 @@ check('text-link keyboard focus uses one animated underline', await js(`getCompu
 await js(`document.querySelector('a.btn-primary').focus()`);
 await ready(`getComputedStyle(document.querySelector('a.btn-primary .button-orb .i')).transform === 'matrix(1, 0, 0, 1, 3, 0)'`);
 check('linked action focus moves its existing arrow', await js(`getComputedStyle(document.querySelector('a.btn-primary .button-orb .i')).transform === 'matrix(1, 0, 0, 1, 3, 0)'`));
-check("supporting text uses Lenis-reference Panchang", await js(`getComputedStyle(document.querySelector('.home-copy .lede')).fontFamily.includes('Panchang')`));
+check("supporting text uses Roboto (Panchang is not shipped)", await js(`getComputedStyle(document.querySelector('.home-copy .lede')).fontFamily.startsWith('"Roboto"') || getComputedStyle(document.querySelector('.home-copy .lede')).fontFamily.startsWith('Roboto')`));
 check("primary buttons have orb details", await js(`!!document.querySelector('.btn-primary > .button-orb[aria-hidden=true]')`));
 check("shared navigation has route and planet destinations", await js(`!!document.querySelector('.site-menu-trigger') && !!document.querySelector('#siteNavigation [aria-current=page]') && document.querySelectorAll('#siteNavigation .site-world-links a').length === 2`));
 check('planet navigation links have no underline', await js(`[...document.querySelectorAll('.site-world-links a')].every(a=>getComputedStyle(a).textDecorationLine === 'none' && !a.classList.contains('text-link-motion'))`));
@@ -456,7 +553,7 @@ check('headers retain one pre-rendered navigation trigger', await js(`document.q
 check("evidence bars use clear red", await js(`getComputedStyle(document.querySelector('.evidence-row .bar i')).backgroundColor === 'rgb(242, 29, 56)'`));
 check("Home evidence bars are rounded and source labels use Roboto", await js(`getComputedStyle(document.querySelector('.evidence-row .bar')).borderRadius !== '0px' && getComputedStyle(document.querySelector('.evidence-row a')).fontFamily.includes('Roboto')`));
 await js(`document.fonts.ready`);
-check("local display and body fonts loaded", await js(`document.fonts.check('400 48px Anton') && document.fonts.check('400 16px Roboto') && document.fonts.check('600 32px Panchang')`));
+check("local display and body fonts loaded", await js(`document.fonts.check('400 48px Anton') && document.fonts.check('400 16px Roboto') && ![...document.fonts].some(f=>f.status === 'error')`));
 await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
 await page("index.html", 700);
 await ready(`document.querySelector('#facts dd')`);
@@ -487,3 +584,4 @@ chrome.kill();
 process.exit(failed || errors.length ? 1 : 0);
 }
 finish();
+

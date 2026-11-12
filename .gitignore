@@ -33,3 +33,10 @@ artifacts/frontend/
 cache/vendor/
 # Panchang permits self-hosting, but not redistribution via a public repository.
 web/vendor/fonts/panchang-*.woff2
+
+# Interrupted thumbnail downloads (src/acquire/download.py writes .partial-* first).
+cache/thumbs/.partial-*
+
+# Review screenshots and scratch output. Files already tracked here stay tracked;
+# new review evidence is kept out of the repository.
+artifacts/

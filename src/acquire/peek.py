@@ -152,12 +152,15 @@ def main() -> int:
                 json={"target_id": target["id"], "top_k": 20, "min_separation_cells": 3, **extra},
             ).json()
             points |= {(r["lat"], r["lon"]) for r in body["results"]}
+    from src.acquire.finder_sites import finder_sites
+
+    points |= set(finder_sites(20))   # the Finder's ranking uses each target's weights
     points |= {
         thumbs.cell_centre(s["lat"], s["lon"]) for s in client.get("/api/analogs").json()["sites"]
     }
     done = 0
     for lat, lon in sorted(points):
-        if abs(lat) > terrain.MAX_MERCATOR_LAT - 1.5:
+        if abs(lat) > sitetiles.MAX_SITE_LAT:
             continue
         try:
             build(lat, lon, offline=False)

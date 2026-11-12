@@ -31,7 +31,7 @@ typography:
     fontWeight: 400
     lineHeight: 1.5
   support:
-    fontFamily: "Panchang, Roboto, sans-serif"
+    fontFamily: "Roboto, sans-serif"
     fontSize: "clamp(14px, 1.12vw, 16px)"
     fontWeight: 600
     lineHeight: 1.85
@@ -78,7 +78,7 @@ components:
 
 User-approved replacement of the earlier Mission control identity. Omega ClearSpace inspired expansive planetary imagery, confident typography and a scrolling narrative. NASA-inspired blue, red and white connect the narrative pages to the working application.
 
-Home tells the discovery story; Targets provides an editorial destination index. Finder and God's Eye carry the same material and type at a denser scale, with native scientific interactions. Real planetary imagery and API results provide the visual content.
+Home tells the discovery story and links each Moon and Mars target straight into the Finder (the separate Targets page is retired; `targets.html` redirects to the Finder). Finder and God's Eye carry the same material and type at a denser scale, with native scientific interactions. Real planetary imagery and API results provide the visual content.
 
 **Key Characteristics:**
 - Black space backgrounds and charcoal surfaces, white typography, red primary actions.
@@ -99,12 +99,12 @@ Use the CSS properties in `web/styles.css`; the frontmatter records their durabl
 
 ## Typography
 
-Self-hosted Anton for display, Roboto for body and navigation, Panchang for feature counters and short narrative supporting text, and IBM Plex Mono for measurement, coordinates and API values. Fonts live in `web/vendor/fonts` and must work offline.
+Self-hosted Anton for display, Roboto for body, navigation, feature counters and narrative supporting text, and IBM Plex Mono for measurement, coordinates and API values. Fonts live in `web/vendor/fonts` and must work offline.
 
 - Home display: responsive up to 96px, weight 400, tight leading and tracking.
 - Narrative headings: responsive 36–64px, weight 400.
 - Target and terrain titles: 21–48px depending on context.
-- Narrative supporting copy: Panchang 600 at 14–16px with generous leading; working UI: Roboto at 14–16px; evidence provenance: at least 14px.
+- Narrative supporting copy: Roboto 600 at 14–16px with generous leading; working UI: Roboto at 14–16px; evidence provenance: at least 14px.
 - Use sentence case, tabular numerals and readable line measures. Narrative heading emphasis is upright in secondary ink.
 
 ## Layout
@@ -119,7 +119,7 @@ Responsive breakpoints: 1280px, 1020px and 720px, with additional narrow navigat
 
 Depth comes from the planetary scene and measured terrain. Page surfaces remain flat. Floating map/terrain panels and search controls use overlay surfaces and backdrop blur. Menus/dialogs retain the existing shadow token. No decorative glows or gradient text.
 
-Motion uses `--ease` with fast, state and view durations. Home/Targets use locally vendored Lenis for wheel smoothing and anchors; Home also has subtle hero parallax. Finder/God's Eye retain native map input. Reduced motion disables smoothing, parallax and decorative transitions; Home globe automatic rotation is disabled when reduced motion is set at page load.
+Motion uses `--ease` with fast, state and view durations. Home uses locally vendored Lenis for wheel smoothing and anchors; Home also has subtle hero parallax. Finder/God's Eye retain native map input. Reduced motion disables smoothing, parallax and decorative transitions; Home globe automatic rotation is disabled when reduced motion is set at page load.
 
 ## Shapes
 
@@ -127,12 +127,18 @@ Actions and selections have compact corners; tool panels/dialogs use shared radi
 
 ## Components
 
-- **Navigation:** left menu trigger, centered temporary SVG mark and wordmark, contextual utilities. The shared menu exposes Home/Targets/Finder and Moon/Mars destinations with a red active-route indicator.
+- **Navigation:** left menu trigger, centered temporary SVG mark and wordmark, contextual utilities. The shared menu exposes Home/Finder and Moon/Mars destinations with a red active-route indicator.
 - **Actions:** red primary, hairline secondary, visible hover/pressed/disabled/focus states. Use Phosphor icons from `web/icons.svg` via `icon()`.
 - **Destinations:** attributed planetary imagery and keyboard-accessible target-specific links.
 - **Evidence:** horizontal bars with API similarities, values and direct dataset links. Retain units and caveats.
 - **Finder:** ranked rows with graphical scores, novelty, stability, detail and exports. Preserve custom profiles and weights.
 - **God's Eye:** defer WebGL allocation, paint loading before geometry, bound successful caches, guard stale requests, retain Retry/Back on unavailable data.
+- **Readiness matrix (`web/readiness.js`):** one disclosure per test category, the name first, then a verdict pill (icon + words, never colour alone: `--ok` ready, `--warn` partial, `--ink-3` not suited) and the system link. Requirements are a table of value, sourced threshold and pass/near/fail. Rendering only; the verdicts come from `/api/qualification`.
+- **Traverse planner (God's Eye):**
+  - **Markers and route:** waypoints are numbered `--tool` markers. The route is `--tool` blue and turns `--accent` red where the ground is steeper than 15°. The profile chart uses the same colours as hazard bands, with dashed waypoint ticks and a legend in words.
+  - **Input:** waypoint names are editable inputs. Backspace undoes the last point, and Esc leaves the tool but keeps the route. "Add the site pin" gives a path without a mouse.
+  - **Data:** all route numbers come from `/api/traverse`.
+- **Mission dossier (`web/dossier.js`):** a light, print-first document (A4, inline CSS, pictures as data URLs). Its only colours are a red rule and blue data, and it carries no NASA marks. Tables, pictures and readiness blocks never split across pages, and every number has a numbered citation.
 - **Notifications:** `toast()` from `web/ui.js`; actionable error copy with technical preparation details in a disclosure.
 
 ## Do's and Don'ts
@@ -147,10 +153,10 @@ Actions and selections have compact corners; tool panels/dialogs use shared radi
 
 ## Navigation and evidence motion
 
-Targets accepts `?body=moon` and `?body=mars`; legacy `#Moon` and `#Mars` also
-select planet-only views. The full index retains custom profiles. Breadcrumbs
-connect Home, Targets, body, Finder target, and God's Eye location. Native anchor
-filters adapt Watermelon Continuous Tabs; breadcrumb semantics adapt Breadcrumb 1.
+Breadcrumbs connect Home, the planet, the Finder target and the God's Eye location.
+The planet crumb opens that planet's first target (`finder.html#target=moon` or
+`#target=mars`); the custom profile is chosen in the Finder's Target tab. Breadcrumb
+semantics adapt Watermelon Breadcrumb 1.
 
 Home summary counters count from zero to their API values over 1.2 seconds on downward
 viewport re-entry; evidence bars grow to their API-supplied width once on entry. The exact final text stays accessible throughout.
@@ -158,7 +164,7 @@ Reduced motion renders the final state immediately, including live preference
 changes. Intermediate counter digits are decorative and aria-hidden; scientific measurements and evidence values remain steady.
 
 Font/component provenance and license information: web/vendor/fonts/INTERFACE-FONTS.md.
-Panchang binaries are acquired locally, not redistributed through this repository.
+Panchang was dropped (its binaries could not be redistributed with the repository); Roboto replaces it.
 
 
 ## Orb controls and scroll text
@@ -172,7 +178,7 @@ filters never underline on hover. AUC separates its label from the API value.
 Narrative headings and supporting copy reveal with a bounded mask on downward viewport
 entry; counters replay only after fully leaving and re-entering while scrolling down.
 Reduced motion cancels active reveals and keeps final content visible. Dense
-scientific interfaces keep readable Roboto; short narrative copy uses Panchang.
+scientific interfaces and short narrative copy use readable Roboto.
 
 
 ## Finder control system
@@ -216,7 +222,7 @@ action above its existing terrain controls. Navigation uses a native modal dialo
 locks background scrolling (including Lenis), and restores focus on dismissal.
 
 Lenis demo typography was checked directly: Roboto for body and navigation, Anton
-for display, Panchang for selected narrative accents. Supporting text, hints,
+for display (the Panchang accents were later dropped for Roboto). Supporting text, hints,
 legends, preview captions, source links and validation explanations use Roboto.
 Measurements retain IBM Plex Mono. Validation role labels use neutral theme ink;
 passed checks include a check icon and explicit wording, not green-only meaning.
@@ -285,3 +291,37 @@ release their observers, media-query listeners and animations through
 dom-lifecycle.js. Shared presentation codecs live in format.js; preview resource
 ownership uses bounded-cache.js. Keep reusable renderer resources and offline
 assets rather than treating intentionally cached resources as unused.
+
+## Cinematic Home chapter transitions
+
+Desktop Home uses a persistent planetary renderer. Earth opens as a cropped,
+cloud-covered horizon, then returns as a close orbital surface beneath a centered
+TerraNova brand quote. The Moon enters from the right with its content on the left;
+Mars enters from the left with its content on the right. Their limbs extend beyond
+the viewport, following the supplied Omega screenshot's composition.
+
+Chapter exits fade all scene content to true black (`#000`), hold while the scene
+changes, and reveal the incoming scene before its text. This is scroll choreography
+inside Home, not a document navigation fade. The solar corona and blue atmosphere
+are planetary lighting, not control decoration. Shader colors belong to the imagery.
+The finale's Milky Way background is shared across all Home chapters, fixed behind
+the transparent planetary canvas and below the blackout. It never scrolls over a
+planet. Finale text follows the shared entrance timing and remains readable at the end.
+The cinematic starfield drifts continuously with edge wrapping in viewport space;
+it never tilts out of view. Reduced motion freezes its drift. Texture attribution
+is retained in `web/assets/cinematic/CREDITS.md` rather than a visible Home credit.
+Reduced motion uses static chapter compositions without blackouts, automatic cloud
+drift, corona animation, or Lenis smoothing. Keyboard focus brings its chapter into
+the readable hold. Narrow touch devices keep the existing Home layout. Mouse and
+trackpad desktops retain the cinematic Home at narrow viewport widths, including
+when DevTools is docked. Landing module selection and cinematic CSS use the same
+width-or-hover/fine-pointer media query; resizing within desktop mode does not reload.
+Desktop Home hides the legacy layout synchronously before first paint while scene
+modules load; failures restore the usable fallback. Restoring browser focus must
+not navigate chapters. Only intentional Tab navigation reveals a focused chapter.
+Changing tab visibility cancels unfinished easing at the current scroll position.
+
+Visual reference inspected with Playwright CLI:
+source_url: https://www.omegawatches.com/world-of-omega/sustainability/clearspace
+dataset_id: omega_clearspace_ui_reference (visual reference, not scientific data).
+Texture provenance remains in `web/assets/cinematic/CREDITS.md`.

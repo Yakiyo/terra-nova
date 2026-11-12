@@ -3,19 +3,35 @@
 <head>
 <link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="preload" href="vendor/fonts/roboto-variable.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="preload" href="vendor/fonts/panchang-600.woff2" as="font" type="font/woff2" crossorigin>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js" } }
+  </script>
+  <script>
+    if (matchMedia('(min-width: 1021px), (hover: hover) and (pointer: fine)').matches) {
+      document.documentElement.classList.add('cinematic-pending');
+    }
+  </script>
+  <style>
+    .cinematic-pending .page-home > :is(.home,.mission-section,.evidence-section,.terrain-story,#starfield,.site-foot){display:none}
+    .cinematic-pending .page-home{background:#050505}
+    .cinematic-pending .page-home::before{content:'';position:fixed;inset:0;background:linear-gradient(0deg,#050505 0%,transparent 40%,#050505 100%),url('assets/cinematic/milky-way.jpg') center/cover;opacity:.7;pointer-events:none}
+    .cinematic-pending .page-home .site-header{position:fixed;inset:0 0 auto;background:transparent;border:0}
+  </style>
   <title>TerraNova · Earth analogs for Moon and Mars bases</title>
   <meta name="description" content="TerraNova scores every land cell on Earth against Moon and Mars base sites using NASA data, and ranks the closest analogs.">
   <meta name="theme-color" content="#050507">
   <link rel="icon" href="brand.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/cinematic/milky-way.jpg" as="image">
+  <link rel="modulepreload" href="cinematic.js">
+  <link rel="modulepreload" href="planet-journey.js">
   <link rel="stylesheet" href="vendor/lenis/lenis.css">
   <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="cinematic.css">
 <link rel="stylesheet" href="shared-controls.css">
-  <script type="importmap">
-    { "imports": { "three": "./vendor/three/three.module.min.js" } }
-  </script>
+<link rel="stylesheet" href="rocket-transition.css">
+<script src="rocket-transition.js"></script>
   <script type="module" src="controls.js"></script>
 </head>
 <body class="page-home">
@@ -32,7 +48,7 @@
     </div>
     <nav class="main-nav" aria-label="Main">
       <a href="index.html" class="nav-link" aria-current="page">Home</a>
-      <a href="targets.html" class="nav-link">Targets</a>
+      
       <a href="finder.html" class="nav-link">Finder</a>
     </nav>
   </header>
@@ -42,7 +58,7 @@
       <h1 class="reveal">The next frontier.<br><em>Here on Earth.</em></h1>
       <p class="lede reveal" style="--d: 1">Find Earth analogs for Moon and Mars bases.</p>
       <div class="home-actions reveal" style="--d: 2">
-        <a class="btn btn-primary" href="targets.html">Choose a target
+        <a class="btn btn-primary" href="finder.html#target=lunar_south_pole">Choose a target
           <span class="button-orb" aria-hidden="true"><svg class="i"><use href="icons.svg#i-arrow-right"></use></svg></span></a>
         <a class="btn btn-ghost" href="finder.html">Open the Finder<span class="button-orb" aria-hidden="true"><svg class="i"><use href="icons.svg#i-arrow-right"></use></svg></span></a>
       </div>
@@ -57,8 +73,8 @@
   <section class="mission-section" id="mission" aria-labelledby="missionTitle">
     <div class="mission-intro"><h2 id="missionTitle">Distant worlds.<br>Common ground.</h2></div>
     <div class="mission-destinations">
-      <a class="mission-world moon" href="targets.html?body=moon"><img src="assets/moon.jpg" alt="" loading="lazy"><div><h3>The Moon</h3></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
-      <a class="mission-world mars" href="targets.html?body=mars"><img src="assets/mars.jpg" alt="" loading="lazy"><div><h3>Mars</h3></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
+      <a class="mission-world moon" href="finder.html#target=lunar_south_pole"><img src="assets/moon_sm.jpg" alt="" loading="lazy"><div><h3>The Moon</h3></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
+      <a class="mission-world mars" href="finder.html#target=jezero_crater"><img src="assets/mars_sm.jpg" alt="" loading="lazy"><div><h3>Mars</h3></div><svg class="i" aria-hidden="true"><use href="icons.svg#i-arrow-right"></use></svg></a>
     </div>
     <dl class="home-facts" id="facts" hidden></dl>
   </section>
@@ -75,7 +91,8 @@
     <span>Data: NASA POWER, NASA GIBS (MODIS, Blue Marble), AWS Terrain Tiles, Natural Earth.</span>
   </footer>
 
-  <script type="module" src="welcome.js"></script>
-  <script type="module" src="experience.js"></script>
+  
+  
+  <script type="module" src="landing-entry.js"></script>
 </body>
 </html>

@@ -1,0 +1,119 @@
+PASS  first paint already has the final header and action layout
+PASS  ranked sites listed
+PASS  status pill shows AUC
+PASS  AUC label and value have distinct type roles
+PASS  Watermelon-inspired map controls are accessible
+PASS  legend rendered
+PASS  layer dropdown uses Watermelon disclosure
+PASS  disclosure selection updates native application state
+PASS  dropdown typeahead does not trigger map shortcuts
+PASS  disclosure Escape closes and restores focus
+PASS  disabled select cannot open
+PASS  disabled options synchronize
+PASS  Tab dismisses selection menu
+PASS  Save Toggle hides known markers
+PASS  Save Toggle restores known markers
+PASS  adaptive overlay supports keyboard and value display
+PASS  Globe/Map uses a sliding selection
+PASS  scores have API-linked graphical gauges
+PASS  planet preview caption uses Lenis-reference Roboto
+PASS  results summary and shared hints use Lenis-reference Roboto
+PASS  statusPill uses Dropdown Disclosure shell
+PASS  statusPill disclosure close restores focus
+PASS  helpButton uses Dropdown Disclosure shell
+PASS  helpButton disclosure close restores focus
+PASS  layer disclosure has a close header and circular option icons
+PASS  navigation opens as a modal and locks scrolling
+PASS  navigation Escape restores trigger focus and scrolling
+PASS  all range controls use the Overlay component
+PASS  programmatic range changes synchronize track without changing events
+PASS  every range normalizes native minimum and maximum
+PASS  reduced motion settles an active disclosure
+PASS  rapid disclosure reversal ends open and interactive
+PASS  layer vegetation legend
+PASS  layer annual_temperature_range legend
+PASS  layer mean_annual_temperature legend
+PASS  layer slope legend
+PASS  site card opens
+PASS  a click shows the small info card
+PASS  a click does not open God's Eye
+PASS  rank 11+ markers look different from known analogs
+PASS  the card's close button closes it
+PASS  globe preview close stays above toolbar at 1046px
+PASS  globe overlapping preview closes at 1046px
+PASS  map preview close stays above toolbar at 1046px
+PASS  map overlapping preview closes at 1046px
+PASS  globe preview close stays above toolbar at 390px
+PASS  globe overlapping preview closes at 390px
+PASS  map preview close stays above toolbar at 390px
+PASS  map overlapping preview closes at 390px
+PASS  explore scatter drawn
+PASS  dynamic Explore selectors use disclosures
+PASS  sidebar tabs use a sliding selection
+PASS  validation controls table
+PASS  Help menu lists its 4 items
+PASS  Esc closes the Help menu
+PASS  status panel shows the AUC
+PASS  status panel opens the Validation tab
+PASS  validation roles match API controls with distinct icons
+PASS  ranked result badges remain proximity only
+PASS  validation method uses shared disclosure
+PASS  globe keeps its width with the sidebar hidden
+PASS  markers and the card are not hidden from screen readers
+PASS  God's Eye takes focus
+PASS  God's Eye includes its Finder return breadcrumb
+PASS  God's Eye renders terrain for the prepared top result
+PASS  Esc closes the controls guide first
+PASS  a second Esc closes God's Eye
+PASS  the Finder opens without a target in the link
+PASS  #target=moon opens the lunar south pole
+PASS  #target=custom opens the custom profile
+PASS  custom profile selector uses disclosure
+PASS  all current selects share one adapter
+PASS  home links to the targets page
+PASS  target cards are keyboard links
+PASS  targets.html?body=moon shows only its planet
+PASS  targets.html?body=moon heading and breadcrumb
+PASS  targets.html?body=moon credits and breadcrumbs use a single underline
+PASS  targets.html?body=mars shows only its planet
+PASS  targets.html?body=mars heading and breadcrumb
+PASS  targets.html?body=mars credits and breadcrumbs use a single underline
+PASS  targets.html#Moon shows only its planet
+PASS  targets.html#Moon heading and breadcrumb
+PASS  targets.html#Moon credits and breadcrumbs use a single underline
+PASS  targets.html#Mars shows only its planet
+PASS  targets.html#Mars heading and breadcrumb
+PASS  targets.html#Mars credits and breadcrumbs use a single underline
+PASS  invalid body keeps full index
+PASS  planet filter survives refresh
+PASS  planet filter follows browser history
+PASS  target-specific Finder breadcrumb
+PASS  desktop cinematic Home mounts with sourced targets
+FAIL  chapter transition reaches full black
+PASS  Earth orbit emerges with centered quote
+FAIL  cinematic reduced motion removes blackout and smoothing
+PASS  home planetary links are filtered
+PASS  counter values and provenance match API
+PASS  counter reveals finish
+PASS  evidence reveals finish with readable sources
+PASS  counters replay after leaving and re-entering
+PASS  counters count up monotonically to exact API values
+PASS  live reduced motion settles counters
+PASS  narrative text reveals on scroll
+PASS  upward scrolling does not replay text
+PASS  upward entry keeps counter values final  ({"runsBefore":3,"state":{},"values":[{"visual":"78,247","final":"78,247"},{"visual":"5","final":"5"},{"visual":"12","final":"12"}]})
+PASS  text-link keyboard focus uses one animated underline
+PASS  linked action focus moves its existing arrow
+PASS  supporting text uses Lenis-reference Panchang
+PASS  primary buttons have orb details
+PASS  shared navigation has route and planet destinations
+PASS  planet navigation links have no underline
+PASS  Home planets are not covered by an opaque title scrim
+PASS  headers retain one pre-rendered navigation trigger
+PASS  evidence bars use clear red
+PASS  Home evidence bars are rounded and source labels use Roboto
+PASS  local display and body fonts loaded
+PASS  reduced motion uses final static values
+PASS  text links animate without changing selection controls
+PASS  unsupported popovers retain usable native selects  ({"supported":false,"adapters":0,"selects":[{"id":"perCountry","hidden":false},{"id":"layer","hidden":false}]})
+PASS  native fallback retains application handlers

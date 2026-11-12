@@ -1,0 +1,24 @@
+/* Both documents meet on the same opaque crimson face. The overscan keeps
+   curved edges and their shadows outside the viewport at the covered pose. */
+.rocket-overlay{position:fixed;inset:0 auto auto 0;width:100vw;height:100vh;z-index:2147483646;overflow:hidden;pointer-events:auto;isolation:isolate}
+.page-leaf{position:absolute;inset:0;background:var(--accent-btn);will-change:clip-path}
+.page-fold{position:absolute;inset:0;width:100%;height:100%;overflow:visible;will-change:transform;pointer-events:none}
+.page-shadow{fill:none;stroke:var(--bg);stroke-width:1.1;stroke-opacity:.12}
+.page-crease{fill:none;stroke:var(--ink);stroke-opacity:.1;stroke-width:.2}
+.rocket-sprite{position:absolute;left:0;top:0;width:min(46vw,62vh);height:min(46vw,62vh);max-width:none;transform-origin:center;will-change:transform;color:var(--ink);pointer-events:none}
+.rocket-trail{opacity:.8}
+html.rocket-busy{overflow:hidden!important;scrollbar-gutter:auto!important}
+html.rocket-busy body{overscroll-behavior:none;width:var(--flight-content-width)}
+html.rocket-busy .site-header{max-width:var(--flight-content-width)}
+.godseye[data-arrival]{transition:none;transform:none;opacity:1}
+.godseye[data-arrival]>:not(#geArrival){display:none!important}
+#geArrival{position:absolute;inset:0;background:var(--bg);color:var(--ink);padding:var(--page-gutter,24px)}
+.ge-arrival-header{display:flex;justify-content:space-between;align-items:center;gap:24px}
+.ge-arrival-header h2{font:400 clamp(28px,4vw,48px)/1.1 var(--display)}
+.ge-arrival-content{position:absolute;inset:25% 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center}
+.ge-arrival-content p{max-width:48ch;font:400 16px/1.6 var(--font);color:var(--ink-2)}
+.ge-arrival-content details{max-width:60ch;color:var(--ink-3);overflow:auto}
+.ge-arrival-content summary{cursor:pointer}
+.ge-arrival-content details p{font-size:14px;overflow-wrap:anywhere}
+.godseye[data-arrival="error"] .spinner{display:none}
+@media(prefers-reduced-motion:reduce){.page-leaf{will-change:auto}#geArrival .spinner{animation:none}}

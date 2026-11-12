@@ -1,64 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<link rel="preload" href="vendor/fonts/anton-regular.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="preload" href="vendor/fonts/roboto-variable.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="preload" href="vendor/fonts/panchang-600.woff2" as="font" type="font/woff2" crossorigin>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>TerraNova · Choose a target site</title>
-  <meta name="description" content="Pick a Moon or Mars base site, or describe your own, and find the places on Earth that behave most like it.">
-  <meta name="theme-color" content="#050507">
-  <link rel="icon" href="brand.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="vendor/lenis/lenis.css">
-  <link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="shared-controls.css">
-  <script type="module" src="controls.js"></script>
-</head>
-<body class="page-targets">
-  <a class="skip" href="#main">Skip to content</a>
-  <canvas id="starfield" aria-hidden="true"></canvas>
-
-  <header class="topbar site-header">
-    <button class="site-menu-trigger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="siteNavigation"><svg class="i" aria-hidden="true"><use href="icons.svg#i-list"></use></svg><span>Menu</span></button>
-    <div class="brand">
-      <a href="index.html" aria-label="TerraNova home">
-        <img class="brand-mark" src="brand.svg" alt="" width="40" height="40">
-        <span class="wordmark">TerraNova</span>
-      </a>
-    </div>
-    <nav class="main-nav" aria-label="Main">
-      <a href="index.html" class="nav-link">Home</a>
-      <a href="targets.html" class="nav-link" aria-current="page">Targets</a>
-      <a href="finder.html" class="nav-link">Finder</a>
-    </nav>
-  </header>
-
-  <main id="main" class="dest">
-    <nav class="breadcrumbs" id="targetBreadcrumbs" aria-label="Breadcrumb"></nav>
-    <div class="dest-head">
-      <h1 class="reveal">Where do we<br><em>go next?</em></h1>
-      <p class="reveal" style="--d: 1">Choose a Moon or Mars profile to find Earth landscapes with similar conditions.</p>
-    </div>
-    <nav class="body-switch" aria-label="Target destinations">
-      <span class="body-switch-indicator" aria-hidden="true"></span>
-      <a href="targets.html" data-body="">All</a>
-      <a href="targets.html?body=moon" data-body="moon">Moon</a>
-      <a href="targets.html?body=mars" data-body="mars">Mars</a>
-    </nav>
-    <div id="groups" aria-live="polite">
-      <section class="dest-group planet-group" aria-label="Loading targets">
-        <div class="planet-intro skeleton" aria-hidden="true"></div>
-        <div class="dest-grid" aria-hidden="true"><div class="dest-card skeleton"></div><div class="dest-card skeleton"></div></div>
-      </section>
-    </div>
-  </main>
-
-  <footer class="site-foot">
-    <span>Target values cite measurements from LRO (Diviner, LOLA), Chang'e-2, Mars Express (HRSC), Mars Global Surveyor (MOLA), MRO (HiRISE), Curiosity and Perseverance, plus NASA fact sheets. Every value lists its source in the Finder.</span>
-  </footer>
-
-  <script type="module" src="targets.js"></script>
-  <script type="module" src="experience.js"></script>
-</body>
-</html>
+    <head>
+        <meta charset="utf-8">
+        <title>TerraNova</title>
+        <meta http-equiv="refresh" content="0;url=finder.html">
+    </head>
+    <body><a href="finder.html">Open Finder</a></body>
+    </html>

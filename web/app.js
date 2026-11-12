@@ -7,10 +7,11 @@ import { GodsEye, SUN_PRESETS } from "./godseye.js";
 import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
 import { initStarfield } from "./starfield.js";
-import { closeMenus, icon, menu, toast, ANALOG_ROLES, analogRoleBadge, catalogRole } from "./ui.js";
+import { closeMenus, icon, menu, toast, ANALOG_ROLES, analogRoleBadge, catalogRole, download } from "./ui.js";
 import { breadcrumbs, targetTrail } from "./navigation.js";
-import { escapeHtml as esc, decodeFloat32 as decode } from './format.js';
+import { escapeHtml as esc, decodeFloat32 as decode, formatCoord, topShareText } from './format.js';
 import { BoundedCache } from './bounded-cache.js';
+import { fetchReadiness, readinessHtml } from "./readiness.js";
 
 const starfield = initStarfield("starfield");
 
@@ -37,6 +38,8 @@ const state = {
   pick: null,          // clicked location
   card: null,          // result row shown in the small info card on the map
   request: 0,
+  pickSeq: 0,          // guards /api/explain responses for clicked places
+  awaitingCustom: false, // custom profile chosen but not yet scored
   topK: 20,
   mode: "target",      // "target" or "custom"
   custom: null,        // {criteria: {key: number|null}, body: "moon"|"mars"|""}
@@ -60,7 +63,11 @@ async function api(path, options = {}) {
   const res = await fetch(path, options);
   if (!res.ok) {
     let detail = res.statusText;
-    try { detail = (await res.json()).detail || detail; } catch { /* not json */ }
+    try {
+      const body = await res.json();
+      // FastAPI validation errors arrive as a list of {loc, msg}; show the messages.
+      detail = Array.isArray(body.detail) ? body.detail.map((d) => d.msg || String(d)).join("; ") : body.detail || detail;
+    } catch { /* not json */ }
     throw new Error(`${res.status} ${detail}`);
   }
   return res.json();
@@ -115,22 +122,17 @@ function fmtValue(value, unit) {
   const text = abs >= 100 ? fmtInt(Math.round(value)) : abs >= 10 ? value.toFixed(1) : value.toFixed(2);
   if (unit === "NDVI") return `NDVI ${text}`;
   if (unit === "degrees") return `${text}°`;
+  // basaltic_volcanic has three rock classes (src/acquire/glim.py).
+  if (unit === "fraction") return `${value >= 1 ? "basaltic" : value >= 0.5 ? "intermediate volcanic" : "not volcanic"} (${text})`;
   return `${text} ${unit}`;
 }
 
 /* "top 3.2%" wording for a percentile; never claims 0% or 100%. */
 function topShare(percentile) {
-  const top = 100 - percentile;
-  if (top < 0.1) return `in the <b>top 0.1%</b>`;
-  if (top < 10) return `in the <b class="num">top ${top.toFixed(1)}%</b>`;
-  return `in the <b class="num">top ${top.toFixed(0)}%</b>`;
+  return `in the <b class="num">${topShareText(percentile)}</b>`;
 }
 
-function fmtCoord(lat, lon) {
-  const ns = lat >= 0 ? "N" : "S";
-  const ew = lon >= 0 ? "E" : "W";
-  return `${Math.abs(lat).toFixed(2)}° ${ns}, ${Math.abs(lon).toFixed(2)}° ${ew}`;
-}
+function fmtCoord(lat, lon) { return formatCoord(lat, lon, 2); }
 
 const NOVELTY = {
   new: ["new", "New candidate"],
@@ -345,7 +347,7 @@ function renderMarkers() {
       markers.push({ lat: site.lat, lon: site.lon, el });
     }
   }
-  if (state.data) {
+  if (state.data && !state.awaitingCustom) {
     for (const r of state.data.results) {
       const el = document.createElement("button");
       el.type = "button";
@@ -460,7 +462,7 @@ function closeCard() {
 function paintLayer() {
   let image;
   if (state.layer === "score") {
-    if (!state.field) return;
+    if (!state.field || state.awaitingCustom) return;
     image = paint(state.field, 720, 360, "score", { sorted: state.sorted, floor: 0.5 });
     const q = (p) => quantile(state.sorted, p);
     // The ramp runs linearly from the 50th to the 100th percentile of land cells,
@@ -534,21 +536,12 @@ function applyUi() {
   if (lt) {
     lt.setAttribute("aria-expanded", String(ui.legend !== false));
   }
-  document.querySelectorAll("[data-fold]").forEach((b) => {
-    const open = ui[`fold_${b.dataset.fold}`] !== false;
-    b.setAttribute("aria-expanded", String(open));
-    b.closest(".block").classList.toggle("collapsed", !open);
-  });
 }
 
 function wireUi() {
   const ts = $("toggleSidebar");
   if (ts) ts.addEventListener("click", () => setUi("sidebar", ui.sidebar === false));
   $("twinToggle").addEventListener("click", () => setUi("twin", ui.twin === false));
-  document.querySelectorAll("[data-fold]").forEach((b) => b.addEventListener("click", () => {
-    const key = `fold_${b.dataset.fold}`;
-    setUi(key, ui[key] === false);
-  }));
   applyUi();
 }
 
@@ -575,16 +568,31 @@ function histogram() {
     <div class="scale num"><span>${fmtPct(lo)}</span><span>${zero ? `+ ${fmtInt(zero)} cells at 0% (vetoed)` : ""}</span><span>${fmtPct(hi)}</span></div>`;
 }
 
+let layerSeq = 0;
 async function setLayer(key) {
-  state.layer = key;
-  if (key !== "score") {
+  const seq = ++layerSeq;
+  if (key !== "score" && !(key === state.layer && state.layerField?.key === key)) {
     const s = spec(key);
-    const payload = await api(`/api/predictor?key=${encodeURIComponent(key)}`);
+    let payload;
+    try {
+      payload = await api(`/api/predictor?key=${encodeURIComponent(key)}`);
+    } catch (err) {
+      if (seq === layerSeq) {
+        // Put the menu back on the layer that is still showing.
+        $("layer").value = state.layer;
+        $("layer").dispatchEvent(new Event("change"));
+        toast(`Could not load that layer: ${err.message}`);
+      }
+      return;
+    }
+    if (seq !== layerSeq) return;   // a newer choice won
     state.layerField = {
-      values: decode(payload), lo: s.earth_min, hi: s.earth_max,
+      key, values: decode(payload), lo: s.earth_min, hi: s.earth_max,
       unit: s.unit, label: s.label, dataset: s.dataset_id, url: s.source_url,
     };
   }
+  if (seq !== layerSeq) return;
+  state.layer = key;
   paintLayer();
 }
 
@@ -746,13 +754,20 @@ function chooseTarget(id) {
     startCustom();
     state.selected = null;
     state.pick = null;
+    state.card = null;
+    state.awaitingCustom = true;
+    state.request++;              // drop any ranking still on its way
+    state.robust = null;
+    if (state.pins.length) { state.pins = []; renderCompare(); }
     renderTargets();
     renderTargetDetail();
     renderWeights();
-    return;   // scored when the form is submitted
+    showAwaitingCustom();
+    return Promise.resolve();   // scored when the form is submitted
   }
-  if (id === state.targetId && state.mode === "target") return;
+  if (id === state.targetId && state.mode === "target") return Promise.resolve();
   if (state.pins.length) { state.pins = []; renderCompare(); }
+  state.awaitingCustom = false;
   state.mode = "target";
   state.targetId = id;
   state.selected = null;
@@ -762,10 +777,25 @@ function chooseTarget(id) {
   renderTargetDetail();
   renderWeights();
   showList();
-  runScore().then(() => {
+  return runScore().then(() => {
     const top = state.data?.results[0];
     if (top && state.view === "globe") globe.flyTo(top.lat, top.lon);
   });
+}
+
+/* Custom profile chosen, not yet scored: no old ranking, markers or score colours. */
+function showAwaitingCustom() {
+  showList();
+  $("siteList").innerHTML = "";
+  $("resultsSummary").textContent = "Submit your profile in the Target tab to score Earth.";
+  if (state.layer === "score") {
+    const blank = new ImageData(720, 360);
+    globe.setOverlay(blank);
+    flat.setOverlay(blank);
+  }
+  renderMarkers();
+  renderValidation();
+  if (!$("explore").hidden) renderExplore();
 }
 
 /* ----------------------------------------------------------------- weights */
@@ -792,7 +822,10 @@ function renderWeights() {
       state.weights[key] = w;
       $(`wv_${key}`).textContent = w === 0 ? "off" : `${w.toFixed(1)}×`;
       input.closest(".weight").classList.toggle("off", w === 0);
-      if (Object.values(state.weights).every((v) => v === 0)) return;
+      if (Object.values(state.weights).every((v) => v === 0)) {
+        $("resultsSummary").textContent = "Turn on at least one criterion to score Earth.";
+        return;
+      }
       scoreSoon();
     });
   });
@@ -800,7 +833,7 @@ function renderWeights() {
 
 /* ----------------------------------------------------------------- scoring */
 
-async function runScore() {
+async function runScore({ throwOnError = false } = {}) {
   const ticket = ++state.request;
   $("resultsSummary").textContent = "Scoring…";
   $("progress").classList.add("on");
@@ -811,6 +844,7 @@ async function runScore() {
       body: JSON.stringify(scoreRequest({ top_k: state.topK, include_field: true })),
     });
     if (ticket !== state.request) return;
+    state.awaitingCustom = false;
     state.data = data;
     state.field = decode(data.field);
     state.sorted = sortedFinite(state.field);
@@ -829,6 +863,7 @@ async function runScore() {
     robustSoon(ticket);
     if (!$("explore").hidden) renderExplore();
   } catch (err) {
+    if (throwOnError) throw err;
     if (ticket === state.request) toast(`Scoring failed: ${err.message}`);
   } finally {
     if (ticket === state.request) $("progress").classList.remove("on");
@@ -863,6 +898,7 @@ const topKSoon = debounce(() => { if (!state.selected) showList(); runScore(); }
 /* fresh: a new ranking (stagger the rows in); otherwise an in-place refresh. */
 function renderResults(fresh = false) {
   const d = state.data;
+  if (!d || state.awaitingCustom) return;
   const bits = [];
   if (d.filters?.new_only) bits.push("new sites only");
   if (d.filters?.min_distance_km) bits.push(`${fmtInt(d.filters.min_distance_km)} km minimum spacing`);
@@ -916,13 +952,17 @@ async function pickLocation(lat, lon) {
 
 /* fresh: a new click (open the info card); otherwise a rescore of the same place. */
 async function refreshPick(fresh = false) {
+  if (!state.pick) return;
   const { lat, lon } = state.pick;
+  const seq = ++state.pickSeq;
+  const current = () => seq === state.pickSeq && state.pick?.lat === lat && state.pick?.lon === lon;
   try {
     const r = await api(`/api/explain?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(scoreRequest()),
     });
+    if (!current()) return;   // the user picked something else meanwhile
     if (!r.scored) {
       $("siteList").hidden = true;
       const det = $("detail");
@@ -937,7 +977,7 @@ async function refreshPick(fresh = false) {
     renderDetail(r);
     if (fresh || state.card) showCard(r);
   } catch (err) {
-    toast(`Could not inspect that location: ${err.message}`);
+    if (current()) toast(`Could not inspect that location: ${err.message}`);
   }
 }
 
@@ -954,6 +994,10 @@ function showList() {
 function renderDetail(r) {
   const t = target();
   const d = state.data;
+  // Re-rendering the same site (a rescore): keep the reader's scroll and open drawers.
+  const prev = $("detail");
+  const same = !prev.hidden && prev.dataset.index === String(r.index);
+  const keep = same ? { scroll: prev.closest(".panel").scrollTop, open: [...prev.querySelectorAll("details")].map((x) => x.open) } : null;
   const eff = d.effective_profile;
   const crits = state.criteria.map((c) => {
     const w = d.weights[c.key];
@@ -975,7 +1019,7 @@ function renderDetail(r) {
     : `${fmtInt(Math.round(nov.distance_km))} km from <a href="${esc(nov.source_url)}" target="_blank" rel="noopener">${esc(nov.nearest_known)}</a>.`;
   const lstNote = r.lst_source === "NASA POWER TS_RANGE fit"
     ? `<p class="notice">No MODIS surface-temperature data here: the day-night swing is estimated from NASA POWER skin temperature (see How it works).</p>` : "";
-  const claims = r.rationale.claims.map((c) => `<li>${esc(c.text)} <a href="${esc(c.source_url)}" target="_blank" rel="noopener">source</a></li>`).join("");
+  const claims = r.rationale.claims.map((c) => `<li>${esc(c.text)}${c.source_url ? ` <a href="${esc(c.source_url)}" target="_blank" rel="noopener">source</a>` : ""}</li>`).join("");
   const caveats = r.rationale.caveats.map((c) => `<li>${esc(c.text)}</li>`).join("");
   const worldview = `https://worldview.earthdata.nasa.gov/?v=${(r.lon - 4).toFixed(2)},${(r.lat - 3).toFixed(2)},${(r.lon + 4).toFixed(2)},${(r.lat + 3).toFixed(2)}&l=MODIS_Terra_CorrectedReflectance_TrueColor`;
   const gmaps = `https://www.google.com/maps/@${r.lat.toFixed(4)},${r.lon.toFixed(4)},9z/data=!3m1!1e3`;
@@ -1006,6 +1050,8 @@ function renderDetail(r) {
     ${viewsStrip(r)}
     <h4 class="section-title">Criterion by criterion</h4>
     ${crits}
+    <h4 class="section-title">Hardware test readiness</h4>
+    <div class="readiness" id="readiness" data-key="${r.lat},${r.lon}" aria-live="polite"><p class="hint">Checking which systems could be tested here…</p></div>
     <h4 class="section-title">Verify it yourself</h4>
     <div class="verify">
       <a href="${esc(worldview)}" target="_blank" rel="noopener">NASA Worldview ${icon("arrow-square-out")}<small>MODIS true colour here</small></a>
@@ -1023,6 +1069,21 @@ function renderDetail(r) {
   det.querySelector("[data-copy]").addEventListener("click", async (e) => {
     try { await navigator.clipboard.writeText(e.target.dataset.copy); e.target.textContent = "Copied"; } catch { e.target.textContent = e.target.dataset.copy; }
   });
+  // Hardware test readiness (src/compute/qualification.py), filled in when it arrives.
+  const readinessKey = `${r.lat},${r.lon}`;
+  fetchReadiness(r.lat, r.lon).then((q) => {
+    const box = det.querySelector("#readiness");
+    if (box?.dataset.key === readinessKey) box.innerHTML = readinessHtml(q);
+  }).catch(() => {
+    const box = det.querySelector("#readiness");
+    if (box?.dataset.key === readinessKey) box.innerHTML = `<p class="hint">Readiness is unavailable right now.</p>`;
+  });
+  det.dataset.index = String(r.index);
+  if (keep) {
+    det.querySelectorAll("details").forEach((x, i) => { if (keep.open[i] !== undefined) x.open = keep.open[i]; });
+    det.closest(".panel").scrollTop = keep.scroll;
+    return;
+  }
   det.closest(".panel").scrollTop = 0;
   if (window.innerWidth <= 1020) det.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1030,12 +1091,18 @@ function renderDetail(r) {
 /* -------------------------------------------------------------- validation */
 
 function renderValidation() {
-  const v = state.data.validation;
+  const v = state.awaitingCustom ? null : state.data?.validation;
   const hasAuc = !!v && v.auc !== null;
   $("statusAuc").hidden = !hasAuc;
   $("statusValRow").hidden = !hasAuc;
   $("statusOpenVal").hidden = !hasAuc;
-  if (!hasAuc) { $("validation").innerHTML = `<p class="hint">No validation for a custom profile.</p>`; return; }
+  if (!hasAuc) {
+    const why = state.awaitingCustom ? "Submit your profile to see its validation."
+      : state.mode === "custom" ? "No validation for this profile. Choose Moon or Mars under “Validate against known analogs” to test it."
+        : "Validation is not available for this target right now.";
+    $("validation").innerHTML = `<p class="hint">${why}</p>`;
+    return;
+  }
   $("statusAuc").innerHTML = `<span class="auc-label">AUC </span><span class="auc-value">${v.auc.toFixed(2)}</span>`;
   $("statusVal").innerHTML = `<span class="num">AUC ${v.auc.toFixed(2)}</span> on ${v.positives} known sites`;
   const rows = v.controls.map((c) => `
@@ -1058,16 +1125,22 @@ function renderValidation() {
 }
 
 let dataChecks = null;
+let dataChecksJob = null;
+let dataChecksFailed = false;
 function dataChecksTable() {
+  if (dataChecksFailed) return `<p class="hint">The dataset agreement checks could not be loaded. They load again with the next change.</p>`;
   if (!dataChecks) {
-    api("/api/datachecks").then((r) => { dataChecks = r.checks; renderValidation(); }).catch(() => {});
+    dataChecksJob ??= api("/api/datachecks")
+      .then((r) => { dataChecks = r.checks; renderValidation(); })
+      .catch(() => { dataChecksFailed = true; renderValidation(); dataChecksFailed = false; })
+      .finally(() => { dataChecksJob = null; });
     return "";
   }
   return `<h4 class="section-title">Do the datasets agree?</h4>
     <p class="hint">Independent datasets must agree where physics says they should. Spearman rank correlation over land cells:</p>
     <table class="controls"><thead><tr><th>Check</th><th class="n">ρ</th><th></th></tr></thead><tbody>
     ${dataChecks.map((c) => `<tr><td title="${esc(c.why)}">${esc(c.title)}<br><small class="hint">${fmtInt(c.cells)} cells</small></td>
-      <td class="n">${c.rho.toFixed(2)}</td><td>${c.passed ? `<span class="role positive">${icon('check-circle')}agrees</span>` : '<span class="role negative">check</span>'}</td></tr>`).join("")}
+      <td class="n">${c.rho === null ? "–" : c.rho.toFixed(2)}</td><td>${c.passed ? `<span class="role positive">${icon('check-circle')}agrees</span>` : '<span class="role negative">check</span>'}</td></tr>`).join("")}
     </tbody></table>`;
 }
 
@@ -1085,20 +1158,13 @@ function sensitivityTable() {
 
 /* ------------------------------------------------------------------ export */
 
-function download(name, text, type) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = Object.assign(document.createElement("a"), { href: url, download: name });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function exportGeojson() {
   const d = state.data;
   if (!d) return;
   const features = d.results.map((r) => ({
     type: "Feature",
     geometry: { type: "Point", coordinates: [r.lon, r.lat] },
-    properties: { rank: r.rank, name: r.label.text, score: r.score, percentile: r.percentile, novelty: r.novelty.status, nearest_known: r.novelty.nearest_known, ...Object.fromEntries(Object.entries(r.values).map(([k, v]) => [`value_${k}`, v])), ...Object.fromEntries(Object.entries(r.similarities).map(([k, v]) => [`similarity_${k}`, v])) },
+    properties: { rank: r.rank, name: r.label.text, score: r.score, percentile: r.percentile, novelty: r.novelty.status, nearest_known: r.novelty.nearest_known, ...Object.fromEntries(Object.entries(r.values).map(([k, v]) => [`value_${k}`, v])), ...Object.fromEntries(Object.entries(r.similarities).map(([k, v]) => [`similarity_${k}`, v])), ...Object.fromEntries(Object.entries(r.readiness || {}).map(([k, v]) => [`readiness_${k}`, v])) },
   }));
   const doc = { type: "FeatureCollection", properties: { target: d.target_id, weights: d.weights, generated_by: "TerraNova", cell_size_degrees: 0.5 }, features };
   download(`analogs_${d.target_id}.geojson`, JSON.stringify(doc, null, 2), "application/geo+json");
@@ -1108,9 +1174,10 @@ function exportCsv() {
   const d = state.data;
   if (!d) return;
   const keys = state.criteria.map((c) => c.key);
-  const head = ["rank", "name", "lat", "lon", "score", "percentile", "novelty", "nearest_known", ...keys.map((k) => `value_${k}`), ...keys.map((k) => `similarity_${k}`)];
+  const ready = Object.keys(d.results[0]?.readiness || {});
+  const head = ["rank", "name", "lat", "lon", "score", "percentile", "novelty", "nearest_known", ...keys.map((k) => `value_${k}`), ...keys.map((k) => `similarity_${k}`), ...ready.map((k) => `readiness_${k}`)];
   const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = d.results.map((r) => [r.rank, q(r.label.text), r.lat, r.lon, r.score, r.percentile, r.novelty.status, q(r.novelty.nearest_known), ...keys.map((k) => r.values[k] ?? ""), ...keys.map((k) => r.similarities[k])].join(","));
+  const lines = d.results.map((r) => [r.rank, q(r.label.text), r.lat, r.lon, r.score, r.percentile, r.novelty.status, q(r.novelty.nearest_known), ...keys.map((k) => r.values[k] ?? ""), ...keys.map((k) => r.similarities[k]), ...ready.map((k) => r.readiness?.[k] ?? "")].join(","));
   download(`analogs_${d.target_id}.csv`, [head.join(","), ...lines].join("\n"), "text/csv");
 }
 
@@ -1141,17 +1208,19 @@ function viewsStrip(r) {
 
 /* ----------------------------------------------------------------- Explore */
 
+let analogValuesJob = null;
 async function loadAnalogValues() {
   if (state.analogValues) return state.analogValues;
-  state.analogValues = await Promise.all(state.analogs.sites.map(async (site) => {
+  analogValuesJob ??= Promise.all(state.analogs.sites.map(async (site) => {
     try { return { site, cell: await api(`/api/cell?lat=${site.lat}&lon=${site.lon}`) }; } catch { return { site, cell: null }; }
-  }));
-  return state.analogValues;
+  })).then((values) => (state.analogValues = values));
+  return analogValuesJob;
 }
 
 async function renderExplore() {
   const box = $("explore");
   const d = state.data;
+  if (state.awaitingCustom) { box.innerHTML = `<p class="hint">Submit your profile in the Target tab to compare sites.</p>`; return; }
   if (!d) return;
   const active = state.criteria.filter((c) => (d.weights[c.key] ?? 0) > 0);
   const xKey = box.dataset.x && state.criteria.some((c) => c.key === box.dataset.x) ? box.dataset.x : (active.find((c) => c.key === "lst_diurnal_range") || active[0]).key;
@@ -1160,6 +1229,7 @@ async function renderExplore() {
     box.innerHTML = `<p class="hint">Reading the known analog sites…</p>${'<div class="skeleton skel-row"></div>'.repeat(6)}`;
   }
   const analogs = await loadAnalogValues();
+  if (d !== state.data || state.awaitingCustom) return;   // a newer ranking renders itself
   const opts = (sel) => state.criteria.map((c) => `<option value="${c.key}" ${c.key === sel ? "selected" : ""}>${esc(c.label)}</option>`).join("");
   const X = spec(xKey), Y = spec(yKey);
   const pts = [
@@ -1191,8 +1261,8 @@ async function renderExplore() {
     ? `<line x1="${sx(tx)}" x2="${sx(tx)}" y1="${T}" y2="${H - B}" class="t"/><line x1="${L}" x2="${W - R}" y1="${sy(ty)}" y2="${sy(ty)}" class="t"/>
        <circle cx="${sx(tx)}" cy="${sy(ty)}" r="8" class="target"/><text x="${sx(tx) + 11}" y="${sy(ty) - 8}" class="tl">target</text>` : "";
   const marks = pts.map((p, i) => p.kind === "site"
-    ? `<circle data-i="${i}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
-    : `<svg data-i="${i}" data-analog-role="${catalogRole(p.a.site) || ''}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-${ANALOG_ROLES[catalogRole(p.a.site)]?.icon || 'rocket'}"></use></svg>`).join("");
+    ? `<circle data-i="${i}" tabindex="0" role="button" aria-label="#${p.r.rank} ${esc(p.r.label.text)}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
+    : `<svg data-i="${i}" tabindex="0" role="button" aria-label="${esc(p.a.site.name)}" data-analog-role="${catalogRole(p.a.site) || ''}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-${ANALOG_ROLES[catalogRole(p.a.site)]?.icon || 'rocket'}"></use></svg>`).join("");
   box.innerHTML = `
     <p class="hint">Compare two criteria. Dots are ranked sites; icons are catalogued analogs. Hover for details or click to explore.</p>
     <div class="axes">
@@ -1218,7 +1288,7 @@ async function renderExplore() {
   const tip = $("exTip");
   svg.querySelectorAll("[data-i]").forEach((el) => {
     const p = pts[Number(el.dataset.i)];
-    el.addEventListener("mouseenter", () => {
+    const show = () => {
       const title = p.kind === "site" ? `#${p.r.rank} ${p.r.label.text} · ${fmtPct(p.r.score)}` : `${p.a.site.name} (${ANALOG_ROLES[catalogRole(p.a.site)]?.label || 'Catalogued analog'})`;
       tip.innerHTML = `<b>${esc(title)}</b><br>${esc(X.label)}: ${esc(fmtValue(p.x, X.unit))}<br>${esc(Y.label)}: ${esc(fmtValue(p.y, Y.unit))}`;
       tip.hidden = false;
@@ -1226,12 +1296,14 @@ async function renderExplore() {
       const k = rect.width / W;
       tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || el.getAttribute("x")) * k + 10)}px`;
       tip.style.top = `${Number(el.getAttribute("cy") || el.getAttribute("y")) * k - 10}px`;
-    });
+    };
+    const open = () => (p.kind === "site" ? selectResult(p.r) : flyToPlace(p.a.site.lat, p.a.site.lon));
+    el.addEventListener("mouseenter", show);
+    el.addEventListener("focus", show);
     el.addEventListener("mouseleave", () => { tip.hidden = true; });
-    el.addEventListener("click", () => {
-      if (p.kind === "site") selectResult(p.r);
-      else flyToPlace(p.a.site.lat, p.a.site.lon);
-    });
+    el.addEventListener("blur", () => { tip.hidden = true; });
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
   });
   $("exX").addEventListener("change", (e) => { box.dataset.x = e.target.value; renderExplore(); });
   $("exY").addEventListener("change", (e) => { box.dataset.y = e.target.value; renderExplore(); });
@@ -1248,19 +1320,47 @@ const restoreMap = () => {
   eyeReturnFocus?.focus?.();
 };
 
-function openGodsEye(r, preset = null) {
-  if (!r || Math.abs(r.lat) > 84) { toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude.", "info"); return Promise.resolve(); }
+/* Site, target and criterion rows for the mission dossier, formatted as the site card shows them. */
+function dossierContext(r, t) {
+  const d = state.data;
+  const eff = d?.effective_profile || {};
+  return {
+    site: { label: r.label?.text || "Selected site", lat: r.lat, lon: r.lon, rank: r.rank || null, of: d?.results.length || null,
+      score: r.score, percentile: r.percentile, novelty: r.novelty || null },
+    target: { id: state.mode === "target" ? state.targetId : null, name: t.name, short_name: t.short_name, body: t.body, source_url: t.source_url || null, source_label: t.source_label || "" },
+    criteria: state.criteria.map((c) => {
+      const w = d?.weights?.[c.key] ?? 0;
+      const sim = r.similarities?.[c.key];
+      return { key: c.key, label: c.label, dataset_id: c.dataset_id, source_url: c.source_url, scored: !!w && sim !== null && sim !== undefined,
+        here: fmtValue(r.values?.[c.key], c.unit), target: fmtValue(eff[c.key], c.unit), similarity: sim ?? null, weight: w };
+    }),
+    claims: r.rationale?.claims || [],
+    caveats: r.rationale?.caveats || [],
+  };
+}
+
+function openGodsEye(r, preset = null, { arrival = false } = {}) {
+  if (!r) {
+    if (arrival) throw new Error('No site is selected. Return to Finder and choose one.');
+    toast("Select a site first, then open God's Eye.", "info"); return Promise.resolve();
+  }
+  if (Math.abs(r.lat) > 84) {
+    if (arrival) throw new Error('The selected site is outside terrain coverage. Return to Finder to choose another site.');
+    toast("The 3D view needs elevation tiles, which stop at about 84 degrees latitude.", "info"); return Promise.resolve();
+  }
   hidePeek();
   if (!(eye instanceof GodsEye)) {
     try {
       eye = new GodsEye($("godseye"));
       eye.onClose = restoreMap;
     } catch {
+      if (arrival) throw new Error('God’s Eye could not start WebGL. Enable browser hardware acceleration and retry.');
       toast("God’s Eye could not start WebGL. Try a browser with hardware acceleration enabled.", "error");
       return Promise.resolve();
     }
   }
-  eyeReturnFocus = document.activeElement;
+  if (arrival) window.rocketTransition?.adopt();
+  eyeReturnFocus = arrival ? document.querySelector('#siteList .site.active') || $('tabResults') : document.activeElement;
   const t = target();
   const context = {
     targetId: state.mode === "target" ? state.targetId : null,
@@ -1268,6 +1368,7 @@ function openGodsEye(r, preset = null) {
     subtitle: `${fmtCoord(r.lat, r.lon)} · ${fmtPct(r.score)} match to ${t.short_name}`,
     badges: `${r.rank ? `<span class="chip">#${r.rank} of ${state.data.results.length}</span>` : ""}${noveltyChip(r.novelty)}`,
     values: r.values,   // the cell's climate, for the climate simulation
+    dossier: dossierContext(r, t),   // what the mission dossier export prints (web/dossier.js)
   };
   if (preset) eye.sun = { ...SUN_PRESETS[preset] };
   // The full-screen 3D view covers everything: stop drawing what is underneath.
@@ -1298,7 +1399,7 @@ function togglePin(r) {
 
 async function refreshPins() {
   if (!state.pins.length) return;
-  state.pins = await Promise.all(state.pins.map(async (r) => {
+  const refreshed = await Promise.all(state.pins.map(async (r) => {
     try {
       const fresh = await api(`/api/explain?lat=${r.lat}&lon=${r.lon}`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(scoreRequest()),
@@ -1307,6 +1408,8 @@ async function refreshPins() {
       return fresh.scored ? { ...fresh, rank: ranked?.rank ?? null } : r;
     } catch { return r; }
   }));
+  // Pins removed (or cleared) while the refresh ran stay removed.
+  state.pins = state.pins.map((pin) => refreshed.find((x) => x.index === pin.index) || pin);
   renderCompare();
 }
 
@@ -1341,6 +1444,8 @@ function renderCompare() {
 
 let searchItems = [];
 let searchActive = -1;
+let searchSeq = 0;         // the newest query; older responses are dropped
+let searchEnter = false;   // Enter pressed before the newest results arrived
 
 function flyToPlace(lat, lon) {
   if (state.view === "globe") globe.flyTo(lat, lon, (globe.fitDistance || 3.6) * 0.7);
@@ -1381,18 +1486,27 @@ function chooseSearch(i) {
   flyToPlace(it.lat, it.lon);
 }
 
-const runSearch = debounce(async (q) => {
+const runSearch = debounce(async (q, seq) => {
   if (!q.trim()) { closeSearch(); return; }
   try {
-    searchItems = (await api(`/api/search?q=${encodeURIComponent(q)}`)).results;
-    searchActive = searchItems.length ? 0 : -1;
-    renderSearch();
-  } catch { closeSearch(); }
+    const items = (await api(`/api/search?q=${encodeURIComponent(q)}`)).results;
+    if (seq !== searchSeq) return;
+    searchItems = items;
+    searchActive = items.length ? 0 : -1;
+    if (searchEnter) { searchEnter = false; if (items.length) { chooseSearch(0); return; } }
+    if (document.activeElement === $("search")) renderSearch();
+  } catch { if (seq === searchSeq) closeSearch(); }
 }, 160);
 
 function wireSearch() {
   const input = $("search");
-  input.addEventListener("input", () => runSearch(input.value));
+  input.addEventListener("input", () => {
+    searchSeq++;
+    searchItems = [];        // never act on results for an older query
+    searchActive = -1;
+    searchEnter = false;
+    runSearch(input.value, searchSeq);
+  });
   input.addEventListener("blur", () => setTimeout(closeSearch, 120));
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -1402,8 +1516,11 @@ function wireSearch() {
       renderSearch();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      chooseSearch(Math.max(0, searchActive));
+      if (searchItems.length) chooseSearch(Math.max(0, searchActive));
+      else if (input.value.trim()) searchEnter = true;   // go to the first result when it arrives
     } else if (e.key === "Escape") {
+      e.stopPropagation();   // only close the search, not the card behind it
+      searchEnter = false;
       closeSearch();
       input.blur();
     }
@@ -1437,7 +1554,7 @@ const TOUR = [
   {
     title: "Welcome",
     text: "TerraNova compares every land cell on Earth with a Moon or Mars base site, using NASA data, and ranks the closest matches.",
-    run: async () => { if (eye.open) eye.close(); chooseTargetById("lunar_south_pole"); showList(); await sleep(300); globe.home(); },
+    run: async (alive) => { if (eye.open) eye.close(); await chooseTargetById("lunar_south_pole"); if (!alive()) return; showList(); await sleep(300); if (alive()) globe.home(); },
   },
   {
     title: "The target",
@@ -1447,7 +1564,7 @@ const TOUR = [
   {
     title: "Where Earth matches",
     text: "The globe lights up where Earth behaves most like the target. Brighter means a closer match. Here is the top-ranked site.",
-    run: async () => { await waitForData(); selectResult(state.data.results[0]); },
+    run: async (alive) => { await waitForData(); if (alive() && state.data) selectResult(state.data.results[0]); },
   },
   {
     title: "Why it matches",
@@ -1462,12 +1579,12 @@ const TOUR = [
   {
     title: "Mars",
     text: "Switch to Mars: Jezero Crater, where Perseverance landed. The ranking changes completely: now hot, flat, bare deserts win.",
-    run: async () => { if (eye.open) eye.close(); chooseTargetById("jezero_crater"); await sleep(1600); },
+    run: async (alive) => { if (eye.open) eye.close(); await chooseTargetById("jezero_crater"); if (alive()) await sleep(600); },
   },
   {
     title: "Is it right?",
     text: () => `We test it. Known analog sites such as Haughton Crater and the Atacama must outscore rainforest and farmland. ROC-AUC = ${state.data?.validation?.auc?.toFixed(2) ?? "…"} (1.00 is perfect).`,
-    run: async () => { await waitForData(); selectTab("validation"); renderValidation(); },
+    run: async (alive) => { await waitForData(); if (alive()) { selectTab("validation"); renderValidation(); } },
   },
   {
     title: "Your turn",
@@ -1480,12 +1597,16 @@ async function waitForData() {
   for (let i = 0; i < 50 && !state.data; i++) await sleep(100);
 }
 
+/* Resolves once the target's new ranking has arrived. */
 function chooseTargetById(id) {
-  const card = document.querySelector(`.target-card[data-id="${id}"]`);
-  if (card && card.getAttribute("aria-checked") !== "true") card.click();
+  if (!state.targets.some((t) => t.id === id)) return Promise.resolve();
+  return chooseTarget(id) || Promise.resolve();
 }
 
+let tourSeq = 0;
 async function tourGo(i) {
+  const seq = ++tourSeq;   // a newer step cancels the rest of this one
+  const alive = () => seq === tourSeq && tourIndex >= 0;
   tourIndex = Math.max(0, Math.min(TOUR.length - 1, i));
   const step = TOUR[tourIndex];
   document.body.classList.add("touring");
@@ -1495,11 +1616,12 @@ async function tourGo(i) {
   $("tourBar").style.transform = `scaleX(${(tourIndex + 1) / TOUR.length})`;
   $("tourPrev").disabled = tourIndex === 0;
   $("tourNext").textContent = tourIndex === TOUR.length - 1 ? "Finish" : "Next";
-  try { await step.run(); } catch (err) { toast(err.message); }
-  if (typeof step.text === "function") $("tourText").textContent = step.text();
+  try { await step.run(alive); } catch (err) { if (alive()) toast(err.message); }
+  if (alive() && typeof step.text === "function") $("tourText").textContent = step.text();
 }
 
 function tourStop() {
+  tourSeq++;
   tourIndex = -1;
   $("tourCaption").hidden = true;
   document.body.classList.remove("touring");
@@ -1523,11 +1645,20 @@ function stepSite(delta) {
 
 function wireKeys() {
   document.addEventListener("keydown", (e) => {
-    const typing = e.target.closest("input, select, textarea, [contenteditable]");
+    // Only text entry counts as typing: a focused slider or checkbox keeps the shortcuts.
+    const field = e.target.closest?.("input");
+    const typing = e.target.closest("select, textarea, [contenteditable]")
+      || (field && !["range", "checkbox", "radio", "button", "submit", "reset", "color"].includes(field.type));
     const dialogOpen = document.querySelector("dialog[open]");
     if (e.key === "Escape") {
       if (closeMenus()) { e.preventDefault(); return; }
-      if (eye.open) { eye.escape(); e.preventDefault(); return; }
+      if (eye.open) {
+        eye.escape();
+        if (!eye.open && tourIndex >= 0) tourStop();   // leaving God's Eye ends the tour step showing it
+        e.preventDefault();
+        return;
+      }
+      if (dialogOpen) return;   // the dialog closes itself
       if (tourIndex >= 0) { tourStop(); return; }
       if (!dialogOpen && state.card) { closeCard(); return; }
       if (!dialogOpen && !typing && !$("detail").hidden) { showList(); return; }
@@ -1540,7 +1671,7 @@ function wireKeys() {
       "/": () => $("search").focus(),
       j: () => stepSite(1),
       k: () => stepSite(-1),
-      e: () => openGodsEye(state.card || state.selected || state.data?.results[0]),
+      e: () => openGodsEye(state.card || state.selected || (state.awaitingCustom ? null : state.data?.results[0])),
       p: () => { const r = state.card || state.selected; if (r?.index !== undefined) togglePin(r); },
       g: () => setView("globe"),
       m: () => setView("map"),
@@ -1606,6 +1737,17 @@ function renderMethod() {
     <p>Open any site in 3D. Its terrain comes from AWS Terrain Tiles at about 150 m, draped with Sentinel-2 cloud-free
       imagery (ESA Copernicus data processed by EOX). The panel measures relief and slope inside the scored cell at that
       finer scale, including the share of ground a rover could drive (slopes under 15°). You can light it with a lunar polar sun.</p>
+    <h3>Hardware test readiness</h3>
+    <p>For every site, TerraNova asks which mission systems could be field-tested there: a VIPER-class ice-mining drill,
+      navigation under a low sun, Artemis spacesuits, and rovers. Each requirement shows the site's value, a threshold linked to
+      its source (for example continuous permafrost, a desert, the polar circle) and pass, near or fail. All pass means
+      "ready for TRL 5-6 field tests", NASA's level for testing in a relevant environment. These are screening thresholds, not
+      NASA certification.</p>
+    <h3>Plan an EVA traverse</h3>
+    <p>In God's Eye, “Plan a traverse” lets you click up to 8 waypoints (Basecamp, Science Station, Drill Site…). The server
+      measures the route on the full-resolution elevation tiles: elevation, grade, climb and descent, the stretches steeper than
+      the 15° rover limit, and a walking time from Tobler's hiking function (an Earth estimate on foot). “Export mission dossier”
+      saves one printable file with the pictures, route, readiness, criteria and every citation; the route also exports as GeoJSON.</p>
     <h3>Criteria and data</h3>
     <table class="src-table"><thead><tr><th>Criterion</th><th>What it measures</th><th>Dataset</th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Known limitations</h3>
@@ -1636,6 +1778,10 @@ function renderSources() {
       <li>God's Eye terrain: AWS Terrain Tiles (Terrarium): SRTM, GMTED, ETOPO1 and others</li>
       <li>God's Eye imagery: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2020), CC BY-NC-SA 4.0</li>
       <li>Detail tiles and hover previews: NASA Blue Marble via NASA GIBS</li></ul>
+    <h3>Readiness and traverse</h3><ul>
+      <li>Readiness levels: <a href="https://www.nasa.gov/directorates/somd/space-communications-navigation-program/technology-readiness-levels/" target="_blank" rel="noopener">NASA, Technology Readiness Levels</a>; each threshold links to its own source in the matrix.</li>
+      <li>Walking time: <a href="https://en.wikipedia.org/wiki/Tobler%27s_hiking_function" target="_blank" rel="noopener">Tobler's hiking function</a> (Tobler 1993).</li>
+      <li>Route terrain: AWS Terrain Tiles (Terrarium), the same elevation as God's Eye.</li></ul>
     <h3>Software</h3><p>three.js (MIT), FastAPI, NumPy, SciPy, rasterio, zarr. Place names: Natural Earth (public domain).</p>`;
 }
 
@@ -1744,6 +1890,7 @@ async function init() {
     ]);
     if (!health.ok) throw new Error(health.detail || "backend not ready");
     Object.assign(state, { health, targets: targets.targets, criteria: criteria.criteria, sources, analogs });
+    if (!state.targets.length) throw new Error('The target catalog is empty. Retry when the local data is available.');
     for (const w of criteria.weights) state.defaults[w.key] = w.weight;
     const hash = readHash();
     const wanted = TARGET_ALIASES[hash.target] || hash.target;
@@ -1782,15 +1929,27 @@ async function init() {
 
     if (hash.target === "custom") chooseTarget(CUSTOM_ID);
     loadingStep(3, `Scoring ${fmtInt(health.candidate_cells)} land cells…`);
-    await runScore();
+    await runScore({ throwOnError: true });
     if (hash.view === "map") setView("map");
     if (hash.layer && state.criteria.some((c) => c.key === hash.layer)) {
       layer.value = hash.layer;
       await setLayer(hash.layer);
     }
-    const site = state.data?.results.find((r) => String(r.rank) === hash.site);
+    // Explicit terrain links retain their shell handoff. Ordinary Finder startup
+    // must not wait on the page turn that is itself waiting for Finder readiness.
+    if (hash.eye === '1') await window.rocketTransition?.ready;
+    const enteringEye = hash.eye === '1' && !window.rocketTransition?.cancelled;
+    const site = hash.site !== undefined
+      ? state.data?.results.find((r) => String(r.rank) === hash.site)
+      : enteringEye ? state.data?.results.find(r => Math.abs(r.lat) <= 84) : null;
     if (site) selectResult(site);
-    if (site && hash.eye === "1") openGodsEye(site, hash.sun in SUN_PRESETS ? hash.sun : null);
+    if (enteringEye) {
+      if (!site) throw new Error(hash.site !== undefined
+        ? 'The linked site is not in these results. Return to Finder to choose another site.'
+        : 'No ranked sites support terrain viewing with these filters. Return to Finder to change the target or filters.');
+      openGodsEye(site, hash.sun in SUN_PRESETS ? hash.sun : null, { arrival: true });
+      writeHash();
+    }
     else if (state.data?.results.length) globe.flyTo(state.data.results[0].lat, state.data.results[0].lon);
     if (hash.tab === "validation") selectTab("validation");
     if (hash.dialog === "method") $("openMethod").click();
@@ -1798,7 +1957,9 @@ async function init() {
     $("loading").classList.add("done");
     ["click", "change"].forEach((ev) => document.addEventListener(ev, () => setTimeout(writeHash, 0)));
     selectTab(hash.target === "custom" ? "target" : "results");
+    requestAnimationFrame(() => window.rocketTransition?.finderReady());
   } catch (err) {
+    window.rocketTransition?.fail(err.message);
     $("loading").classList.add("failed");
     $("loadingText").textContent = `Could not start: ${err.message}. Check that the TerraNova server is running.`;
     $("loadingRetry").hidden = false;
@@ -1820,7 +1981,8 @@ function loadingStep(n, text) {
 // UI updates use replaceState, so hashchange means an externally followed link.
 // Restore the entire shared state, including sites and terrain within one target.
 window.addEventListener("hashchange", () => {
-  if (readHash().target) location.reload();
+  const hash = readHash();
+  if (hash.target || hash.eye === '1') location.reload();
 });
 
-init();
+export const startup = init();

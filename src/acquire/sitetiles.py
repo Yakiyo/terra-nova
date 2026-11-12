@@ -12,7 +12,7 @@ Imagery (fetched by the browser through ``/api/imagery``):
 Everything is cached under ``cache/sitetiles/`` (gitignored). Prefetch the top
 sites for an offline demo:
 
-    python -m src.acquire.sitetiles --top 5
+    python -m src.acquire.sitetiles            # top 20 of every target, as the Finder lists them
 """
 
 from __future__ import annotations
@@ -46,13 +46,17 @@ IMAGERY = {
 DEM_CREDIT = "AWS Terrain Tiles (Terrarium): SRTM, GMTED, ETOPO1 and others"
 
 
+# Highest |latitude| a site view is built for: the mosaic needs tiles north and south of it.
+MAX_SITE_LAT = terrain.MAX_MERCATOR_LAT - 1.0
+
+
 class SiteTileError(ValueError):
     """Raised for a location or tile request that cannot be served."""
 
 
 def mosaic_origin(lat: float, lon: float) -> tuple[int, int]:
     """Top-left tile (x0, y0) of the mosaic around a point."""
-    if abs(lat) > terrain.MAX_MERCATOR_LAT - 1.0:
+    if abs(lat) > MAX_SITE_LAT:
         raise SiteTileError("elevation tiles do not cover latitudes beyond about +/-84 degrees")
     x, y = terrain.lonlat_to_tile(lat, lon, DEM_ZOOM)
     n = 2**DEM_ZOOM
@@ -126,17 +130,12 @@ def main(argv: list[str] | None = None) -> int:
 def _prepare_sites(top: int, terrain_only: bool) -> int:
     from fastapi.testclient import TestClient
 
-    from src.api.main import UI_DEFAULTS, app
+    from src.acquire.finder_sites import finder_sites
+    from src.api.main import app
 
     client = TestClient(app)
-    sites: set[tuple[float, float]] = set()
-    for target in client.get("/api/targets").json()["targets"]:
-        response = client.post(
-            "/api/score", json={**UI_DEFAULTS, "target_id": target["id"], "top_k": top}
-        )
-        response.raise_for_status()
-        body = response.json()
-        sites |= {(r["lat"], r["lon"]) for r in body["results"] if abs(r["lat"]) <= 84}
+    # Exactly the sites the Finder lists (its filters and each target's default weights).
+    sites = {(lat, lon) for lat, lon in finder_sites(top) if abs(lat) <= MAX_SITE_LAT}
 
     def prepare(site: tuple[float, float]) -> bool:
         lat, lon = site

@@ -1,5 +1,13 @@
 # Review: research doc vs mentor build guide vs this repo
 
+> **Superseded (2026-11-12).** This review describes the repository as it was on
+> 2026-09-28. Much of what it lists as missing has since been built: 7 targets
+> (including a lava-tube habitat and Mars ice-rich ground), a 16-site known-analog
+> catalogue with negative controls, robustness and sensitivity checks, the map
+> interface, exports, a hardware test readiness matrix and an EVA traverse planner.
+> The test suite now has 121 tests. For the current state see `README.md` and
+> `docs/WINNING_FEATURES.md`; read the tables below as history.
+
 Written 2026-09-28. Sources compared:
 
 - **MD**: `EVERYTHING you need.md`, the research notes written during initial research.

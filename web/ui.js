@@ -120,6 +120,16 @@ export function closeMenus() {
   return open.length > 0;
 }
 
+/* Save text as a file in the browser's downloads. */
+export function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /* toast(message, kind): info and success hide after 5 s; errors stay until dismissed. */
 export function toast(message, kind = "error") {
   let stack = document.querySelector(".toasts");
