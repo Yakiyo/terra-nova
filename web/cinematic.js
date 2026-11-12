@@ -20,7 +20,7 @@ if (desktop.matches) {
       <section class="cinematic-chapter chapter-moon" id="cinematic-moon"><div class="cinematic-copy cinematic-list"><h2>The Moon</h2><p>Choose a lunar site to inspect its story.</p><div class="cinematic-targets" data-body="Moon"></div></div></section>
       <section class="cinematic-chapter chapter-mars" id="cinematic-mars"><div class="cinematic-copy cinematic-list"><h2>Mars</h2><p>Explore the places shaping future exploration.</p><div class="cinematic-targets" data-body="Mars"></div></div></section>
       <section class="cinematic-chapter chapter-analogs" id="cinematic-analogs"><div class="cinematic-copy cinematic-list"><h2>Other worlds.<br>Closer than you think.</h2><p>These places have hosted real Moon and Mars exploration work. Click a location to travel there.</p><div class="cinematic-analog-list"></div><div class="cinematic-analog-detail" aria-live="polite"></div></div></section>
-      <section class="cinematic-chapter chapter-finale" id="cinematic-finale"><div class="cinematic-copy"><h2>The next discovery<br>starts here.</h2><p>Find a place on Earth that helps us understand another world.</p><a class="cinematic-launch" href="finder.html#eye=1" aria-description="Opens God’s Eye for the highest-ranked terrain-supported site">Take me to Finder</a></div></section>
+      <section class="cinematic-chapter chapter-finale" id="cinematic-finale"><div class="cinematic-copy"><h2>The next discovery<br>starts here.</h2><p>Find a place on Earth that helps us understand another world.</p><a class="cinematic-launch" href="finder.html" aria-description="Opens the Finder globe and ranked Earth locations">Take me to Finder</a></div></section>
     </div>
     <div class="cinematic-blackout" aria-hidden="true"></div>`;
   document.querySelector('.site-header').after(root);
@@ -28,7 +28,23 @@ if (desktop.matches) {
   document.documentElement.classList.remove('cinematic-pending');
   document.querySelector('main#main').id='legacy-main';root.id='main';
 
-  let selectedAnalog = 0, selectedMoon = 0, selectedMars = 0;
+  const chapters = [...root.querySelectorAll('.cinematic-chapter')];
+  const chevron = root.querySelector('.cinematic-scroll svg').outerHTML;
+  chapters.forEach((chapter, index) => {
+    if (chapter.querySelector('.cinematic-scroll')) return;
+    const next = chapters[index + 1];
+    const link = document.createElement('a');
+    link.className = 'cinematic-scroll';
+    link.href = next ? `#${next.id}` : 'finder.html';
+    link.setAttribute('aria-label', next ? `Continue to ${next.querySelector('h2')?.textContent || next.getAttribute('aria-label')}` : 'Open Finder');
+    if (!next) link.dataset.finderLaunch = '';
+    link.innerHTML = chevron;
+    chapter.querySelector('.cinematic-copy').append(link);
+  });
+
+  // The planet scene focuses each body's first target (its list items are links to the Finder).
+  let selectedAnalog = 0;
+  const selectedMoon = 0, selectedMars = 0;
   const targetLists = {Moon:[],Mars:[]};
   const detail = root.querySelector('.cinematic-analog-detail');
   const list = root.querySelector('.cinematic-analog-list');
@@ -51,19 +67,16 @@ if (desktop.matches) {
     const targets = payload.targets || [];
     for (const body of ['Moon','Mars']) {
       const box = root.querySelector(`[data-body="${body}"]`);
-      targetLists[body]=targets.filter(t=>t.body===body).slice(0,3);
-      targetLists[body].forEach((target,i)=>{
+      targetLists[body]=targets.filter(t=>t.body===body);
+      targetLists[body].forEach((target)=>{
         const row=document.createElement('div'); row.className='cinematic-target';
         const image=regionalThumb(body,target);
-        const button=document.createElement('button'); button.type='button'; button.textContent=target.name;
-        button.setAttribute('aria-pressed', String(i===0));
-        button.addEventListener('click',()=>{ if(body==='Moon') selectedMoon=i; else selectedMars=i; box.querySelectorAll('button').forEach((b,j)=>b.setAttribute('aria-pressed',String(j===i)));  });
         const link=document.createElement('a'); link.href=`finder.html#target=${encodeURIComponent(target.id)}`; link.textContent=target.name;link.className='cinematic-site-link';link.setAttribute('aria-label',`Find analogs for ${target.name}`);
         row.append(image,link); box.append(row);
       });
 
     }
-  }).catch(()=>root.querySelectorAll('.cinematic-targets').forEach(box=>box.innerHTML='<p>Target catalog is unavailable. Use View all targets to retry.</p>'));
+  }).catch(()=>root.querySelectorAll('.cinematic-targets').forEach(box=>box.innerHTML='<p>Target catalog is unavailable. <a href="finder.html">Open the Finder</a> to try again.</p>'));
 
   try {
     initPlanetJourney(root, chapter => {

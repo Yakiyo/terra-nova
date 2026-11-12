@@ -49,8 +49,8 @@ Each new target in `data/targets.json` needs, **for every criterion**, a value (
 Earth percentile) plus `dataset_id`, `source_url`, `definition_note` and `confidence`.
 The tests reject anything uncited.
 
-Done: **Malapert Massif**, **Haworth cold trap** and **Gale Crater** are in
-`data/targets.json`. Their terrain values are estimated classes (marked "estimated" in the
+Done: **Malapert Massif**, **Haworth cold trap**, **Gale Crater**, the **Marius Hills
+lava-tube skylight** and **Utopia Planitia ice-rich ground** are in `data/targets.json`. Their terrain values are estimated classes (marked "estimated" in the
 app) until PGDA Product 78 / HiRISE data arrive; Haworth's terrain is "not used".
 
 Still wanted:
@@ -58,7 +58,8 @@ Still wanted:
 1. **Shoemaker cold trap**: Diviner PSR temperatures (Paige et al. 2010, Science).
 2. **Measured temperatures for Gale**: REMS ground temperature (the current values are
    air temperature from the REMS climate table).
-3. **Lava-tube skylight** (Marius Hills pit, 14.09°N 303.23°E): needs a cave layer on
+3. **Lava-tube skylight** (Marius Hills pit, 14.09°N 303.23°E): **done** as `lunar_lava_tube`, using a
+   basaltic-rock layer from GLiM (see `docs/WINNING_FEATURES.md`). Still wanted: a cave layer on
    the Earth side as well.
 
 ## E. Earth data upgrades (Division 4)
@@ -73,7 +74,6 @@ Still wanted:
 ## F. Decisions only the team can make
 
 1. **Product name.** **TerraNova** (locked for Space Apps 2026).
-   It goes in the video on 1 Oct.
 2. **Which archetypes to show on day 1 of the hackathon.** Recommendation: the lunar
    south pole plus PSR cold trap for the Moon, and Jezero plus Gale for Mars.
 3. **Whether to keep Wikipedia** as the citation for the known-analog catalog, or

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import Lenis from './vendor/lenis/lenis.mjs';
+import { createChapterNavigation } from './chapter-navigation.js';
 
 // Presentation geometry only. Scientific measurements remain in src/compute.
 export function surfacePoint(lat, lon, radius = 1) {
@@ -162,7 +162,7 @@ export function initPlanetJourney(root, getSelection) {
 
   const chapters = [...root.querySelectorAll('.cinematic-chapter')];
   const copies = chapters.map(c => c.querySelector('.cinematic-copy'));
-  let tops = [], halfWidth = 5, lenis, raf, last = 0, failed = false, inFlight = false;
+  let tops = [], halfWidth = 5, raf, last = 0, failed = false;
   const pointer = new THREE.Vector2(), pointerAim = new THREE.Vector2();
   let spin = 0;
   const movePointer = event => { pointerAim.set(event.clientX / innerWidth * 2 - 1, event.clientY / innerHeight * 2 - 1); };
@@ -178,71 +178,26 @@ export function initPlanetJourney(root, getSelection) {
     tops = chapters.map(c => c.getBoundingClientRect().top + scrollY);
   };
   resize(); addEventListener('resize', resize);
-  const configureScroll = () => {
-    lenis?.destroy();
-    lenis = reduced.matches || failed ? null : new Lenis({autoRaf: false, anchors: false, lerp: .045, wheelMultiplier: .55, syncTouch: false, virtualScroll: event => { event.deltaY = Math.max(-180, Math.min(180, event.deltaY)); return true; }});
-    if (inFlight) lenis?.stop();
-    requestAnimationFrame(resize);
-  };
-  configureScroll(); reduced.addEventListener('change', configureScroll);
-  let keyboardFocus = false;
-  const trackKeyboard = event => { keyboardFocus = event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey; };
-  const clearKeyboard = () => { keyboardFocus = false; };
-  document.addEventListener('keydown', trackKeyboard);
-  document.addEventListener('keyup', clearKeyboard);
-  window.addEventListener('blur', clearKeyboard);
-  const syncVisibility = () => {
-    clearKeyboard();
-    // Cancel unfinished easing at the visible position; never replay it on return.
-    lenis?.scrollTo(window.scrollY, {immediate: true, force: true});
-    last = 0;
-  };
-  document.addEventListener('visibilitychange', syncVisibility);
-  const nav = e => e.detail.open || inFlight ? lenis?.stop() : lenis?.start();
-  document.addEventListener('navigation-state', nav);
-  const flight = e => { inFlight = e.detail.active; if (inFlight) lenis?.stop(); else lenis?.start(); };
-  document.addEventListener('rocket-flight', flight);
-  // Chapter anchors land in the readable hold, rather than stopping inside a blackout.
-  const revealChapter = (chapter, immediate = true) => {
-    const i = chapters.indexOf(chapter);
-    if (i < 0) return;
-    const y = tops[i] + (reduced.matches ? 0 : chapter.offsetHeight * .28);
-    if (lenis) lenis.scrollTo(y, {immediate, duration: 1.8}); else window.scrollTo(0, y);
-  };
-  root.addEventListener('click', event => {
-    const anchor = event.target.closest('a[href^="#cinematic-"]');
-    if (!anchor) return;
-    const chapter = root.querySelector(anchor.getAttribute('href'));
-    if (chapter) { event.preventDefault(); revealChapter(chapter, false); }
-  });
-  // Native Tab can reach the next section even while its visual entrance is masked.
-  root.addEventListener('focusin', event => {
-    if (!keyboardFocus || document.hidden) return;
-    clearKeyboard();
-    const chapter = event.target.closest('.cinematic-chapter');
-    if (chapter && Number(chapter.querySelector('.cinematic-copy').style.opacity) < .9) revealChapter(chapter);
-  });
-  const hashChapter = chapters.find(c => `#${c.id}` === location.hash);
-  if (hashChapter) requestAnimationFrame(() => revealChapter(hashChapter));
+  const navigation = createChapterNavigation(root, reduced);
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
     const dt = Math.min((now - last) / 1000 || 0, .05); last = now;
     if (document.hidden || failed) return;
-    lenis?.raf(now);
+    navigation.raf(now);
     if (!reduced.matches) spin += dt * .16;
     pointer.lerp(reduced.matches ? new THREE.Vector2() : pointerAim, 1 - Math.exp(-dt * 4));
     let index = 0;
     while (index < chapters.length - 1 && scrollY >= tops[index + 1]) index++;
     const raw = index < chapters.length - 1 ? clamp((scrollY - tops[index]) / (tops[index + 1] - tops[index])) : clamp((scrollY - tops[index]) / innerHeight);
     // Exit -> full black hold -> scene swap -> entrance. Never crossfade two planets.
-    const arrive = index === 0 || reduced.matches ? 1 : ease((raw - .035) / .19);
-    const leave = index === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .70) / .23);
+    const arrive = index === 0 || reduced.matches ? 1 : ease(raw / .20);
+    const leave = index === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .55) / .45);
     const visibility = arrive * (1 - leave);
     blackout.style.opacity = String(1 - visibility);
     root.dataset.chapter = String(index);
     copies.forEach((copy, i) => {
-      copy.style.opacity = reduced.matches ? String(i === index ? 1 : 0) : String(i === index ? (index === 0 ? 1 : ease((raw - .12) / .16)) * (index === chapters.length - 1 ? 1 : 1 - ease((raw - .65) / .18)) : 0);
+      copy.style.opacity = reduced.matches ? String(i === index ? 1 : 0) : String(i === index ? (index === 0 ? 1 : ease((raw - .04) / .20)) * (index === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
       copy.style.pointerEvents = Number(copy.style.opacity) > .1 ? '' : 'none';
     });
     for (const w of Object.values(worlds)) w.group.visible = false;
@@ -309,19 +264,13 @@ export function initPlanetJourney(root, getSelection) {
   }
   raf = requestAnimationFrame(frame);
   canvas.addEventListener('webglcontextlost', event => {
-    event.preventDefault(); failed = true; lenis?.destroy(); root.classList.add('cinematic-no-webgl');
+    event.preventDefault(); failed = true; navigation.destroy(); root.classList.add('cinematic-no-webgl');
     copies.forEach(copy => { copy.style.opacity = '1'; copy.style.pointerEvents = ''; });
   });
   addEventListener('pagehide', () => {
-    cancelAnimationFrame(raf); lenis?.destroy();
+    cancelAnimationFrame(raf); navigation.destroy();
     removeEventListener('pointermove', movePointer); document.documentElement.removeEventListener('pointerleave', resetPointer);
-    removeEventListener('resize', resize); document.removeEventListener('navigation-state', nav);
-    document.removeEventListener('rocket-flight', flight);
-    reduced.removeEventListener('change', configureScroll);
-    document.removeEventListener('keydown', trackKeyboard);
-    document.removeEventListener('keyup', clearKeyboard);
-    window.removeEventListener('blur', clearKeyboard);
-    document.removeEventListener('visibilitychange', syncVisibility);
+    removeEventListener('resize', resize);
     const geometries = new Set(), materials = new Set();
     scene.traverse(object => { if (object.geometry) geometries.add(object.geometry); if (object.material) materials.add(object.material); });
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); renderer.dispose();

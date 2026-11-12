@@ -2,55 +2,60 @@
  * Artwork and viewport geometry are decorative, never scientific measurements.
  * No renderer, remote asset, or application module is needed for the handoff. */
 (() => {
-  const KEY = 'terranova-rocket-handoff';
+  const KEY = 'terranova-page-handoff-v3';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const desktop = matchMedia('(min-width: 1021px), (hover: hover) and (pointer: fine)');
   const params = new URLSearchParams(location.hash.slice(1));
   const isFinder = location.pathname.endsWith('/finder.html');
   const wantsEye = isFinder && params.get('eye') === '1';
-  // Opaque silver hull, inset panels, machined rings, swept fins and red livery.
-  const artwork = `<svg class="rocket-sprite" viewBox="0 0 240 800" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="rocket-metal"><stop stop-color="#35404b"/><stop offset=".16" stop-color="#85939f"/><stop offset=".38" stop-color="#e8eef2"/><stop offset=".56" stop-color="#c5cfd6"/><stop offset=".82" stop-color="#7f8e9c"/><stop offset="1" stop-color="#27323d"/></linearGradient>
-      <linearGradient id="rocket-red"><stop stop-color="#6b0719"/><stop offset=".38" stop-color="#f33450"/><stop offset=".7" stop-color="#d5092b"/><stop offset="1" stop-color="#680e20"/></linearGradient>
-      <linearGradient id="rocket-fin" x2="1" y2="1"><stop stop-color="#cbd6df"/><stop offset="1" stop-color="#35414d"/></linearGradient>
-      <linearGradient id="rocket-exhaust" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f6f3dd"/><stop offset=".3" stop-color="#efa977"/><stop offset="1" stop-color="#d55330" stop-opacity="0"/></linearGradient>
-    </defs>
-    <path d="M105 714Q98 753 120 800Q142 753 135 714Z" fill="url(#rocket-exhaust)"/>
-    <path d="M75 542L18 659L18 702L77 658ZM165 542L222 659L222 702L163 658Z" fill="url(#rocket-fin)" stroke="#475563" stroke-width="2"/>
-    <path d="M18 659L18 702L42 684L43 610ZM222 659L222 702L198 684L197 610Z" fill="url(#rocket-red)"/>
-    <path d="M98 677L91 721Q120 733 149 721L142 677Z" fill="#27323d" stroke="#8a9aa6" stroke-width="3"/>
-    <path d="M120 18C91 64 70 119 70 181V654Q70 686 94 695H146Q170 686 170 654V181C170 119 149 64 120 18Z" fill="url(#rocket-metal)"/>
-    <path d="M120 18C108 37 98 58 91 80Q120 88 149 80C142 58 132 37 120 18Z" fill="url(#rocket-red)"/>
-    <path d="M70 176Q120 184 170 176V205Q120 214 70 205Z" fill="url(#rocket-red)"/>
-    <path d="M72 225H168M72 496H168M72 637H168M76 661H164" fill="none" stroke="#495b6a" stroke-opacity=".55" stroke-width="2"/>
-    <path d="M84 242V474M84 511V622M157 242V474M157 511V622" stroke="#f7fafb" stroke-opacity=".28"/>
-    <rect x="102" y="260" width="36" height="60" rx="18" fill="#3c4b58" stroke="#e2eaf0" stroke-width="4"/>
-    <rect x="108" y="267" width="24" height="46" rx="12" fill="#0c263d"/>
-    <path d="M111 293V279Q111 270 120 270" fill="none" stroke="#99bfd6" stroke-width="3"/>
-    <path d="M114 565L110 690L120 711L130 690L126 565Z" fill="url(#rocket-metal)" stroke="#687887"/>
-    <path d="M111 664L110 690L120 711L130 690L129 664Z" fill="url(#rocket-red)"/>
-    <g fill="#536675"><circle cx="78" cy="236" r="2"/><circle cx="162" cy="236" r="2"/><circle cx="78" cy="486" r="2"/><circle cx="162" cy="486" r="2"/><circle cx="78" cy="628" r="2"/><circle cx="162" cy="628" r="2"/></g>
+  // Decorative storyboard geometry. The curved red boundary travels diagonally
+  // across the viewport; the outlined rocket grows in front of the red surface.
+  const curve = [[[-5,-2],[15,28],[35,27],[50,24]], [[50,24],[53,60],[82,92],[105,103]]];
+  const edgePoints = curve.flatMap(segment => Array.from({length:25}, (_, i) => {
+    const t = i / 24, u = 1 - t;
+    return [0,1].map(axis => u*u*u*segment[0][axis] + 3*u*u*t*segment[1][axis] + 3*u*t*t*segment[2][axis] + t*t*t*segment[3][axis]);
+  }));
+  const clip = (offset, revealing = false) => `polygon(${edgePoints.map(([x,y]) => `${x}% ${y+offset}%`).join(',')},105% ${revealing ? '-150%' : '250%'},-5% ${revealing ? '-150%' : '250%'})`;
+  const paper = `<svg class="page-fold" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <path class="page-shadow" d="M-5 -2C15 28 35 27 50 24C53 60 82 92 105 103"/>
+    <path class="page-crease" d="M-5 -2C15 28 35 27 50 24C53 60 82 92 105 103"/>
   </svg>`;
-  let overlay, sprite, animation, watchdog, unlockFlight, destination, phase = 'idle';
+  const rocket = `<svg class="rocket-sprite" viewBox="0 0 200 200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M58 134C62 81 112 36 177 24C174 88 132 136 80 143Z"/>
+      <circle cx="128" cy="74" r="15"/>
+      <path d="M63 100C40 96 25 111 18 137L58 130M112 137C115 162 91 178 67 184L78 144M61 140L49 153L62 163L76 146"/>
+      <path class="rocket-trail" d="M37 151L21 167M45 170L34 184M19 153L10 162"/>
+    </g>
+  </svg>`;
+  const coveredRocket = 'translate(-50%,-50%) translate(58vw,48vh) scale(1)';
+  const startRocket = 'translate(-50%,-50%) translate(-4vw,104vh) scale(.12)';
+  const endRocket = 'translate(-50%,-50%) translate(140vw,-45vh) scale(1)';
+  let overlay, leaf, fold, sprite, animation, accents = [], watchdog, revealTimer, unlockFlight, destination, phase = 'idle';
+  let finderIsReady = false, animatedArrival = false, arrivalFocused = false;
   let pending = false, cancelled = false, adopted = false, unlockShell, shellAbort, bootTimer;
   let arrivalReady = Promise.resolve();
   const painted = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  const coverScale = () => Math.max(innerWidth / 96, innerHeight / 460) * 1.06;
-  const coveredPose = () => `translateY(0px) rotate(0deg) scale(${coverScale()})`;
   function lockExcept(exempt) {
-    const saved = [...document.body.children].filter(el => el !== exempt && !['SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)).map(el => [el, el.inert]);
+    const saved = [...(document.body?.children || [])].filter(el => el !== exempt && !['SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)).map(el => [el, el.inert]);
     saved.forEach(([el]) => { el.inert = true; });
     return () => saved.forEach(([el, inert]) => { el.inert = inert; });
   }
-  function createOverlay() {
+  function createOverlay(receiving = false) {
+    // Temporarily release the browser gutter so the cover can paint to the
+    // physical edge, while preserving the underlying document's content width.
+    document.documentElement.style.setProperty('--flight-content-width', `${document.documentElement.getBoundingClientRect().width}px`);
     overlay = document.createElement('div');
     overlay.className = 'rocket-overlay';
     overlay.setAttribute('aria-hidden', 'true');
-    overlay.innerHTML = artwork;
+    overlay.innerHTML = `<div class="page-leaf"></div>${paper}${rocket}`;
     // Head bootstrap must paint before body parsing or module evaluation.
     document.documentElement.append(overlay);
-    sprite = overlay.firstElementChild;
+    leaf = overlay.firstElementChild;
+    fold = overlay.querySelector('.page-fold'); sprite = overlay.querySelector('.rocket-sprite');
+    leaf.style.clipPath = clip(receiving ? -120 : 120);
+    fold.style.transform = `translateY(${receiving ? -120 : 120}%)`;
+    sprite.style.transform = receiving ? coveredRocket : startRocket;
     document.documentElement.classList.add('rocket-busy');
   }
   function setPhase(value) {
@@ -59,12 +64,15 @@
   }
   function cleanup() {
     clearTimeout(watchdog);
+    clearTimeout(revealTimer);
     animation?.cancel(); animation = null;
-    overlay?.remove(); overlay = sprite = null;
+    accents.forEach(effect => effect.cancel()); accents = [];
+    overlay?.remove(); overlay = leaf = fold = sprite = null;
     unlockFlight?.(); unlockFlight = null;
     document.documentElement.classList.remove('rocket-busy');
+    document.documentElement.style.removeProperty('--flight-content-width');
     document.dispatchEvent(new CustomEvent('rocket-flight', { detail: { active: false } }));
-    phase = 'idle';
+    phase = 'finished';
   }
   function clearMarker() { try { sessionStorage.removeItem(KEY); } catch { /* storage unavailable */ } }
   function navigateDirect() {
@@ -72,8 +80,15 @@
     clearMarker(); cleanup();
     if (href) location.assign(href);
   }
-  function animate(frames, duration, easing) {
-    animation = sprite.animate(frames, { duration, easing, fill: 'forwards' });
+  function animate(revealing) {
+    const options = {duration: revealing ? 650 : 1000, easing:'cubic-bezier(.45,0,.2,1)', fill:'forwards'};
+    leaf.style.clipPath = clip(120, revealing);
+    fold.style.transform = 'translateY(120%)';
+    animation = leaf.animate([{clipPath:clip(120, revealing)}, {clipPath:clip(-120, revealing)}], options);
+    accents = [
+      fold.animate([{transform:'translateY(120%)'}, {transform:'translateY(-120%)'}], options),
+      sprite.animate([{transform:revealing ? coveredRocket : startRocket}, {transform:revealing ? endRocket : coveredRocket}], options),
+    ];
     return animation.finished;
   }
   async function launch(link) {
@@ -81,23 +96,18 @@
     if (reduced.matches || !desktop.matches) return navigateDirect();
     try {
       // Test storage before hiding anything; the receiver consumes this exact URL.
-      sessionStorage.setItem(KEY, JSON.stringify({ destination, created: Date.now() }));
+      sessionStorage.setItem(KEY, JSON.stringify({ version: 3, destination, created: Date.now() }));
       createOverlay(); unlockFlight = lockExcept(null);
       document.dispatchEvent(new CustomEvent('rocket-flight', { detail: { active: true } }));
-      setPhase('approach');
+      setPhase('covering');
       watchdog = setTimeout(navigateDirect, 3000);
-      const startScale = Math.min(innerWidth / 800, innerHeight / 1100);
-      await animate([
-        { transform: `translateY(${innerHeight * .8}px) rotate(-14deg) scale(${startScale})` },
-        { transform: `translateY(${innerHeight * .1}px) rotate(-7deg) scale(${startScale * 2})`, offset: .48 },
-        { transform: coveredPose() },
-      ], 800, 'cubic-bezier(.55,.02,.82,.45)');
+      await animate(false);
       if (!overlay) return;
-      // Retire the scaled compositor bitmap and paint the SVG at its final size.
-      // The receiver starts from this same sharp, static covered pose.
-      sprite.style.transform = coveredPose();
-      sprite.style.willChange = 'auto';
+      leaf.style.clipPath = clip(-120);
+      fold.style.transform = 'translateY(-120%)';
+      sprite.style.transform = coveredRocket;
       animation.cancel(); animation = null;
+      accents.forEach(effect => effect.cancel()); accents = [];
       setPhase('covered');
       await painted();
       if (!overlay) return;
@@ -105,25 +115,34 @@
     } catch { navigateDirect(); }
   }
   function focusArrival() {
+    if (animatedArrival && !wantsEye) {
+      if (!finderIsReady || arrivalFocused || overlay || document.activeElement !== document.body) return;
+      const results = document.getElementById('results');
+      if (results) { results.tabIndex = -1; results.focus({ preventScroll: true }); arrivalFocused = true; }
+      return;
+    }
     const root = document.getElementById('godseye');
     if (root && !root.hidden && !cancelled) root.focus({ preventScroll: true });
   }
   async function depart() {
+    if (phase === 'revealing') return;
     if (!overlay) { focusArrival(); return; }
+    clearTimeout(revealTimer); clearTimeout(watchdog);
     if (reduced.matches) { cleanup(); focusArrival(); return; }
+    setPhase('revealing');
     try {
-      unlockFlight = lockExcept(null);
-      sprite.style.transform = coveredPose();
+      unlockFlight ??= lockExcept(null);
       await painted();
       if (!overlay) return;
-      setPhase('departure');
       watchdog = setTimeout(() => { cleanup(); focusArrival(); }, 1500);
-      await animate([
-        { transform: coveredPose() },
-        { transform: `translateY(${-370 * coverScale() - innerHeight * .6}px) rotate(0deg) scale(${coverScale()})` },
-      ], 500, 'cubic-bezier(.4,0,.8,.3)');
+      await animate(true);
     } catch { /* Motion must never prevent arrival. */ }
     cleanup(); focusArrival();
+  }
+  function finderReady() {
+    finderIsReady = true;
+    // Do not return a promise to application startup: readiness flows one way.
+    if (animatedArrival && !wantsEye) void depart();
   }
   function cancelArrival(event) {
     if (!pending) return;
@@ -139,6 +158,7 @@
     document.querySelector('.site-menu-trigger')?.focus({ preventScroll: true });
   }
   function fail(message) {
+    if (animatedArrival) cleanup();
     if (!pending || cancelled || adopted) return;
     clearTimeout(bootTimer);
     const root = document.getElementById('godseye');
@@ -149,6 +169,15 @@
     document.getElementById('geArrivalRetry').hidden = false;
   }
   function prepareArrival() {
+    if (animatedArrival && !wantsEye) {
+      unlockFlight ??= lockExcept(null);
+      // Give the first real frame a chance to arrive, then expose the existing
+      // loading UI instead of holding an unresponsive red screen indefinitely.
+      clearTimeout(watchdog);
+      revealTimer = setTimeout(() => void depart(), 1500);
+      if (finderIsReady) void depart();
+      return;
+    }
     if (!wantsEye || pending || cancelled) return;
     pending = true;
     const root = document.getElementById('godseye');
@@ -183,22 +212,26 @@
     document.getElementById('geArrival').hidden = true;
     return true;
   }
-  window.rocketTransition = { prepareArrival, fail, adopt, get ready() { return arrivalReady; }, get pending() { return pending && !cancelled; }, get cancelled() { return cancelled; } };
+  window.rocketTransition = { prepareArrival, finderReady, fail, adopt, get ready() { return arrivalReady; }, get pending() { return pending && !cancelled; }, get cancelled() { return cancelled; } };
   // A recent same-tab, normal navigation may restore the covered pose once.
   try {
+    sessionStorage.removeItem('terranova-rocket-handoff');
+    sessionStorage.removeItem('terranova-page-handoff-v2');
     const raw = sessionStorage.getItem(KEY); sessionStorage.removeItem(KEY);
     const marker = raw && JSON.parse(raw);
     const navigation = performance.getEntriesByType('navigation')[0];
-    if (wantsEye && marker?.destination === location.href && Date.now() - marker.created < 10000 && navigation?.type === 'navigate' && !reduced.matches) {
-      createOverlay(); sprite.style.transform = coveredPose(); setPhase('covered');
+    const age = Date.now() - marker?.created;
+    if (isFinder && marker?.version === 3 && marker.destination === location.href && age >= 0 && age < 10000 && navigation?.type === 'navigate' && !reduced.matches) {
+      animatedArrival = true;
+      createOverlay(true); setPhase('covered');
       watchdog = setTimeout(() => { cleanup(); focusArrival(); }, 3000);
     }
   } catch { /* Native navigation remains available without storage. */ }
   document.addEventListener('click', event => {
-    const link = event.target.closest?.('a.cinematic-launch');
-    if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === '_blank') return;
+    const link = event.target.closest?.('a.cinematic-launch, a[data-finder-launch]');
+    if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || (link.target && link.target !== '_self') || link.hasAttribute('download') || link.origin !== location.origin) return;
     event.preventDefault();
-    if (phase !== 'idle') return;
+    if (phase !== 'idle' && phase !== 'finished') return;
     launch(link);
   });
   reduced.addEventListener('change', () => {

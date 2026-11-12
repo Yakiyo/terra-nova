@@ -11,6 +11,10 @@ import { ClimateSim, thermalGradient } from "./climate.js";
 import { terrainData } from "./terrain-data.js";
 import { breadcrumbs } from "./navigation.js";
 import { escapeHtml as esc, decodeFloat32 as decode } from './format.js';
+import { fetchReadiness, readinessHtml } from "./readiness.js";
+import { download, toast } from "./ui.js";
+import { MAX_WAYPOINTS, defaultName, fetchTraverse, profileChart, totalsList, legsList, routeGeojson, fmtKm } from "./traverse-view.js";
+import { dossierHtml, slug } from "./dossier.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DEG = Math.PI / 180;
@@ -88,6 +92,32 @@ function gpsPin() {
   return sprite;
 }
 
+/* A numbered waypoint marker in the tool colour, drawn on a canvas, constant size on screen. */
+function waypointSprite(n) {
+  const s = 96;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const g = c.getContext("2d");
+  g.beginPath();
+  g.arc(s / 2, s / 2, s / 2 - 6, 0, Math.PI * 2);
+  g.fillStyle = "#7cb7ff";
+  g.fill();
+  g.lineWidth = 6;
+  g.strokeStyle = "#050507";
+  g.stroke();
+  g.fillStyle = "#050507";
+  g.font = "700 50px Roboto, system-ui, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(String(n), s / 2, s / 2 + 3);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false }));
+  sprite.scale.set(0.032, 0.032, 1);
+  sprite.renderOrder = 31;
+  return sprite;
+}
+
 function exagLabel(x) {
   return x === 1 ? "1× true scale" : `${x.toFixed(1)}× exaggerated`;
 }
@@ -144,8 +174,10 @@ export class GodsEye {
     this.scene.add(this.probeMarker);
     this.pin = gpsPin();
     this.scene.add(this.pin);
-    this.profilePoints = [];
-    this.profileMode = false;
+    this.waypoints = [];       // [{u, v, lat, lon, name}] picked on the terrain
+    this.route = null;         // the last /api/traverse result for those waypoints
+    this.routeMarkers = [];
+    this.traverseMode = false;
     this.sunPlaying = false;
 
     new ResizeObserver(() => this._resize()).observe(root);
@@ -198,7 +230,20 @@ export class GodsEye {
     }));
     $("geCell").addEventListener("change", (e) => { if (this.cellLine) this.cellLine.visible = e.target.checked; });
     $("geContours").addEventListener("change", (e) => { this.contour.uOn.value = e.target.checked ? 1 : 0; });
-    $("geProfileBtn").addEventListener("click", () => this._toggleProfileMode());
+    $("geTraverseBtn").addEventListener("click", () => this._toggleTraverseMode());
+    $("geAddPin").addEventListener("click", () => { const [u, v] = this.data.site; this._addWaypoint(u, v); });
+    $("geClearRoute").addEventListener("click", () => this._clearRoute());
+    $("geDossier").addEventListener("click", () => this.exportDossier());
+    $("geWaypoints").addEventListener("input", (e) => {
+      const i = Number(e.target.dataset.wp);
+      if (!Number.isInteger(i) || !this.waypoints[i]) return;
+      this.waypoints[i].name = e.target.value.slice(0, 40);
+      this._renameRoute();
+    });
+    $("geWaypoints").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-remove]");
+      if (b) this._removeWaypoint(Number(b.dataset.remove));
+    });
     $("geSunPlay").addEventListener("click", () => {
       this.climate.manualSun();
       this._setSunPlaying(!this.sunPlaying);
@@ -226,8 +271,14 @@ export class GodsEye {
     // A modal view: Tab cycles through its own controls only.
     this.root.tabIndex = -1;
     this.root.addEventListener("keydown", (e) => {
+      if (e.key === "Backspace" && this.traverseMode && this.waypoints.length && !e.target.closest("input, textarea, select")) {
+        e.preventDefault();
+        this._removeWaypoint(this.waypoints.length - 1);
+        return;
+      }
       if (e.key !== "Tab") return;
-      const items = [...this.root.querySelectorAll("button, input, select, a[href], [tabindex='0']")]
+      const items = [...this.root.querySelectorAll("button, input, select, a[href], [tabindex='0']"),
+        ...document.querySelectorAll("#tourCaption:not([hidden]) button")]   // the guided tour stays reachable
         .filter((el) => !el.disabled && el.offsetParent !== null);
       if (!items.length) return;
       const first = items[0], last = items[items.length - 1];
@@ -278,9 +329,8 @@ export class GodsEye {
     this._setSunPlaying(false);
     $("geError").hidden = true;
     this.drive = null;
-    this.profilePoints = [];
-    this._clearProfile();
-    this._toggleProfileMode(false);
+    this._clearRoute();
+    this._toggleTraverseMode(false);
     this.probeMarker.visible = false;
     $("geProbe").hidden = true;
     $("geToolHint").textContent = "Click the terrain to probe any point.";
@@ -322,6 +372,7 @@ export class GodsEye {
       this.root.focus({ preventScroll: true });
     }
     this.context = context;
+    this.site = site;
     $("geTitle").textContent = site.label?.text || "Selected site";
     const trail = [...document.querySelectorAll("#finderBreadcrumbs li")].map(item => {
       const link = item.querySelector("a");
@@ -344,11 +395,11 @@ export class GodsEye {
       if (!this.open || generation !== this.generation) return;
       const reuse = this.builtData === data;
       this.data = data;
-      this.profilePoints = [];
-      this._clearProfile();
+      this.readiness = null;
+      this._clearRoute();
       this.probeMarker.visible = false;
       $("geProbe").hidden = true;
-      this._toggleProfileMode(false);
+      this._toggleTraverseMode(false);
       this._showExaggeration();
       if (!reuse) {
         this.builtData = null;
@@ -361,6 +412,7 @@ export class GodsEye {
       }
       this.climate.setSite(site, context.values);
       this._renderStats(data);
+      this._loadReadiness(site, generation);
       this.root.dataset.status = "ready";
       this.root.querySelector(".ge-panel").inert = false;
       $("geCredit").innerHTML = `Terrain: ${esc(data.credits.elevation)} · Imagery: ${esc(data.credits.imagery)} (${esc(data.imagery.s2.licence)})`;
@@ -377,6 +429,19 @@ export class GodsEye {
       $("geStatus").textContent = "";
       this._showError(err.message, () => this.show(site, context));
     }
+  }
+
+  /* Hardware test readiness on the site terrain (src/compute/qualification.py). */
+  _loadReadiness(site, generation) {
+    const box = $("geReadiness");
+    box.innerHTML = `<p class="hint">Checking which systems could be tested here…</p>`;
+    fetchReadiness(site.lat, site.lon, { terrain: true }).then((q) => {
+      if (generation !== this.generation) return;
+      this.readiness = q;
+      box.innerHTML = readinessHtml(q);
+    }).catch(() => {
+      if (generation === this.generation) box.innerHTML = `<p class="hint">Readiness is unavailable right now.</p>`;
+    });
   }
 
   /* A visible explanation in the middle of the screen while there is no terrain to show. */
@@ -396,6 +461,8 @@ export class GodsEye {
   close() {
     if (!this.open) return;
     this.open = false;
+    this._setSunPlaying(false);
+    this.drive = null;
     this.generation = (this.generation || 0) + 1;
     $("geGuide").hidden = true;
     this.climate.setPlaying(false);
@@ -420,10 +487,10 @@ export class GodsEye {
     this.closeTimer = setTimeout(done, 400);   // in case the transition does not fire
   }
 
-  /* Esc: close the topmost thing first (guide, profile tool), then the view. */
+  /* Esc: close the topmost thing first (guide, traverse tool), then the view. */
   escape() {
     if (!$("geGuide").hidden) { $("geGuideOk").click(); return; }
-    if (this.profileMode) { this._toggleProfileMode(false); return; }
+    if (this.traverseMode) { this._toggleTraverseMode(false); return; }
     this.close();
   }
 
@@ -481,6 +548,7 @@ export class GodsEye {
     this.slopeSpacing = spacing;
     $("geElevLo").textContent = `${Math.round(eLo).toLocaleString("en-US")} m`;
     $("geElevHi").textContent = `${Math.round(eHi).toLocaleString("en-US")} m`;
+    $("geSlopeLimit").textContent = `${data.stats.trafficable_deg}° rover limit`;
     const step = niceStep((hi - lo) / 14);
     this.contour.uInterval.value = step;
     this.contour.uBase.value = lo;
@@ -589,7 +657,7 @@ export class GodsEye {
 
   _buildOverlays() {
     this._buildSkirt();
-    if (this.profilePoints.length === 2) this._drawProfile();
+    this._drawRoute3d();
     if (this.cellLine) {
       this.scene.remove(this.cellLine);
       this.cellLine.geometry.dispose();
@@ -608,7 +676,7 @@ export class GodsEye {
     edge(se[0], se[1], nw[0], se[1]);
     edge(nw[0], se[1], nw[0], nw[1]);
     this.cellLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: 0xe03c31, transparent: true, opacity: 0.95, depthTest: true }));
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: true }));
     this.cellLine.visible = $("geCell").checked;
     this.scene.add(this.cellLine);
 
@@ -748,6 +816,11 @@ export class GodsEye {
   _renderStats(data) {
     const c = data.stats.cell || data.stats.area;
     const pct = (x) => `${Math.round(x * 100)}%`;
+    const coverage = data.stats.cell_coverage ?? 1;
+    // Near the poles the tile block spans less latitude than the 0.5 degree cell.
+    const partial = coverage < 0.995
+      ? `<p class="notice ge-coverage">This 3D block covers ${pct(coverage)} of the scored cell (map tiles shrink towards the poles). The cell figures use that part.</p>`
+      : "";
     const t = data.target_slope;
     let compare = "";
     if (t && t.measured_value !== null && t.measured_value !== undefined) {
@@ -755,7 +828,7 @@ export class GodsEye {
         at ${esc(t.baseline || "a finer scale")}. Slopes measured over shorter distances read steeper, so compare
         with care: this cell is <b>${c.slope_mean.toFixed(1)}°</b> on average at ${data.stats.slope_baseline_m} m.</p>`;
     }
-    $("geStats").innerHTML = `
+    $("geStats").innerHTML = `${partial}
       <div class="ge-stat"><span>Elevation in the cell</span><b class="num">${Math.round(c.elevation_min).toLocaleString("en-US")}–${Math.round(c.elevation_max).toLocaleString("en-US")} m</b></div>
       <div class="ge-stat"><span>Relief in the cell</span><b class="num">${Math.round(c.relief)} m</b></div>
       <div class="ge-stat"><span>Mean slope</span><b class="num">${c.slope_mean.toFixed(1)}°</b></div>
@@ -765,12 +838,12 @@ export class GodsEye {
       <div class="ge-stat wide"><span>Rover-trafficable (under ${data.stats.trafficable_deg}°)</span>
         <b class="num">${pct(c.share_under_15)}</b>
         <div class="bar" role="img" aria-label="${pct(c.share_under_15)} trafficable"><i style="width:${(c.share_under_15 * 100).toFixed(1)}%"></i></div></div>
-      <details class="ge-section"><summary>Measurement scale</summary><p class="hint">Measured on ${data.stats.slope_baseline_m} m elevation pixels inside the scored 0.5° cell (red outline).
-        The probe, profile and Slope colours use the ${Math.round(data.ground_size_m / 255)} m display grid, so they read a little gentler.</p>
+      <details class="ge-section"><summary>Measurement scale</summary><p class="hint">Measured on ${data.stats.slope_baseline_m} m elevation pixels inside the scored 0.5° cell (white outline).
+        The probe and Slope colours use the ${Math.round(data.ground_size_m / 255)} m display grid, so they read a little gentler. Traverse numbers use the full ${data.stats.slope_baseline_m} m pixels.</p>
       ${compare}</details><a class="ge-stats-source" href="${esc(data.provenance.source_url)}" data-dataset-id="${esc(data.provenance.dataset_id)}" target="_blank" rel="noopener">${esc(data.provenance.dataset_id)} · terrain source</a>`;
   }
 
-  /* --------------------------------------------------- probe + profile */
+  /* --------------------------------------------------- probe + traverse */
 
   _uvToLatLon(u, v) {
     const b = this.data.bounds;
@@ -800,17 +873,8 @@ export class GodsEye {
     if (!hit) return;
     const u = hit.point.x / this.sizeKm + 0.5;
     const v = hit.point.z / this.sizeKm + 0.5;
-    if (this.profileMode) {
-      this.profilePoints.push([u, v]);
-      if (this.profilePoints.length === 1) $("geToolHint").textContent = "Now click the end point.";
-      if (this.profilePoints.length === 2) {
-        this._drawProfile();
-        this._toggleProfileMode(false);
-      }
-      this._probe(u, v, hit.point);
-      return;
-    }
     this._probe(u, v, hit.point);
+    if (this.traverseMode) this._addWaypoint(u, v);
   }
 
   _probe(u, v, point) {
@@ -824,111 +888,331 @@ export class GodsEye {
     const temp = this.climate.tempAt(u, v);
     const tempLine = temp === null ? "" : `<br><b>${Math.round(temp) || 0} °C</b> ground now <small>(simulated, see Climate)</small>`;
     box.innerHTML = `<b>${Math.round(this._elevationAt(u, v))} m</b> elevation · <b>${slope.toFixed(1)}°</b> slope
-      <span class="${slope >= 15 ? "warn" : "ok"}">${slope >= 15 ? "too steep for a rover" : "drivable"}</span><br>
+      <span class="${slope >= this.data.stats.trafficable_deg ? "warn" : "ok"}">${slope >= this.data.stats.trafficable_deg ? "too steep for a rover" : "drivable"}</span><br>
       <small>${Math.abs(lat).toFixed(3)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(3)}°${lon >= 0 ? "E" : "W"} ·
       slope over ${Math.round(this.slopeSpacing)} m</small>${tempLine}`;
   }
 
-  _toggleProfileMode(force) {
-    this.profileMode = force ?? !this.profileMode;
-    $("geProfileBtn").setAttribute("aria-pressed", String(this.profileMode));
-    if (this.profileMode) {
-      this.profilePoints = [];
-      this._clearProfile();
-      $("geToolHint").textContent = "Click the start point on the terrain.";
-    } else if (this.profilePoints.length < 2) {
-      $("geToolHint").textContent = "Click the terrain to probe any point.";
-    } else {
-      $("geToolHint").textContent = "Profile drawn. Measure again, or drive it.";
-    }
+  _toggleTraverseMode(force) {
+    this.traverseMode = force ?? !this.traverseMode;
+    $("geTraverseBtn").setAttribute("aria-pressed", String(this.traverseMode));
+    this.canvas.classList.toggle("placing", this.traverseMode);
+    this._routeHint();
+    this._renderWaypointList();
   }
 
-  _clearProfile() {
-    for (const obj of [this.profileLine, this.rover]) {
+  _routeHint() {
+    const n = this.waypoints.length;
+    let text = "Click the terrain to probe any point.";
+    if (this.traverseMode) {
+      text = n >= MAX_WAYPOINTS
+        ? `The route has the maximum ${MAX_WAYPOINTS} waypoints. Remove one to add another. Esc to finish.`
+        : `Click the terrain to add ${defaultName(n)}. Backspace removes the last point, Esc finishes.`;
+    } else if (n >= 2) {
+      text = "Route planned. Press Plan a traverse to edit it, or drive it and export the dossier.";
+    }
+    $("geToolHint").textContent = text;
+  }
+
+  _addWaypoint(u, v) {
+    if (!this.data || this.waypoints.length >= MAX_WAYPOINTS) { this._routeHint(); return; }
+    const cu = Math.min(0.9995, Math.max(0.0005, u)), cv = Math.min(0.9995, Math.max(0.0005, v));
+    const { lat, lon } = this._uvToLatLon(cu, cv);
+    this.waypoints.push({ u: cu, v: cv, lat, lon, name: defaultName(this.waypoints.length) });
+    this._routeChanged();
+  }
+
+  _removeWaypoint(i) {
+    if (!this.waypoints[i]) return;
+    this.waypoints.splice(i, 1);
+    this._routeChanged();
+  }
+
+  _clearRoute() {
+    this.routeAbort?.abort();
+    this.waypoints = [];
+    this.route = null;
+    this.drive = null;
+    for (const obj of [this.routeLine, this.rover]) {
       if (!obj) continue;
       this.scene.remove(obj);
       obj.geometry.dispose();
       obj.material.dispose();
     }
-    this.profileLine = this.rover = null;
-    this.drive = null;
+    this.routeLine = this.rover = null;
+    this.routePath = null;
+    for (const m of this.routeMarkers) { this.scene.remove(m); m.material.map.dispose(); m.material.dispose(); }
+    this.routeMarkers = [];
     $("geProfile").hidden = true;
+    $("geProfile").innerHTML = "";
+    this._renderWaypointList();
+    this._routeHint();
   }
 
-  _drawProfile() {
-    const [[u0, v0], [u1, v1]] = this.profilePoints;
-    const n = 200;
-    const pts = [];
-    const samples = [];
-    const groundKm = Math.hypot(u1 - u0, v1 - v0) * this.sizeKm;
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      const u = u0 + (u1 - u0) * t;
-      const v = v0 + (v1 - v0) * t;
-      pts.push(this._toWorld(u, v, 0.05 * this.exaggeration + 0.03));
-      samples.push({ d: groundKm * t, e: this._elevationAt(u, v), u, v });
-    }
-    for (const obj of [this.profileLine]) if (obj) { this.scene.remove(obj); obj.geometry.dispose(); obj.material.dispose(); }
-    this.profileLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x7cb7ff }));
-    this.scene.add(this.profileLine);
-    this.profilePath = pts;
-    this.profileSamples = samples;
-
-    let maxGrade = 0, steep = 0, climb = 0, descent = 0;
-    for (let i = 1; i < samples.length; i++) {
-      const dz = samples[i].e - samples[i - 1].e;
-      const dx = (samples[i].d - samples[i - 1].d) * 1000;
-      const grade = Math.atan2(Math.abs(dz), dx) / DEG;
-      maxGrade = Math.max(maxGrade, grade);
-      if (grade >= 15) steep += dx;
-      if (dz > 0) climb += dz; else descent -= dz;
-    }
-    const es = samples.map((p) => p.e);
-    const lo = Math.min(...es), hi = Math.max(...es);
-    const W = 268, Hh = 96, pad = 4;
-    const x = (d) => pad + (d / (groundKm || 1)) * (W - 2 * pad);
-    const y = (e) => Hh - pad - ((e - lo) / (hi - lo || 1)) * (Hh - 2 * pad - 10);
-    const line = samples.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)},${y(p.e).toFixed(1)}`).join("");
+  /* Waypoints changed: redraw markers and a provisional line now, then measure on the server. */
+  _routeChanged() {
+    this.routeAbort?.abort();
+    this.route = null;
+    this.drive = null;
+    this._renderWaypointList();
+    this._drawRoute3d();
+    this._routeHint();
     const box = $("geProfile");
+    if (this.waypoints.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = `<p class="hint">Measuring the route on the elevation tiles…</p>`;
+    const controller = this.routeAbort = new AbortController();
+    const generation = this.generation;
+    fetchTraverse(this.site, this.waypoints, controller.signal).then((route) => {
+      if (controller.signal.aborted || generation !== this.generation) return;
+      this.route = route;
+      this._renameRoute(false);   // keep any renaming typed while the request ran
+      this._drawRoute3d();
+      this._renderRoute();
+    }).catch((err) => {
+      if (controller.signal.aborted || generation !== this.generation) return;
+      box.innerHTML = `<p class="hint">${esc(err.message)}</p>`;
+    });
+  }
+
+  _renderWaypointList() {
+    const list = $("geWaypoints");
+    $("geRoute").hidden = !this.traverseMode && !this.waypoints.length;
+    $("geAddPin").disabled = !this.data || this.waypoints.length >= MAX_WAYPOINTS;
+    $("geClearRoute").disabled = !this.waypoints.length;
+    // Keep focus in a name field that is being edited.
+    const focused = list.contains(document.activeElement) ? document.activeElement.dataset.wp : undefined;
+    list.innerHTML = this.waypoints.map((w, i) => {
+      const along = this.route?.waypoints[i] ? fmtKm(this.route.waypoints[i].d_km) : "";
+      return `<li><span class="wp-num" aria-hidden="true">${i + 1}</span>
+        <input type="text" value="${esc(w.name)}" maxlength="40" data-wp="${i}" aria-label="Name of waypoint ${i + 1}">
+        <span class="num wp-along">${along}</span>
+        <button class="icon-button small" type="button" data-remove="${i}" aria-label="Remove waypoint ${i + 1}, ${esc(w.name)}"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button></li>`;
+    }).join("");
+    if (focused !== undefined) {
+      const input = list.querySelector(`[data-wp="${focused}"]`);
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
+
+  /* Names are labels only: update the measured route in place, without measuring again. */
+  _renameRoute(render = true) {
+    if (!this.route) return;
+    this.route.waypoints.forEach((w, i) => { if (this.waypoints[i]) w.name = this.waypoints[i].name.trim() || defaultName(i); });
+    this.route.legs.forEach((l, i) => { l.from = this.route.waypoints[i].name; l.to = this.route.waypoints[i + 1].name; });
+    if (render) this._renderRoute(false);
+  }
+
+  /* Markers, and the route line coloured by the server's terrain slope (blue, red over the limit). */
+  _drawRoute3d() {
+    if (!this.mesh) return;
+    for (const m of this.routeMarkers) { this.scene.remove(m); m.material.map.dispose(); m.material.dispose(); }
+    const lift = 0.05 * this.exaggeration + 0.03;
+    this.routeMarkers = this.waypoints.map((w, i) => {
+      const m = waypointSprite(i + 1);
+      m.position.copy(this._toWorld(w.u, w.v, lift));
+      this.scene.add(m);
+      return m;
+    });
+    if (this.routeLine) { this.scene.remove(this.routeLine); this.routeLine.geometry.dispose(); this.routeLine.material.dispose(); this.routeLine = null; }
+    this.routePath = null;
+    if (this.waypoints.length < 2) return;
+    const pts = [], colours = [];
+    const blue = new THREE.Color(0x7cb7ff), red = new THREE.Color(0xf21d38);
+    if (this.route) {
+      const s = this.route.samples;
+      const step = Math.max(1, Math.ceil(s.u.length / 3000));
+      const idx = [];
+      for (let i = 0; i < s.u.length; i += step) idx.push(i);
+      if (idx[idx.length - 1] !== s.u.length - 1) idx.push(s.u.length - 1);
+      for (const i of idx) {
+        pts.push(this._toWorld(s.u[i], s.v[i], lift));
+        const c = s.terrain_slope_deg[i] >= this.route.limit_deg ? red : blue;
+        colours.push(c.r, c.g, c.b);
+      }
+      this.routePath = pts;
+    } else {
+      // Provisional straight legs, drawn faintly until the measured route arrives.
+      for (let k = 0; k < this.waypoints.length - 1; k++) {
+        const a = this.waypoints[k], b = this.waypoints[k + 1];
+        for (let i = 0; i <= 40; i++) {
+          const t = i / 40;
+          pts.push(this._toWorld(a.u + (b.u - a.u) * t, a.v + (b.v - a.v) * t, lift));
+          colours.push(blue.r, blue.g, blue.b);
+        }
+      }
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+    this.routeLine = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: !this.route, opacity: this.route ? 1 : 0.55 }));
+    this.routeLine.renderOrder = 5;
+    this.scene.add(this.routeLine);
+  }
+
+  _renderRoute(refreshList = true) {
+    const route = this.route;
+    const box = $("geProfile");
+    if (!route) return;
+    const legsOpen = box.querySelector(".ge-legs")?.open;
+    this.chart = profileChart(route, { roverDot: true });
+    const stats = totalsList(route).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd class="num">${esc(v)}</dd></div>`).join("");
+    const hazards = route.hazards.length
+      ? `<ul class="ge-hazards">${route.hazards.map((h) => `<li>Leg ${h.leg + 1}: ${fmtKm(h.start_km)} to ${fmtKm(h.end_km)}, steepest <b class="num">${h.max_slope_deg.toFixed(1)}°</b></li>`).join("")}</ul>`
+      : `<p class="hint">No stretch is steeper than ${route.limit_deg}°.</p>`;
     box.hidden = false;
     box.innerHTML = `
-      <div class="ge-profile-head"><b>Elevation profile</b><span class="num">${groundKm.toFixed(1)} km</span></div>
-      <svg viewBox="0 0 ${W} ${Hh}" class="ge-chart" role="img" aria-label="Elevation profile from ${Math.round(es[0])} to ${Math.round(es[es.length - 1])} metres">
-        <path d="${line}L${x(groundKm)},${Hh}L${x(0)},${Hh}Z" class="area"/><path d="${line}" class="stroke"/>
-        <circle id="geRoverDot" r="3.5" cx="${x(0)}" cy="${y(es[0])}" class="dot"/>
-        <text x="${pad}" y="10">${Math.round(hi)} m</text><text x="${pad}" y="${Hh - 6}">${Math.round(lo)} m</text>
-      </svg>
-      <div class="ge-profile-stats">
-        <span>Climb <b class="num">${Math.round(climb)} m</b></span><span>Descent <b class="num">${Math.round(descent)} m</b></span>
-        <span>Steepest <b class="num">${maxGrade.toFixed(1)}°</b></span>
-        <span>Over 15° <b class="num">${groundKm ? Math.round((steep / 1000 / groundKm) * 100) : 0}%</b></span>
+      <div class="ge-profile-head"><b>Traverse profile</b><span class="num">${fmtKm(route.total.distance_km)}</span></div>
+      ${this.chart.svg}
+      <p class="ge-route-legend"><span><i class="lg-route"></i>Elevation</span><span><i class="lg-hz"></i>Over ${route.limit_deg}°, rover hazard</span><span><i class="lg-wp"></i>Waypoint</span></p>
+      <dl class="ge-route-stats">${stats}</dl>
+      <details class="ge-legs" ${legsOpen ? "open" : ""}><summary>Legs and hazards</summary>${legsList(route)}${hazards}</details>
+      <div class="ge-tools">
+        <button class="primary small" type="button" id="geDrive"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg>Drive it</button>
+        <button class="ghost small" type="button" id="geRouteGeojson"><svg class="i" aria-hidden="true"><use href="icons.svg#i-download-simple"></use></svg>Route GeoJSON</button>
       </div>
-      <button class="primary small" type="button" id="geDrive"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg>Drive it</button>
-      <small class="hint">Sampled from the ~${Math.round(this.slopeSpacing)} m display grid.</small>`;
-    this.chart = { x, y };
+      <small class="hint">Measured on the server every ~${Math.round(route.sample_spacing_m)} m (${esc(route.provenance.dataset_id)}).
+        Walking time: <a href="${esc(route.walking_model.source_url)}" target="_blank" rel="noopener">${esc(route.walking_model.name)}</a>, an Earth estimate on foot.</small>`;
     $("geDrive").addEventListener("click", () => this._startDrive());
+    $("geRouteGeojson").addEventListener("click", () => this.exportRoute());
+    if (refreshList) this._renderWaypointList();
   }
 
   _startDrive() {
-    if (!this.profilePath) return;
+    if (!this.routePath || this.routePath.length < 2) return;
     if (!this.rover) {
       this.rover = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xeef0f3 }));
       this.scene.add(this.rover);
     }
     this.rover.scale.setScalar(this.sizeKm * 0.006);
-    this.drive = { t0: performance.now(), dur: REDUCED ? 1 : 7000 };
+    this.drive = { t0: performance.now(), dur: REDUCED ? 1 : Math.min(16000, 6000 + 1500 * (this.route.legs.length - 1)) };
   }
 
   _driveStep() {
+    const path = this.routePath;
+    if (!path || !this.rover || !this.route) { this.drive = null; return; }
     const t = Math.min(1, (performance.now() - this.drive.t0) / this.drive.dur);
-    const f = t * (this.profilePath.length - 1);
-    const i = Math.min(this.profilePath.length - 2, Math.floor(f));
-    const p = this.profilePath[i].clone().lerp(this.profilePath[i + 1], f - i);
+    const f = t * (path.length - 1);
+    const i = Math.min(path.length - 2, Math.floor(f));
+    const p = path[i].clone().lerp(path[i + 1], f - i);
     this.rover.position.copy(p).add(new THREE.Vector3(0, this.sizeKm * 0.006, 0));
-    const s = this.profileSamples[Math.round(f)];
+    const s = this.route.samples;
+    const k = Math.min(s.d_km.length - 1, Math.round(t * (s.d_km.length - 1)));
     const dot = $("geRoverDot");
-    if (dot && s) { dot.setAttribute("cx", this.chart.x(s.d)); dot.setAttribute("cy", this.chart.y(s.e)); }
+    if (dot && this.chart) { dot.setAttribute("cx", this.chart.x(s.d_km[k])); dot.setAttribute("cy", this.chart.y(s.elev_m[k])); }
     if (t >= 1) this.drive = null;
+  }
+
+  /* The frame just rendered, with the route and waypoints drawn over it at print weight
+   * (WebGL lines are one pixel wide). `crop`: the block's square, for the top-down view. */
+  _frame(cam, crop = false) {
+    const src = this.canvas;
+    const toScreen = (p) => { const v = p.clone().project(cam); return [(v.x + 1) / 2 * src.width, (1 - v.y) / 2 * src.height]; };
+    let sx = 0, sy = 0, sw = src.width, sh = src.height;
+    if (crop) {
+      const corners = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([u, v]) => toScreen(this._toWorld(u, v)));
+      const xs = corners.map((c) => c[0]), ys = corners.map((c) => c[1]);
+      sx = Math.max(0, Math.floor(Math.min(...xs))); sy = Math.max(0, Math.floor(Math.min(...ys)));
+      sw = Math.min(src.width, Math.ceil(Math.max(...xs))) - sx; sh = Math.min(src.height, Math.ceil(Math.max(...ys))) - sy;
+    }
+    const out = document.createElement("canvas");
+    out.width = sw; out.height = sh;
+    const g = out.getContext("2d");
+    g.drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh);
+    const px = Math.max(2, Math.round(Math.min(sw, sh) / 260));
+    if (this.routePath && this.route) {
+      const s = this.route.samples;
+      const step = Math.max(1, Math.ceil(s.u.length / 3000));
+      const pts = this.routePath.map((p) => toScreen(p).map((c, k) => c - (k ? sy : sx)));
+      g.lineCap = g.lineJoin = "round";
+      g.lineWidth = px * 2.2;
+      g.strokeStyle = "rgba(5, 5, 7, 0.75)";
+      g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+      g.lineWidth = px * 1.2;
+      for (let i = 1; i < pts.length; i++) {
+        const hazard = s.terrain_slope_deg[Math.min(s.u.length - 1, i * step)] >= this.route.limit_deg;
+        g.strokeStyle = hazard ? "#f21d38" : "#7cb7ff";
+        g.beginPath(); g.moveTo(...pts[i - 1]); g.lineTo(...pts[i]); g.stroke();
+      }
+    }
+    this.waypoints.forEach((w, i) => {
+      const [x, y] = toScreen(this._toWorld(w.u, w.v, 0.05 * this.exaggeration + 0.03));
+      const r = px * 4.5;
+      g.beginPath(); g.arc(x - sx, y - sy, r, 0, Math.PI * 2);
+      g.fillStyle = "#7cb7ff"; g.fill();
+      g.lineWidth = px; g.strokeStyle = "#050507"; g.stroke();
+      g.fillStyle = "#050507"; g.font = `700 ${Math.round(r * 1.2)}px Roboto, system-ui, sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(String(i + 1), x - sx, y - sy + 1);
+    });
+    return out.toDataURL("image/jpeg", 0.88);
+  }
+
+  /* Two pictures for the dossier: the view as it is now, and straight down with north up. */
+  _snapshots() {
+    const cam = this.camera;
+    const pos = cam.position.clone(), target = this.controls.target.clone();
+    this.flight = null;
+    const markers = this.routeMarkers.map((m) => m.visible);
+    this.routeMarkers.forEach((m) => { m.visible = false; });   // drawn by _frame at print size
+    this.renderer.render(this.scene, cam);
+    const oblique = this._frame(cam);
+    const fog = this.scene.fog;
+    this.scene.fog = null;
+    cam.position.set(0, this.sizeKm * 1.35 + ((this.top - this.base) / 1000) * this.exaggeration, 0.001);
+    cam.lookAt(0, 0, 0);
+    cam.updateMatrixWorld();
+    this.renderer.render(this.scene, cam);
+    const top = this._frame(cam, true);
+    this.routeMarkers.forEach((m, i) => { m.visible = markers[i]; });
+    this.scene.fog = fog;
+    cam.position.copy(pos);
+    this.controls.target.copy(target);
+    cam.lookAt(target);
+    this.controls.update();
+    return { oblique, top, exaggeration: this.exaggeration, imagery: this.imagery === "s2" && this.imageryAvailable !== false };
+  }
+
+  _fileName() {
+    return slug(this.context?.dossier?.site?.label || this.data.label?.text);
+  }
+
+  _routeDocument(generated) {
+    const ctx = this.context?.dossier || null;
+    const meta = { site: ctx?.site?.label || this.data.label?.text, target: ctx?.target?.name || null, generated, source: "TerraNova POST /api/traverse" };
+    return JSON.stringify(routeGeojson(this.route, meta), null, 1);
+  }
+
+  /* The planned route as GeoJSON (a LineString with its statistics, and the waypoints). */
+  exportRoute() {
+    if (!this.route) return;
+    const generated = `${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC`;
+    download(`TerraNova_route_${this._fileName()}.geojson`, this._routeDocument(generated), "application/geo+json");
+  }
+
+  /* Save the mission dossier: one self-contained HTML file, with the route GeoJSON inside it. */
+  async exportDossier() {
+    if (!this.data) return;
+    if (this.waypoints.length >= 2 && !this.route) {
+      toast("The route is still being measured. Try again in a moment.", "info");
+      return;
+    }
+    const button = $("geDossier");
+    button.disabled = true;
+    try {
+      const sources = await fetch("/api/sources").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const shots = this._snapshots();
+      const generated = `${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC`;
+      const name = this._fileName();
+      const geojson = this.route ? { name: `TerraNova_route_${name}.geojson`, text: this._routeDocument(generated) } : null;
+      const html = dossierHtml({ context: this.context?.dossier || null, terrain: this.data, route: this.route, readiness: this.readiness, shots, sources, generated, geojson });
+      download(`TerraNova_dossier_${name}.html`, html, "text/html");
+      toast("Mission dossier saved to your downloads. Open it in a browser to read or print it.", "success");
+    } catch (err) {
+      toast(`The dossier could not be made: ${err.message}`, "error");
+    } finally {
+      button.disabled = false;
+    }
   }
 
   /* ------------------------------------------------------------ camera */

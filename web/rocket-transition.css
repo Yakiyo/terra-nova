@@ -1,8 +1,15 @@
-/* The hull's opaque safe region is x=72..168, y=200..660 in the SVG. */
-.rocket-overlay{position:fixed;inset:0;z-index:2147483646;overflow:hidden;pointer-events:auto;isolation:isolate}
-.rocket-sprite{position:absolute;left:50%;top:50%;width:240px;height:800px;max-width:none;margin-left:-120px;margin-top:-430px;transform-origin:120px 430px;will-change:transform}
-html.rocket-busy{overflow:hidden!important}
-html.rocket-busy body{overscroll-behavior:none}
+/* Both documents meet on the same opaque crimson face. The overscan keeps
+   curved edges and their shadows outside the viewport at the covered pose. */
+.rocket-overlay{position:fixed;inset:0 auto auto 0;width:100vw;height:100vh;z-index:2147483646;overflow:hidden;pointer-events:auto;isolation:isolate}
+.page-leaf{position:absolute;inset:0;background:var(--accent-btn);will-change:clip-path}
+.page-fold{position:absolute;inset:0;width:100%;height:100%;overflow:visible;will-change:transform;pointer-events:none}
+.page-shadow{fill:none;stroke:var(--bg);stroke-width:1.1;stroke-opacity:.12}
+.page-crease{fill:none;stroke:var(--ink);stroke-opacity:.1;stroke-width:.2}
+.rocket-sprite{position:absolute;left:0;top:0;width:min(46vw,62vh);height:min(46vw,62vh);max-width:none;transform-origin:center;will-change:transform;color:var(--ink);pointer-events:none}
+.rocket-trail{opacity:.8}
+html.rocket-busy{overflow:hidden!important;scrollbar-gutter:auto!important}
+html.rocket-busy body{overscroll-behavior:none;width:var(--flight-content-width)}
+html.rocket-busy .site-header{max-width:var(--flight-content-width)}
 .godseye[data-arrival]{transition:none;transform:none;opacity:1}
 .godseye[data-arrival]>:not(#geArrival){display:none!important}
 #geArrival{position:absolute;inset:0;background:var(--bg);color:var(--ink);padding:var(--page-gutter,24px)}
@@ -14,4 +21,4 @@ html.rocket-busy body{overscroll-behavior:none}
 .ge-arrival-content summary{cursor:pointer}
 .ge-arrival-content details p{font-size:14px;overflow-wrap:anywhere}
 .godseye[data-arrival="error"] .spinner{display:none}
-@media(prefers-reduced-motion:reduce){.rocket-sprite{will-change:auto}#geArrival .spinner{animation:none}}
+@media(prefers-reduced-motion:reduce){.page-leaf{will-change:auto}#geArrival .spinner{animation:none}}

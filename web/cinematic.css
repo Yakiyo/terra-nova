@@ -128,6 +128,14 @@
 
 
 /* A docked desktop inspector must resize the story, not restore the old Home. */
+@media (min-width:1021px), (hover:hover) and (pointer:fine){
+  .cinematic-copy{max-height:68svh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  .cinematic-copy .cinematic-scroll{min-width:44px;min-height:44px;align-items:center;justify-content:center;margin-top:24px;padding:8px;background:none;color:var(--ink);flex-shrink:0}
+  .cinematic-scroll svg{transition:transform var(--t-state) var(--ease)}
+  .cinematic-scroll:is(:hover,:focus-visible) svg{transform:translateY(4px)}
+  .cinematic-copy:focus{outline:none}
+}
+@media(prefers-reduced-motion:reduce){.cinematic-scroll svg{transition:none!important;transform:none!important}}
 @media (max-width:1020px) and (hover:hover) and (pointer:fine){
   .cinematic-list,.chapter-analogs .cinematic-copy{top:100px}
   .cinematic-list h2,.chapter-analogs h2{font-size:clamp(32px,5vw,48px)}

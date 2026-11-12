@@ -50,6 +50,12 @@ export const RAMPS = {
     [0.75, 226, 118, 92, 0.86],
     [1.0, 170, 26, 32, 0.92],
   ],
+  // Rock type: not volcanic (clear) to intermediate (warm grey) to basaltic (deep charcoal-rust).
+  basalt: [
+    [0.0, 40, 40, 44, 0.0],
+    [0.5, 168, 150, 132, 0.78],
+    [1.0, 196, 92, 52, 0.94],
+  ],
   phthalo: [
     [0.0, 226, 240, 232, 0.55],
     [0.3, 132, 190, 162, 0.72],
@@ -68,6 +74,7 @@ export const LAYER_RAMPS = {
   slope: { ramp: "phthalo" },
   roughness: { ramp: "phthalo" },
   elevation: { ramp: "phthalo" },
+  basaltic_volcanic: { ramp: "basalt" },
 };
 
 function sample(stops, t) {

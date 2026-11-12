@@ -39,7 +39,7 @@ def test_site3d_cache_invalidates_when_source_tiles_change(monkeypatch, tmp_path
         assert first.status_code == 200
         body = first.json()
         assert body["display_slopes"]["shape"] == body["heightmap"]["shape"]
-        assert body["provenance"]["dataset_id"] == "AWS_TERRAIN_TILES"
+        assert body["provenance"]["dataset_id"] == "aws_terrain_tiles_terrarium"
         assert client.get("/api/site3d", params=params).json() == body
         assert len(calls) == 1
         x, y = main.sitetiles.mosaic_origin(**params)

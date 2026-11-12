@@ -1,5 +1,58 @@
 # Use of AI in this project
 
+### 2026-11-12 — Pre-demo review and polish
+
+AI Assistant reviewed the whole project and fixed the issues the user
+approved:
+- **Backend fixes:**
+  - the robustness cache now matches the interface's requests (no longer 4-5 s each time);
+  - near the poles, God's Eye says how much of the scored cell its terrain block covers;
+  - readiness uses cached terrain only;
+  - fixed a data-check race;
+  - weights are capped at 100;
+  - the leave-one-out check now uses the same tolerance and ranking as the headline result;
+  - the two polar Moon targets validate against their original sites again.
+- **Finder fixes:**
+  - stale responses (search, map clicks, layer switches, tour, pins, Explore) can no
+    longer overwrite newer state;
+  - the custom profile clears the old ranking;
+  - the detail panel keeps its place when rescored;
+  - shortcuts keep working after a slider is used;
+  - credits stay visible on phones.
+- **Home and pages:**
+  - Home lists all four Moon targets;
+  - Panchang was dropped (the font file is not shipped);
+  - the retired Targets page is gone from breadcrumbs, scripts and docs;
+  - the prefetch scripts rank as the Finder does.
+
+All numbers still come from `src/compute`. The climate simulation was left unchanged at
+the user's request. Checks: 121 pytest tests pass, ruff is clean, and `check_controls`
+gives AUC 1.0 for all 7 targets. `ui_smoke` gives 85 PASS and 0 FAIL up to the Home
+chapter checks, which conflict with the new chapter navigation (team work in progress).
+Not committed.
+
+### 2026-11-12 — Winning features 1, 3 and 5 (lava tubes and permafrost, hardware readiness, EVA traverse)
+
+AI Assistant implemented three features from the team's strategy review.
+The spec, sources and results are in `docs/WINNING_FEATURES.md`.
+- **Feature 1.** A GLiM basaltic-rock layer (`src/acquire/glim.py`) and two targets: the
+  Marius Hills lava-tube skylight and Utopia Planitia ice-rich ground.
+- **Feature 3.** A hardware test readiness matrix (`src/compute/qualification.py`,
+  `GET /api/qualification`, `web/readiness.js`).
+- **Feature 5.** An EVA traverse planner and mission dossier export
+  (`src/compute/traverse.py`, `POST /api/traverse`, `web/traverse-view.js`,
+  `web/dossier.js`).
+
+All numbers are computed in `src/compute` by deterministic code. Every threshold and
+target value links to a source that was checked during the work. Values that could not
+be verified were left out, not estimated: Viking 2 temperatures and the cave-air ≈ mean
+annual temperature rule.
+- **Tests and checks:** pytest and ruff pass. `scripts/check_controls` gives AUC 1.00 for
+  all 7 targets; the 5 existing targets keep their AUC and top 5.
+- **UI smoke checks** were added for the readiness matrix, the traverse tool and the
+  dossier export.
+- **Not committed:** everything is left uncommitted for team review.
+
 ### 2026-11-11 — Shared space backdrop, refresh and tab-return stability
 
 Codex reused the finale's Milky Way backdrop behind every cinematic Home chapter
@@ -315,3 +368,28 @@ waits made the motion smoke rerun pass (`artifacts/cinematic-motion-smoke.txt`).
 `nHome space refinement: integrated user-supplied Lucide chevron SVG, brighter screen-sized stars, longer chapters and bounded wheel deltas. Enlarged destination/analog lists and removed divider lines and red arrows. Site names now link directly to Finder. Compared large-wheel input on Omega using Playwright; timing is tuned to the reference rather than copied from its implementation.
 `nSpace color polish: replaced the navy Home background with neutral near-black and neutralized the star tint while preserving visibility, motion and planetary atmospheric lighting.
 `nRestored the original Anton display typography at user request; existing Roboto body text and Panchang supporting styles remain. Preserved the current layout, colors and motion.
+
+
+## Diagonal rocket and chapter navigation (implementation in progress)
+
+Implemented the user-approved storyboard as a local crimson SVG/CSS sweep from
+bottom-left to top-right, with a growing white outline rocket and the same covered
+composition on Home and Finder. Added a shared Lenis chapter controller for wheel
+bursts, trackpad momentum, keyboard navigation and down chevrons on all Home
+chapters. Explicit terrain deep links retain their existing entry flow. No
+scientific calculations were introduced by this interface work. Concurrent science
+and data edits in the workspace belong to separate work and are preserved.
+
+Verification is in progress; final results will be recorded in the rocket handoff.
+source_url: ../web/rocket-transition.js, ../web/chapter-navigation.js,
+../scripts/rocket_review.js, ../scripts/chapter_review.js
+(dataset_id: terra_nova_motion_implementation_review).
+User storyboard dataset_id: user_transition_storyboard; source_url:
+C:/Users/Saa'd/AppData/Local/Temp/codex-clipboard-49580633-9dea-49a0-beca-729264985ff8.png.
+Reference inspected through browser skills: source_url:
+https://www.omegawatches.com/world-of-omega/sustainability/clearspace;
+dataset_id: omega_clearspace_ui_reference. No artwork or code was copied from Omega.
+
+Codex traced a local homepage fallback to the Windows MIME type for `lenis.mjs`
+and registered the JavaScript MIME type before mounting the frontend.
+source_url: ../src/api/main.py (dataset_id: terra_nova_static_module_mime).

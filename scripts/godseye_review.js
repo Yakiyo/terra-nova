@@ -44,11 +44,8 @@ async page => {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Terrain overflows mobile width');
   await page.locator('#geClose').click();
   await page.waitForSelector('#godseye', { state: 'hidden' });
-  await page.goto(`${base}/targets.html`);
-  await page.waitForSelector('.dest-card:not(.skeleton)');
-  await page.screenshot({ path: 'artifacts/frontend/targets-fixed-mobile.png', fullPage: true });
+  // The Targets page is retired (targets.html redirects to the Finder).
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.screenshot({ path: 'artifacts/frontend/targets-fixed-desktop.png', fullPage: true });
   assert(errors.length === 0, errors.join('\n'));
   return { retry: 'passed', reopenCache: 'passed', sameTargetTerrainLink: 'passed', mobile: 'passed', pageErrors: errors };
 }

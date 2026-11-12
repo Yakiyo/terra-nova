@@ -40,7 +40,7 @@ Implement the desktop cinematic landing sequence in `plan.md`: Earth hero, orbit
 - Replace the finale’s night-sky placeholder with the user-supplied Milky Way mountain video and a local poster frame.
 - Improve the visual treatment and chapter transitions with more polished cloud imagery, site-specific thumbnail assets if available, and tighter lighting/camera choreography. The current cloud shell is deliberately subtle; the analog focus remains a regional globe, not terrain descent.
 - Run a full desktop scroll pass at 1920×1080 and laptop sizes, including keyboard, reduced-motion, WebGL-failure, and backward-scroll behavior. The current check inspected hero and Moon plus direct Finder navigation.
-- Verify each Moon/Mars target deep link on `targets.html`; refine source display for target summaries so the clickable `source_url` accompanies each claim.
+- Verify each Moon/Mars target deep link from Home into `finder.html#target=…` (the Targets page is retired); refine source display for target summaries so the clickable `source_url` accompanies each claim.
 - Avoid touching pre-existing unrelated repo changes: deleted `artifacts/review-pytest.txt` and untracked `scripts/generate_review_pdf.py` were present before this implementation.
 
 ## Files and decisions
