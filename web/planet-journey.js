@@ -173,6 +173,30 @@ export function initPlanetJourney(root, getSelection) {
   siteLabel.hidden = true;
   root.appendChild(siteLabel);
   const labelPos = new THREE.Vector3();
+  // Highlighted land for the selected analog (Natural Earth outlines, web/assets/analog-areas.json),
+  // painted on a transparent shell just above the Earth's surface.
+  const areaCanvas = Object.assign(document.createElement('canvas'), {width: 4096, height: 2048});
+  const areaTex = new THREE.CanvasTexture(areaCanvas);
+  areaTex.colorSpace = THREE.SRGBColorSpace;
+  const areaShell = new THREE.Mesh(new THREE.SphereGeometry(1.003, 128, 64),
+    new THREE.MeshBasicMaterial({map: areaTex, transparent: true, depthWrite: false, opacity: 0}));
+  areaShell.visible = false;
+  let areas = null, areaKey = '';
+  fetch('assets/analog-areas.json').then(r => r.json()).then(j => { areas = j.areas; }).catch(() => {});
+  const paintArea = (name) => {
+    const g = areaCanvas.getContext('2d'), W = areaCanvas.width, H = areaCanvas.height;
+    g.clearRect(0, 0, W, H);
+    const a = areas?.[name];
+    if (!a) return false;
+    g.beginPath();
+    a.ring.forEach(([lo, la], i) => { const x = (lo + 180) / 360 * W, y = (90 - la) / 180 * H; i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.closePath();
+    g.fillStyle = 'rgba(255, 176, 56, 0.55)'; g.fill();
+    g.lineJoin = 'round'; g.shadowColor = 'rgba(255, 170, 40, 1)'; g.shadowBlur = 10;
+    g.strokeStyle = 'rgb(255, 200, 90)'; g.lineWidth = 3; g.stroke();
+    areaTex.needsUpdate = true;
+    return true;
+  };
 
   const chapters = [...root.querySelectorAll('.cinematic-chapter')];
   const copies = chapters.map(c => c.querySelector('.cinematic-copy'));
@@ -260,6 +284,7 @@ export function initPlanetJourney(root, getSelection) {
     const chosen = getSelection(index);
     ring.visible = false;
     siteLabel.hidden = true;
+    if (!(chosen && index === 4)) { areaShell.visible = false; areaShell.material.opacity = 0; }
     if (chosen && index === 4) {
       const name = index === 2 ? 'moon' : index === 3 ? 'mars' : 'earth', w = worlds[name];
       const key = `${name}:${chosen.lat},${chosen.lon}`, normal = surfacePoint(chosen.lat, chosen.lon);
@@ -268,12 +293,16 @@ export function initPlanetJourney(root, getSelection) {
         const facing = new THREE.Vector3(index === 2 ? -.76 : index === 3 ? .76 : -.25, 0, .65).normalize();
         targetQ.setFromUnitVectors(normal, facing);
         w.surface.add(ring); ring.position.copy(normal).multiplyScalar(1.006);
+        if (!areaShell.parent) w.surface.add(areaShell);
         ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
         root.dataset.selectedLocation = chosen.name || key;
         if (arrive < .1) w.surface.quaternion.copy(targetQ);
       }
       w.surface.quaternion.slerp(targetQ, reduced.matches ? 1 : 1 - Math.exp(-dt * 3));
       ring.visible = visibility > .05;
+      if (areas && areaKey !== (chosen.name || '')) { areaKey = chosen.name || ""; areaShell.userData.has = paintArea(areaKey); areaShell.material.opacity = 0; }
+      areaShell.visible = !!areaShell.userData.has && ring.visible;
+      areaShell.material.opacity = Math.min(1, areaShell.material.opacity + dt * 2) * visibility;
       // Pulse: expand and fade every 1.8 s.
       const ph = reduced.matches ? .3 : (now / 1800) % 1;
       pulse.scale.setScalar(1 + ph * 1.6);
