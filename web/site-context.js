@@ -49,7 +49,14 @@ export async function fillTwin(det, target) {
   const syncEarth = () => { earth.style.backgroundImage = hero.style.backgroundImage; };
   syncEarth(); new MutationObserver(syncEarth).observe(hero, { attributes: true, attributeFilter: ["style"] });
   const set = (v) => { alien.style.clipPath = `inset(0 ${100 - v}% 0 0)`; bar.style.left = `${v}%`; };
-  box.querySelector("input").addEventListener("input", (e) => { set(+e.target.value); box.classList.add("is-used"); });
+  const input = box.querySelector("input");
+  input.addEventListener("input", (e) => { set(+e.target.value); box.classList.add("is-used"); });
+  // Drag anywhere on the image (not only the hidden slider thumb).
+  const at = (e) => { const r = box.getBoundingClientRect(); const v = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100)); input.value = v; set(v); box.classList.add("is-used"); };
+  box.addEventListener("pointerdown", (e) => { e.preventDefault(); box.setPointerCapture(e.pointerId); box.classList.add("is-drag"); at(e); });
+  box.addEventListener("pointermove", (e) => { if (box.classList.contains("is-drag")) at(e); });
+  const end = () => box.classList.remove("is-drag");
+  box.addEventListener("pointerup", end); box.addEventListener("pointercancel", end);
   set(50);
   const q = TWIN_Q[target.id] || `${target.short_name} ${target.body}`;
   let url = twinCache.get(q);

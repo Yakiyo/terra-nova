@@ -19,6 +19,20 @@
     else for (const t of tabs) t.setAttribute("aria-selected", String(t.dataset.getab === current));
   };
   close.addEventListener("click", () => setCollapsed(true));
+  // Drag the left edge to make the panel wider or narrower (remembered per browser).
+  const grip = document.createElement("div");
+  grip.className = "ge-resize"; grip.title = "Drag to resize"; grip.setAttribute("aria-hidden", "true");
+  panel.appendChild(grip);
+  try { const w0 = +localStorage.getItem("ge-width"); if (w0) panel.style.width = `${w0}px`; } catch { /* storage off */ }
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId); panel.classList.add("is-resizing");
+    const right = panel.getBoundingClientRect().right;
+    const move = (ev) => { panel.style.width = `${Math.max(280, Math.min(innerWidth * 0.7, right - ev.clientX))}px`; };
+    const up = () => { panel.classList.remove("is-resizing"); grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up);
+      try { localStorage.setItem("ge-width", parseInt(panel.style.width, 10)); } catch { /* storage off */ } };
+    grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up);
+  });
+
   const show = (name) => {
     current = name; panel.classList.remove("is-collapsed");
     for (const t of tabs) t.setAttribute("aria-selected", String(t.dataset.getab === name));
