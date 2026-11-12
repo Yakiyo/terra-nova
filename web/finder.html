@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="target-picker.css">
 <link rel="stylesheet" href="results-view.css">
 <link rel="stylesheet" href="site-dossier.css">
+<link rel="stylesheet" href="godseye-console.css">
 <script src="rocket-transition.js"></script>
 <script type="importmap">
   { "imports": { "three": "./vendor/three/three.module.min.js" } }
@@ -254,88 +255,97 @@
       <button class="icon-button ge-close" id="geClose" type="button" aria-label="Close the 3D view (Esc)"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg></button>
     </div>
   </header>
-  <aside class="ge-panel" aria-label="Terrain, sun, view and climate">
-    <h3>Terrain in the scored cell</h3>
-    <div id="geStats" class="ge-stats"></div>
-
-    <details class="ge-section">
-      <summary>Sun and lighting</summary>
-      <div class="segmented ge-presets" role="group" aria-label="Sun presets">
-        <button type="button" data-sun="earth">Midday</button>
-        <button type="button" data-sun="evening">Evening</button>
-        <button type="button" data-sun="lunar">Lunar pole</button>
-      </div>
-      <label class="ge-slider">Height above horizon <b id="geSunElevValue" class="num"></b>
-        <input type="range" id="geSunElev" min="0.5" max="85" step="0.5" value="55"></label>
-      <label class="ge-slider">Direction <b id="geSunAzValue" class="num"></b>
-        <input type="range" id="geSunAz" min="0" max="359" step="1" value="160"></label>
-      <p class="hint" id="geSunNote"></p>
-    </details>
-
-    <div class="ge-section">
-      <h3>Surface</h3>
-      <div class="segmented ge-presets" role="group" aria-label="Surface">
-        <button type="button" data-imagery="s2" aria-pressed="true">Satellite</button>
-        <button type="button" data-imagery="relief" aria-pressed="false">Relief</button>
-        <button type="button" data-imagery="slope" aria-pressed="false">Slope</button>
-        <button type="button" data-imagery="elevation" aria-pressed="false" title="Elevation">Height</button>
-        <button type="button" data-imagery="thermal" aria-pressed="false" title="Illustrative ground temperature at the chosen month and hour">Thermal</button>
-      </div>
-      <div class="ge-slope-legend ge-thermal-legend" id="geThermalLegend" hidden>
-        <div class="ramp" id="geThermalRamp"></div>
-        <div class="scale num"><span>−40 °C</span><span>−15</span><span>10</span><span>35</span><span>60 °C</span></div>
-      </div>
-      <div class="ge-slope-legend ge-elev-legend" id="geElevLegend" hidden>
-        <div class="ramp"></div>
-        <div class="scale num"><span id="geElevLo"></span><span id="geElevHi"></span></div>
-      </div>
-      <div class="ge-slope-legend" id="geSlopeLegend" hidden>
-        <div class="ramp"></div>
-        <div class="scale num"><span>0°</span><span>5°</span><span id="geSlopeLimit">15° rover limit</span><span>30°+</span></div>
-      </div>
-      <label class="toggle ge-toggle"><input type="checkbox" id="geContours"><span>Contour lines <small id="geContourStep"></small></span></label>
-      <label class="ge-slider">Height exaggeration <b id="geExagValue" class="num">1× true scale</b>
-        <input type="range" id="geExag" min="1" max="6" step="0.5" value="1"></label>
-      <label class="toggle ge-toggle"><input type="checkbox" id="geCell" checked><span>Outline the scored cell (white)</span></label>
+  <aside class="ge-panel ge-console" aria-label="Terrain, view, planning and climate">
+    <div class="ge-tabs" role="tablist" aria-label="God's Eye panels">
+      <button role="tab" type="button" data-getab="overview" aria-selected="true"><svg class="i" aria-hidden="true"><use href="icons.svg#i-mountains"></use></svg><span>Overview</span></button>
+      <button role="tab" type="button" data-getab="view" aria-selected="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-stack"></use></svg><span>View</span></button>
+      <button role="tab" type="button" data-getab="plan" aria-selected="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-path"></use></svg><span>Plan</span></button>
+      <button role="tab" type="button" data-getab="climate" aria-selected="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-thermometer"></use></svg><span>Climate</span></button>
     </div>
-
-    <div class="ge-section">
-      <h3>Measure and plan</h3>
-      <div class="ge-tools">
-        <button class="ghost small" type="button" id="geTraverseBtn" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-path"></use></svg>Plan a traverse</button>
-        <button class="ghost small" type="button" id="geSunPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-sun"></use></svg><span>Turn the sun</span></button>
+    <div class="ge-tab" data-getab-panel="overview" role="tabpanel">
+      <h3>Terrain in the scored cell</h3>
+      <div id="geStats" class="ge-stats"></div>
+      <div class="ge-section ge-readiness-panel" id="geReadinessPanel">
+        <h3>What could be tested here</h3>
+        <div class="readiness" id="geReadiness" aria-live="polite"><p class="hint">Checking which systems could be tested here…</p></div>
       </div>
-      <p class="hint" id="geToolHint" aria-live="polite">Click the terrain to probe any point.</p>
-      <div id="geProbe" class="ge-probe" hidden></div>
-      <div id="geRoute" class="ge-route" hidden>
-        <ol class="ge-waypoints" id="geWaypoints" aria-label="Route waypoints"></ol>
-        <div class="ge-tools">
-          <button class="ghost small" type="button" id="geAddPin"><svg class="i" aria-hidden="true"><use href="icons.svg#i-push-pin"></use></svg>Add the site pin</button>
-          <button class="ghost small" type="button" id="geClearRoute"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg>Clear route</button>
+    </div>
+    <div class="ge-tab" data-getab-panel="view" role="tabpanel" hidden>
+      <div class="ge-section">
+        <h3>Surface</h3>
+        <div class="segmented ge-presets" role="group" aria-label="Surface">
+          <button type="button" data-imagery="s2" aria-pressed="true">Satellite</button>
+          <button type="button" data-imagery="relief" aria-pressed="false">Relief</button>
+          <button type="button" data-imagery="slope" aria-pressed="false">Slope</button>
+          <button type="button" data-imagery="elevation" aria-pressed="false" title="Elevation">Height</button>
+          <button type="button" data-imagery="thermal" aria-pressed="false" title="Illustrative ground temperature at the chosen month and hour">Thermal</button>
         </div>
+        <div class="ge-slope-legend ge-thermal-legend" id="geThermalLegend" hidden>
+          <div class="ramp" id="geThermalRamp"></div>
+          <div class="scale num"><span>−40 °C</span><span>−15</span><span>10</span><span>35</span><span>60 °C</span></div>
+        </div>
+        <div class="ge-slope-legend ge-elev-legend" id="geElevLegend" hidden>
+          <div class="ramp"></div>
+          <div class="scale num"><span id="geElevLo"></span><span id="geElevHi"></span></div>
+        </div>
+        <div class="ge-slope-legend" id="geSlopeLegend" hidden>
+          <div class="ramp"></div>
+          <div class="scale num"><span>0°</span><span>5°</span><span id="geSlopeLimit">15° rover limit</span><span>30°+</span></div>
+        </div>
+        <label class="toggle ge-toggle"><input type="checkbox" id="geContours"><span>Contour lines <small id="geContourStep"></small></span></label>
+        <label class="ge-slider">Height exaggeration <b id="geExagValue" class="num">1× true scale</b>
+          <input type="range" id="geExag" min="1" max="6" step="0.5" value="1"></label>
+        <label class="toggle ge-toggle"><input type="checkbox" id="geCell" checked><span>Outline the scored cell (white)</span></label>
       </div>
-      <div id="geProfile" class="ge-profile" hidden></div>
-      <button class="primary small ge-dossier-btn" type="button" id="geDossier"><svg class="i" aria-hidden="true"><use href="icons.svg#i-download-simple"></use></svg>Export mission dossier</button>
+      <div class="ge-section ge-sun">
+        <h3>Sun</h3>
+        <div class="segmented ge-presets" role="group" aria-label="Sun presets">
+          <button type="button" data-sun="earth">Midday</button>
+          <button type="button" data-sun="evening">Evening</button>
+          <button type="button" data-sun="lunar">Lunar pole</button>
+        </div>
+        <label class="ge-slider">Height above horizon <b id="geSunElevValue" class="num"></b>
+          <input type="range" id="geSunElev" min="0.5" max="85" step="0.5" value="55"></label>
+        <label class="ge-slider">Direction <b id="geSunAzValue" class="num"></b>
+          <input type="range" id="geSunAz" min="0" max="359" step="1" value="160"></label>
+        <p class="hint" id="geSunNote"></p>
+      </div>
     </div>
-
-    <details class="ge-section ge-readiness-panel" id="geReadinessPanel" open>
-      <summary>Hardware test readiness</summary>
-      <div class="readiness" id="geReadiness" aria-live="polite"><p class="hint">Checking which systems could be tested here…</p></div>
-    </details>
-
-    <details class="ge-section ge-climate-panel" id="geClimatePanel">
-      <summary>Climate simulation</summary>
-      <label class="ge-slider">Month <b id="geMonthValue" class="num"></b>
-        <input type="range" id="geMonth" min="0" max="11" step="1" value="6"></label>
-      <label class="ge-slider">Time of day <b id="geHourValue" class="num"></b>
-        <input type="range" id="geHour" min="0" max="23.75" step="0.25" value="13"></label>
-      <div class="ge-tools">
-        <button class="ghost small" type="button" id="geDayPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg><span>Play a day</span></button>
-        <button class="ghost small" type="button" id="geWeather" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-cloud-rain"></use></svg><span>Weather</span></button>
+    <div class="ge-tab" data-getab-panel="plan" role="tabpanel" hidden>
+      <div class="ge-section">
+        <h3>Plan an expedition</h3>
+        <div class="ge-tools">
+          <button class="ghost small" type="button" id="geTraverseBtn" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-path"></use></svg>Plan a traverse</button>
+          <button class="ghost small" type="button" id="geSunPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-sun"></use></svg><span>Turn the sun</span></button>
+        </div>
+        <p class="hint" id="geToolHint" aria-live="polite">Click the terrain to probe any point.</p>
+        <div id="geProbe" class="ge-probe" hidden></div>
+        <div id="geRoute" class="ge-route" hidden>
+          <ol class="ge-waypoints" id="geWaypoints" aria-label="Route waypoints"></ol>
+          <div class="ge-tools">
+            <button class="ghost small" type="button" id="geAddPin"><svg class="i" aria-hidden="true"><use href="icons.svg#i-push-pin"></use></svg>Add the site pin</button>
+            <button class="ghost small" type="button" id="geClearRoute"><svg class="i" aria-hidden="true"><use href="icons.svg#i-x"></use></svg>Clear route</button>
+          </div>
+        </div>
+        <div id="geProfile" class="ge-profile" hidden></div>
+        <button class="primary small ge-dossier-btn" type="button" id="geDossier"><svg class="i" aria-hidden="true"><use href="icons.svg#i-download-simple"></use></svg>Export mission dossier</button>
       </div>
-      <div class="ge-climate" id="geClimate" aria-live="polite"></div>
-      <p class="hint">Illustrative, not a forecast. Based on NASA POWER and MODIS.</p>
-    </details>
+    </div>
+    <div class="ge-tab" data-getab-panel="climate" role="tabpanel" hidden>
+      <div class="ge-section ge-climate-panel" id="geClimatePanel">
+        <h3>A day at this site</h3>
+        <label class="ge-slider">Month <b id="geMonthValue" class="num"></b>
+          <input type="range" id="geMonth" min="0" max="11" step="1" value="6"></label>
+        <label class="ge-slider">Time of day <b id="geHourValue" class="num"></b>
+          <input type="range" id="geHour" min="0" max="23.75" step="0.25" value="13"></label>
+        <div class="ge-tools">
+          <button class="ghost small" type="button" id="geDayPlay" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-play"></use></svg><span>Play a day</span></button>
+          <button class="ghost small" type="button" id="geWeather" aria-pressed="false"><svg class="i" aria-hidden="true"><use href="icons.svg#i-cloud-rain"></use></svg><span>Weather</span></button>
+        </div>
+        <div class="ge-climate" id="geClimate" aria-live="polite"></div>
+        <p class="hint">Illustrative, not a forecast. Based on NASA POWER and MODIS.</p>
+      </div>
+    </div>
     <p class="hint ge-status" id="geStatus" role="status"></p>
   </aside>
   <div class="ge-hud">
@@ -387,5 +397,6 @@
 
 <script>window.rocketTransition?.prepareArrival();</script>
 <script type="module" src="finder-entry.js"></script>
+<script src="godseye-console.js"></script>
 </body>
 </html>
