@@ -7,6 +7,7 @@ import { GodsEye, SUN_PRESETS } from "./godseye.js";
 import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
 import { initStarfield } from "./starfield.js";
+import { validationHtml } from "./validation-view.js";
 import { closeMenus, icon, menu, toast, ANALOG_ROLES, analogRoleBadge, catalogRole, download } from "./ui.js";
 import { breadcrumbs, targetTrail } from "./navigation.js";
 import { escapeHtml as esc, decodeFloat32 as decode, formatCoord, topShareText } from './format.js';
@@ -1220,23 +1221,8 @@ function renderValidation() {
   }
   $("statusAuc").innerHTML = `<span class="auc-label">AUC </span><span class="auc-value">${v.auc.toFixed(2)}</span>`;
   $("statusVal").innerHTML = `<span class="num">AUC ${v.auc.toFixed(2)}</span> on ${v.positives} known sites`;
-  const rows = v.controls.map((c) => `
-    <tr><td>${c.source_url ? `<a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.name)}</a>` : esc(c.name)}<br>${analogRoleBadge(c.role)}</td>
-      <td class="n">${c.score === null ? "–" : fmtPct(c.score)}</td>
-      <td class="pbar">${c.percentile === null ? "" : `<div class="bar" role="img" aria-label="percentile ${c.percentile}"><i style="width:${c.percentile}%"></i></div>`}</td>
-      <td class="n">${c.percentile === null ? "–" : `p${c.percentile.toFixed(0)}`}</td></tr>`).join("");
-  $("validation").innerHTML = `
-    <div class="auc-hero"><div class="big num">${v.auc.toFixed(2)}</div>
-      <p><b>ROC-AUC</b> measures how well scores separate environmental analogs from reference sites. It does not prove that ranked sites are analogs.</p></div>
-    <div class="analog-role-guide" aria-label="Validation roles">${Object.entries(ANALOG_ROLES).map(([role, definition]) => `<div>${analogRoleBadge(role)}<p>${definition.description}</p></div>`).join('')}</div>
-    <h4 class="section-title">Control sites under the current weights</h4>
-    <table class="controls validation-controls"><thead><tr><th>Site & role</th><th class="n">Score</th><th colspan="2">Percentile of land</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-    ${sensitivityTable()}
-    ${dataChecksTable()}
-    <details class="validation-method"><summary>How validation works</summary><div>
-      <p class="hint">${esc(v.method)}</p><p class="hint">Known analogs span different environments. No single target should rank all of them at the top. Geology-only sites are excluded from the validation score.</p>
-    </div></details>`;
+  dataChecksTable(); // starts the /api/datachecks fetch; re-renders when it lands
+  $("validation").innerHTML = validationHtml(v, state.robust, dataChecks, dataChecksFailed);
 }
 
 let dataChecks = null;
