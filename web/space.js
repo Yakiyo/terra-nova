@@ -228,9 +228,20 @@ export class SpaceScenery {
       // Fade in once placed and textured.
       const show = this.placed && b.ready;
       b.mesh.visible = show;
-      if (show && b.shown < 1) {
-        b.shown = REDUCED ? 1 : Math.min(1, b.shown + step / 0.9);
+      if (show) {
+        // Keep clear of the Earth and its glow: fade out while the body's disc, as seen from
+        // the camera, comes within the atmosphere shell (about 1.3 Earth radii) of the Earth.
+        const cam = this.camera.position, camDist = cam.length();
+        const toB = b.mesh.position.clone().sub(cam), dB = toB.length();
+        const sep = Math.acos(Math.max(-1, Math.min(1, toB.dot(cam.clone().negate()) / (dB * camDist))));
+        const earthAng = Math.asin(Math.min(1, (this.radius * 1.32) / camDist));
+        const bodyAng = Math.asin(Math.min(1, b.mesh.scale.x / dB));
+        const gap = sep - earthAng - bodyAng;            // radians of clear sky between them
+        const target = gap <= 0 ? 0 : Math.min(1, gap / 0.06);
+        const rate = REDUCED ? 1 : step / 0.35;
+        b.shown += Math.max(-rate, Math.min(rate, target - b.shown));
         b.mesh.material.opacity = b.shown;
+        b.mesh.visible = b.shown > 0.01;
       }
     }
     if (!this.cometsOn) return;
