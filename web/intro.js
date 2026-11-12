@@ -20,10 +20,13 @@
       el.classList.add("is-gone"); document.documentElement.style.overflow = "";
       try { sessionStorage.setItem("tn-intro", "1"); } catch { /* private mode */ }
       setTimeout(() => el.remove(), 1100);
-      removeEventListener("wheel", close); removeEventListener("keydown", close); removeEventListener("touchmove", close);
     };
-    el.addEventListener("click", close);
-    addEventListener("wheel", close, { passive: true }); addEventListener("keydown", close); addEventListener("touchmove", close, { passive: true });
+    // Stay here until Begin is pressed; block the page from scrolling underneath.
+    const go = el.querySelector(".tn-go");
+    go.addEventListener("click", close);
+    setTimeout(() => go.focus({ preventScroll: true }), 2100);
+    const block = (e) => { if (!el.classList.contains("is-gone")) e.preventDefault(); };
+    el.addEventListener("wheel", block, { passive: false }); el.addEventListener("touchmove", block, { passive: false });
   }
 
   // By the numbers: placed inside the "Earth from orbit" chapter of the cinematic page
@@ -41,6 +44,14 @@
     requestAnimationFrame(step);
   };
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); run(e.target); } }), { threshold: .3 });
+  const addLearn = () => {
+    const launch = document.querySelector("#cinematic-finale .cinematic-launch");
+    if (!launch || launch.parentElement.querySelector(".tn-learn")) return !!launch;
+    const a = document.createElement("a");
+    a.href = "learn.html"; a.className = "tn-learn"; a.textContent = "First, learn about the Moon & Mars";
+    launch.after(a); return true;
+  };
+  if (!addLearn()) { const mo2 = new MutationObserver(() => { if (addLearn()) mo2.disconnect(); }); mo2.observe(document.body, { childList: true, subtree: true }); setTimeout(() => mo2.disconnect(), 15000); }
   const observe = () => sec.querySelectorAll("b[data-to]").forEach((b) => io.observe(b));
   const orbitHost = () => document.querySelector("#cinematic-orbit .cinematic-copy");
   const mission = document.getElementById("mission");

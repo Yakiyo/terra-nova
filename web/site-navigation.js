@@ -21,6 +21,30 @@ function enhanceHeader(header, terrain = false) {
   worlds.className = 'site-world-links';
   worlds.innerHTML = '<a href="finder.html#target=lunar_south_pole">Explore the Moon</a><a href="finder.html#target=jezero_crater">Explore Mars</a><a href="learn.html?world=mars">Learn: Mars</a><a href="learn.html?world=moon">Learn: Moon</a>';
   nav.append(worlds);
+  // "Learn" as a main destination: in the menu and as a glowing pill in the header.
+  if (!nav.querySelector('a[href^="learn.html"].nav-link')) {
+    const ln = document.createElement('a');
+    ln.href = 'learn.html'; ln.className = 'nav-link'; ln.textContent = 'Learn';
+    if (location.pathname.endsWith('learn.html')) ln.setAttribute('aria-current', 'page');
+    const home = nav.querySelector('a[href="index.html"]');
+    home ? home.after(ln) : nav.prepend(ln);
+  }
+  if (!document.getElementById('learnPillStyle')) {
+    const st = document.createElement('style'); st.id = 'learnPillStyle';
+    st.textContent = `.learn-pill{position:absolute;left:clamp(104px,9vw,140px);top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;font:600 13px/1 Roboto,system-ui,sans-serif;color:#fff;text-decoration:none;background:linear-gradient(90deg,rgba(255,106,61,.25),rgba(255,73,97,.25));border:1px solid rgba(255,140,90,.7);box-shadow:0 0 14px rgba(255,106,61,.35);animation:learnGlow 2.6s ease-in-out infinite;z-index:5}
+.learn-pill:hover{background:#ff6a3d;border-color:#ff6a3d}
+.learn-pill small{font:500 10px/1 "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+@keyframes learnGlow{50%{box-shadow:0 0 24px rgba(255,106,61,.65)}}
+@media (max-width:760px){.learn-pill{left:96px;padding:6px 10px}.learn-pill small{display:none}}`;
+    document.head.append(st);
+  }
+  if (!terrain && !location.pathname.endsWith('learn.html') && !header.querySelector('.learn-pill')) {
+    const pill = document.createElement('a');
+    pill.href = 'learn.html'; pill.className = 'learn-pill';
+    pill.innerHTML = '<span aria-hidden="true">🪐</span>Learn<small>Moon &amp; Mars</small>';
+    if (getComputedStyle(header).position === 'static') header.style.position = 'relative';
+    header.append(pill);
+  }
   document.body.append(dialog);
   header.prepend(trigger);
   header.classList.add('site-header');
