@@ -363,7 +363,7 @@ function renderMarkers() {
       el.innerHTML = r.rank <= 3
         ? `${r.rank}<span class="mk-tag">${esc(r.label.text.replace(/^near /, ""))} <b>${fmtPct(r.score)}</b></span>`
         : String(r.rank);
-      if (r.rank <= 3) el.classList.add("named");
+      if (r.rank <= 3) { el.classList.add("named"); el.dataset.rank = r.rank; }
       el.dataset.key = `site-${r.index}`;
       el.setAttribute("aria-label", `#${r.rank} ${r.label.text}, ${fmtPct(r.score)} match`);
       el.addEventListener("click", () => { hidePeek(); selectResult(r); });
@@ -687,15 +687,6 @@ function renderTargetDetail() {
     <p class="ti-hint">${icon("globe-hemisphere-east")}<span>Tap a condition to see it across Earth.</span>
       <button type="button" class="ti-back link-button" hidden>Back to the match map</button></p>
     <ul class="tp-chips">${chips}</ul>
-    <section class="ti-funnel" aria-label="How Earth gets narrowed down">
-      <div class="ti-funnel-head">
-        <div><b>How Earth gets narrowed down</b><small>Watch the globe as each condition is switched on.</small></div>
-        <button type="button" class="ti-play">${icon("play")} Play</button>
-      </div>
-      <ol class="ti-steps"></ol>
-      <p class="ti-caption" aria-live="polite"></p>
-      <button type="button" class="ti-restore link-button" hidden>Back to the match map</button>
-    </section>
     <details class="tp-more"><summary>Full matching profile and sources</summary>
       <p class="pf-intro">Each bar runs from Earth's lowest to highest value.</p>
       <div class="ti-compare">
@@ -718,7 +709,6 @@ function renderTargetDetail() {
     showLayer: (k) => { $("layer").value = k; $("layer").dispatchEvent(new Event("change")); },
     setOverlay: (img) => { globe.setOverlay(img); flat.setOverlay(img); },
     restoreOverlay: () => paintLayer(),
-    setLegend: (html) => { $("legend").innerHTML = html; },
     setPlacePin: (pin, fly) => {
       state.placePin = pin;
       renderMarkers();
@@ -735,7 +725,6 @@ function renderTargetDetail() {
       const sep = Math.acos(Math.max(-1, Math.min(1, a.reduce((t, x, i) => t + x * b[i], 0)))) * 180 / Math.PI;
       setTimeout(() => globe.flyTo(lat, lon, Math.min(5.2, 2.4 + sep / 40)), 1500);
     },
-    funnelQuery: () => `target_id=${encodeURIComponent(state.targetId)}&weights=${encodeURIComponent(Object.entries(state.weights).map(([k, v]) => `${k}:${v}`).join(","))}`,
   });
   const caption = $("twinCaption");
   caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} · ${fmtCoord(t.latitude, t.longitude)}`;

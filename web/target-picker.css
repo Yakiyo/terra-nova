@@ -113,7 +113,7 @@
 .pf-sources a { display: block; margin-top: 6px; color: var(--ink); font-size: 12.5px; line-height: 1.4; }
 .pf-sources .i { width: 12px; height: 12px; vertical-align: -1px; }
 
-/* ---------- Target insights: clickable conditions, comparison, funnel ---------- */
+/* ---------- Target insights: clickable conditions, comparison ---------- */
 #targetDetail .ti-hint { display: flex; align-items: center; gap: 6px; margin: -2px 0 8px; color: var(--tool); font-size: 12px; }
 .ti-hint .i { width: 14px; height: 14px; flex: none; }
 #targetDetail .ti-hint .ti-back { margin-left: auto; font-size: 12px; white-space: nowrap; }
@@ -146,33 +146,6 @@
 .ti-readout span { display: inline-flex; align-items: center; gap: 5px; }
 .ti-readout b { color: var(--ink-2); font-weight: 600; }
 
-.ti-funnel { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r);
-  background: linear-gradient(180deg, rgba(242,29,56,.07), transparent 70%); }
-.ti-funnel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.ti-funnel-head b { display: block; color: var(--ink); font-size: 13.5px; }
-.ti-funnel-head small { display: block; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; }
-.ti-play { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; border-radius: 999px;
-  background: var(--accent-btn); color: #fff; font: 600 12.5px var(--font); cursor: pointer; }
-.ti-play:hover { background: var(--accent-btn-hover); }
-.ti-play:disabled { opacity: .7; cursor: default; }
-.ti-play .i { width: 14px; height: 14px; }
-.ti-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
-.ti-funnel.is-playing .ti-steps { margin-top: 12px; }
-.ti-step { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; animation: ti-in .45s var(--ease) both; }
-.ti-bar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-3); position: relative; overflow: hidden; }
-.ti-bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: 4px; background: var(--accent);
-  animation: ti-grow .8s var(--ease) both; }
-.ti-step:first-child .ti-bar::after { background: var(--ink-3); }
-.ti-step-label { color: var(--ink-2); font-size: 12px; }
-.ti-step b { color: var(--ink); font-size: 12.5px; }
-#targetDetail .ti-caption { margin: 10px 0 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.45; }
-.ti-caption:empty { display: none; }
-.ti-caption b { color: var(--ink); }
-.ti-restore { margin-top: 8px; font-size: 12px; }
-@keyframes ti-in { from { opacity: 0; transform: translateY(4px); } }
-@keyframes ti-grow { from { width: 100%; } }
-@media (prefers-reduced-motion: reduce) { .ti-step, .ti-bar::after { animation: none; } }
-.mk.ti-out { background: rgba(8,8,12,.75); box-shadow: inset 0 0 0 1px var(--line-2); }
 
 /* ---------- Map: analog zones, named top 3, "place you know" pin ---------- */
 .marks .mk.zone { display: inline-block; width: 16px; height: 11px; min-width: 0; padding: 0; border: 0; background: rgba(255,176,56,.25); box-shadow: inset 0 0 0 2px rgb(255,196,92), 0 0 6px rgba(255,170,40,.8); border-radius: 3px; }
@@ -193,6 +166,5 @@
   color: #fff; font: 600 12px var(--font); white-space: nowrap; }
 .marker.place-pin b { color: var(--tool); margin-left: 4px; }
 .ti-show-place { font-size: 12px; }
-.marker.tag-flip .mk-tag { left: auto; right: calc(100% + 6px); }
 .marker.tag-hide .mk-tag { opacity: 0; transition: opacity var(--t-fast); }
 .marker.tag-hide:hover .mk-tag, .marker.tag-hide:focus-visible .mk-tag { opacity: 1; z-index: 3; }
