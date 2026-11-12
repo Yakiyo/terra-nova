@@ -42,14 +42,25 @@ export function zoneDecorator(field, sorted, share = ZONE_SHARE) {
   const { cells, segs } = cache;
   return (ctx, s) => {
     ctx.save();
-    // Spotlight: fade the heatmap outside the zones so the zones carry the eye.
-    // (Path = whole map + each zone cell; even-odd fill punches the zones out.)
+    // Spotlight, like a highlighted country on a news map: outside the zones the heatmap is
+    // removed (no muddy red over the desert) and the Earth is gently dimmed; inside, the
+    // score colours stay. Path = whole map + each zone cell; even-odd punches the zones out.
+    const outside = () => {
+      ctx.beginPath();
+      ctx.rect(0, 0, 720 * s, 360 * s);
+      for (const i of cells) ctx.rect((i % 720) * s, Math.floor(i / 720) * s, s, s);
+    };
     ctx.globalCompositeOperation = "destination-out";
-    ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
+    ctx.fillStyle = "#000";
+    outside(); ctx.fill("evenodd");
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(4, 7, 14, 0.38)";
+    outside(); ctx.fill("evenodd");
+    // a warm wash inside so the zone reads as one region rather than pink speckle
+    ctx.fillStyle = "rgba(255, 176, 56, 0.16)";
     ctx.beginPath();
-    ctx.rect(0, 0, 720 * s, 360 * s);
     for (const i of cells) ctx.rect((i % 720) * s, Math.floor(i / 720) * s, s, s);
-    ctx.fill("evenodd");
+    ctx.fill();
     ctx.globalCompositeOperation = "source-over";
     ctx.beginPath();
     for (let i = 0; i < segs.length; i += 4) {
