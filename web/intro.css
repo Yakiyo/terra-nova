@@ -1,0 +1,39 @@
+/* Opening frame ("Voyager"): a glowing Mars rim, a line of analog sites, vertical wordmark. */
+.tn-intro { position: fixed; inset: 0; z-index: 200; background: radial-gradient(120% 90% at 70% 50%, #1d1715 0%, #0b0a0a 55%, #050505 100%); overflow: hidden; cursor: pointer;
+  transition: opacity 1s ease, visibility 1s; }
+.tn-intro.is-gone { opacity: 0; visibility: hidden; }
+.tn-intro::before { content: ""; position: absolute; inset: 0; opacity: .06; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.tn-rim { position: absolute; top: 50%; left: 58%; width: 120vh; height: 120vh; transform: translate(-6%, -50%); border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #0a0909 60%, transparent 70.6%);
+  box-shadow: -14px 0 24px -6px rgba(255,110,60,.85), -40px 0 90px -10px rgba(255,90,40,.55), -120px 0 220px -40px rgba(140,190,200,.25);
+  animation: tn-breathe 6s ease-in-out infinite; }
+.tn-rim::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: conic-gradient(from 200deg, transparent 0 8%, rgba(255,120,70,.7) 14%, rgba(255,160,110,.25) 22%, transparent 32% 100%); filter: blur(10px); -webkit-mask: radial-gradient(circle, transparent 69%, #000 70.5%, transparent 74%); mask: radial-gradient(circle, transparent 69%, #000 70.5%, transparent 74%); }
+@keyframes tn-breathe { 50% { box-shadow: -16px 0 30px -6px rgba(255,120,70,.95), -50px 0 110px -10px rgba(255,90,40,.6), -140px 0 240px -40px rgba(140,190,200,.3); } }
+.tn-line { position: absolute; top: 50%; left: 6%; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35) 20%, rgba(255,255,255,.55) 58%, rgba(255,255,255,.15)); }
+.tn-line i { position: absolute; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: #fff; opacity: .8; animation: tn-blink 3s ease-in-out infinite; }
+.tn-line i.big { top: -9px; width: 18px; height: 18px; background: #0c0a0a; border: 1.5px solid #fff; box-shadow: 0 0 22px rgba(255,140,90,.8); animation: none; }
+.tn-line i.big::after { content: ""; position: absolute; left: 50%; top: 50%; width: 90px; height: 1px; background: rgba(255,255,255,.6); transform: translate(-50%, -50%) rotate(-40deg); }
+@keyframes tn-blink { 50% { opacity: .25; } }
+.tn-word { position: absolute; left: clamp(28px, 13vw, 200px); top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; text-orientation: upright;
+  font: 500 12px/1 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.2em; color: rgba(255,255,255,.7); }
+.tn-copy { position: absolute; left: clamp(70px, 20vw, 300px); bottom: 12vh; max-width: 520px; color: #eee; }
+.tn-copy h1 { margin: 0 0 10px; font: 400 clamp(30px, 4.4vw, 58px)/1.02 "Anton", system-ui, sans-serif; letter-spacing: .01em; }
+.tn-copy h1 b { color: #ff7a4a; font-weight: 400; }
+.tn-copy p { margin: 0; font: 12px/1.6 "IBM Plex Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+.tn-go { position: absolute; right: 5vw; bottom: 8vh; font: 12px "IBM Plex Mono", monospace; letter-spacing: .2em; text-transform: uppercase; color: #fff; background: none; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 12px 20px; cursor: pointer; }
+.tn-go:hover { background: #fff; color: #111; }
+.tn-intro > * { opacity: 0; animation: tn-in 1.4s ease forwards; }
+.tn-intro > .tn-rim { animation: tn-in 2.2s ease forwards, tn-breathe 6s ease-in-out 2.2s infinite; }
+.tn-intro > .tn-line { animation-delay: .6s; } .tn-intro > .tn-word { animation-delay: 1s; } .tn-intro > .tn-copy { animation-delay: 1.4s; } .tn-intro > .tn-go { animation-delay: 2s; }
+@keyframes tn-in { to { opacity: 1; } }
+@media (max-width: 700px) { .tn-rim { left: 40%; } .tn-copy { left: 56px; right: 20px; bottom: 18vh; } .tn-word { left: 18px; letter-spacing: .9em; } }
+@media (prefers-reduced-motion: reduce) { .tn-intro *, .tn-intro > * { animation: none !important; opacity: 1; } }
+
+/* By the numbers */
+.tn-numbers { padding: 90px clamp(16px, 6vw, 80px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid rgba(255,255,255,.08); position: relative; z-index: 2; }
+.tn-numbers > h2 { grid-column: 1 / -1; margin: 0 0 10px; font: 400 clamp(30px, 4.6vw, 60px)/1.02 "Anton", system-ui, sans-serif; }
+.tn-numbers > h2 b { color: #ff4961; font-weight: 400; }
+.tn-num { border-top: 1px solid rgba(255,255,255,.25); padding-top: 14px; }
+.tn-num b { display: block; font: 400 clamp(44px, 6.5vw, 92px)/1 "Anton", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.tn-num span { font: 12px/1.5 "IBM Plex Mono", monospace; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+@media (max-width: 700px) { .tn-numbers { grid-template-columns: 1fr; } }
