@@ -41,3 +41,6 @@
 
 .cinematic-copy .tn-learn { display: inline-block; margin: 20px 0 20px 10px; padding: 19px 29px; border: 1px solid rgba(255,255,255,.6); background: transparent; color: #fff; text-decoration: none; text-transform: uppercase; letter-spacing: .06em; font-size: 13px; pointer-events: auto; }
 .cinematic-copy .tn-learn:hover { background: #fff; color: #111; }
+
+/* Home footer: no divider line or solid band, so the Earth horizon runs to the bottom. */
+.page-home .site-foot { border-top: 0; background: transparent; z-index: 2; }

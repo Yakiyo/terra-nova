@@ -236,13 +236,13 @@ export function initPlanetJourney(root, getSelection) {
     const leave = scrollIndex === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .62) / .38);
     if (shownIndex < 0) shownIndex = scrollIndex;
     const targetVis = scrollIndex !== shownIndex ? 0 : arrive * (1 - leave);
-    visSm += (targetVis - visSm) * (reduced.matches ? 1 : 1 - Math.exp(-dt * (targetVis < visSm ? 5.5 : 2.6)));
-    if (scrollIndex !== shownIndex && visSm < .04) shownIndex = scrollIndex;
+    visSm += (targetVis - visSm) * (reduced.matches ? 1 : 1 - Math.exp(-dt * (targetVis < visSm ? 9 : 3.6)));
+    if (scrollIndex !== shownIndex && visSm < .08) shownIndex = scrollIndex;
     const index = shownIndex, visibility = visSm;
     blackout.style.opacity = String(1 - visibility);
     root.dataset.chapter = String(scrollIndex);
     copies.forEach((copy, i) => {
-      copy.style.opacity = reduced.matches ? String(i === scrollIndex ? 1 : 0) : String(i === scrollIndex ? (scrollIndex === 0 ? 1 : ease((raw - .04) / .20)) * (scrollIndex === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
+      copy.style.opacity = reduced.matches ? String(i === scrollIndex ? 1 : 0) : String(i === scrollIndex ? (scrollIndex === 0 ? 1 : Math.min(ease((raw - .04) / .20), shownIndex === scrollIndex ? Math.min(1, visSm * 1.4) : 0)) * (scrollIndex === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
       copy.style.pointerEvents = Number(copy.style.opacity) > .1 ? '' : 'none';
     });
     for (const w of Object.values(worlds)) w.group.visible = false;
@@ -291,7 +291,7 @@ export function initPlanetJourney(root, getSelection) {
     else if (index === chapters.length - 1) {
       // Finale: the story ends where it began, a soft Earth horizon under the call to action.
       earth.group.visible = true;
-      earth.group.position.set(0, -10.6 + (1 - enter) * -1.2, 0);
+      earth.group.position.set(0, -9.3 + (1 - enter) * -1.2, 0);
       earth.group.scale.setScalar(8.2);
       earth.surface.rotation.set(-.35, 1.4 + spin * .3, -.1);
       earthMaterial.uniforms.exposure.value = .32;
