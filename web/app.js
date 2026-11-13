@@ -7,11 +7,19 @@ import { GodsEye, SUN_PRESETS } from "./godseye.js";
 import { FlatMap } from "./flatmap.js";
 import { LAYER_RAMPS, cssGradient, paint, percentileOf, quantile, rampPosition, sortedFinite } from "./colors.js";
 import { initStarfield } from "./starfield.js";
+import { validationHtml } from "./validation-view.js";
+import { fillProcesses, fillTwin } from "./site-context.js";
 import { closeMenus, icon, menu, toast, ANALOG_ROLES, analogRoleBadge, catalogRole, download } from "./ui.js";
 import { breadcrumbs, targetTrail } from "./navigation.js";
 import { escapeHtml as esc, decodeFloat32 as decode, formatCoord, topShareText } from './format.js';
 import { BoundedCache } from './bounded-cache.js';
 import { fetchReadiness, readinessHtml } from "./readiness.js";
+import { renderTargetPicker, installTabIntros } from "./target-picker.js";
+import { enhanceTargetDetail, refreshComparison, syncActiveLayer } from "./target-insights.js";
+import { zoneDecorator, ZONE_SHARE, startTagDeclutter } from "./analog-zones.js";
+import { headlineHtml, listHtml } from "./results-view.js";
+import { dossierHtml, dataFoldHtml } from "./site-dossier.js";
+queueMicrotask(() => { installTabIntros(esc); const l = document.getElementById("labels"); if (l) startTagDeclutter(l); });
 
 const starfield = initStarfield("starfield");
 
@@ -50,6 +58,7 @@ const state = {
   tolerance: 0,        // permissible error multiplier (0 = exact targets)
   robust: null,        // /api/robustness payload for the current ranking
   analogValues: null,  // predictor values of the known analog sites (Explore tab)
+  placePin: null,      // {lat, lon, name, value}: "a place you know" on the map
 };
 const MAX_PINS = 3;
 
@@ -209,17 +218,38 @@ async function thumbFor(cell) {
   try { return await request; } finally { pendingThumbs.delete(cell.key); }
 }
 
+function gibsDirect(lat, lon) {
+  const s = Math.max(-90, lat - 1), n = Math.min(90, lat + 1), w = Math.max(-180, lon - 1), e = Math.min(180, lon + 1);
+  const url = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0"
+    + "&LAYERS=BlueMarble_NextGeneration&STYLES=&CRS=EPSG:4326"
+    + `&BBOX=${s},${w},${n},${e}&WIDTH=320&HEIGHT=320&FORMAT=image/jpeg`;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const t = setTimeout(() => resolve(null), 15000);
+    img.onload = () => { clearTimeout(t); resolve(url); };
+    img.onerror = () => { clearTimeout(t); resolve(null); };
+    img.src = url;
+  });
+}
+
 async function loadThumb(cell) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 6000);
   let out;
   try {
     const res = await fetch(`/api/thumb?lat=${cell.lat}&lon=${cell.lon}`, {signal:controller.signal});
     if (!res.ok) throw new Error(String(res.status));
     out = { src: URL.createObjectURL(await res.blob()), credit: "NASA Blue Marble NG · GIBS · 2°×2°" };
   } catch {
-    const src = localCrop(cell.lat, cell.lon);
-    out = src ? { src, credit: "Offline preview · Blue Marble 10 km" } : null;
+    // The server could not fetch it in time: ask NASA GIBS directly from the browser (same
+    // Blue Marble layer and 2 x 2 degree window as src/acquire/thumbs.py), and only fall
+    // back to the low-resolution crop of the globe texture if that fails too.
+    const direct = await gibsDirect(cell.lat, cell.lon);
+    if (direct) out = { src: direct, credit: "NASA Blue Marble NG · GIBS · 2°×2°" };
+    else {
+      const src = localCrop(cell.lat, cell.lon);
+      out = src ? { src, credit: "Offline preview · Blue Marble 10 km" } : null;
+    }
   } finally { clearTimeout(timer); }
   if (out) thumbCache.set(cell.key, out);
   return out;
@@ -354,7 +384,11 @@ function renderMarkers() {
       const active = state.selected && state.selected.index === r.index;
       const pinned = state.pins.some((x) => x.index === r.index);
       el.className = "marker" + (active ? " active" : "") + (r.rank > 10 && !active ? " minor" : "") + (pinned ? " pinned" : "");
-      el.textContent = r.rank;
+      // The top 3 carry their name on the map, so a first look reads as places, not numbers.
+      el.innerHTML = r.rank <= 3
+        ? `${r.rank}<span class="mk-tag">${esc(r.label.text.replace(/^near /, ""))} <b>${fmtPct(r.score)}</b></span>`
+        : String(r.rank);
+      if (r.rank <= 3) { el.classList.add("named"); el.dataset.rank = r.rank; }
       el.dataset.key = `site-${r.index}`;
       el.setAttribute("aria-label", `#${r.rank} ${r.label.text}, ${fmtPct(r.score)} match`);
       el.addEventListener("click", () => { hidePeek(); selectResult(r); });
@@ -363,6 +397,15 @@ function renderMarkers() {
       labels.appendChild(el);
       markers.push({ lat: r.lat, lon: r.lon, el });
     }
+  }
+  if (state.placePin) {
+    const p = state.placePin, el = document.createElement("div");
+    el.className = "marker place-pin";
+    el.innerHTML = `<i aria-hidden="true"></i><span>${esc(p.name)}${p.value ? ` <b>${esc(p.value)}</b>` : ""}</span>`;
+    el.setAttribute("role", "img");
+    el.setAttribute("aria-label", `${p.name}${p.value ? `: ${p.value}` : ""}`);
+    labels.appendChild(el);
+    markers.push({ lat: p.lat, lon: p.lon, el });
   }
   if (state.pick) {
     const el = document.createElement("div");
@@ -421,14 +464,26 @@ function infoCard(r) {
     $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
   });
   for (const type of ["pointerdown", "wheel", "dblclick"]) el.addEventListener(type, (e) => e.stopPropagation());
-  thumbFor(cellOf(r.lat, r.lon)).then((thumb) => {
+  {
+    // Instant preview cut from the globe's own Blue Marble image, replaced by the sharper
+    // NASA thumbnail when it arrives (a never-seen place can take several seconds).
     const box = el.querySelector(".ic-img");
-    if (!thumb || !box) return;
     const img = new Image();
     img.alt = `Satellite view around ${fmtCoord(r.lat, r.lon)}`;
-    img.src = thumb.src;
-    box.prepend(img);
-  });
+    const quick = localCrop(r.lat, r.lon);
+    if (quick && box) { img.src = quick; img.className = "is-quick"; box.prepend(img); }
+    // First sharp image wins: the NASA thumbnail or the terrain-relief preview.
+    let sharp = false;
+    const use = (src) => {
+      if (sharp || !box || !src || src.startsWith("data:")) return;
+      sharp = true; img.src = src; img.className = "";
+      if (!img.isConnected) box.prepend(img);
+    };
+    thumbFor(cellOf(r.lat, r.lon)).then((thumb) => use(thumb?.src));
+    const relief = new Image();
+    relief.onload = () => use(relief.src);
+    relief.src = `/api/peek.jpg?lat=${cellOf(r.lat, r.lon).lat}&lon=${cellOf(r.lat, r.lon).lon}`;
+  }
   // Sit above the point, but stay inside the stage.
   const onPlace = (x, y, w, h) => {
     const cw = el.offsetWidth, ch = el.offsetHeight;
@@ -472,8 +527,8 @@ function paintLayer() {
       <div class="ramp" style="background:${cssGradient("score")}"></div>
       <div class="scale abs num"><span style="left:0">top 50%</span><span style="left:80%">top 10%</span><span style="left:98%">1%</span></div>
       ${histogram()}
-      <div class="marks"><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span><span><i class="mk known" aria-hidden="true">${icon("mountains")}</i>geology only</span></div>
-      <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Bars: how many land cells
+      <div class="marks"><span><i class="mk zone"></i>analog zone (best ${Math.round(ZONE_SHARE * 100)}% of land)</span><span><i class="mk top">3</i>top 10</span><span><i class="mk minor"></i>rank 11 and below</span><span><i class="mk known" aria-hidden="true">${icon("rocket")}</i>known analog</span><span><i class="mk known" aria-hidden="true">${icon("mountains")}</i>geology only</span></div>
+      <div class="note">Brighter = closer match; uncoloured land is in the bottom half. Outside the amber analog zones the map is dimmed so the best regions stand out; pick a criterion above to see the raw data everywhere. Bars: how many land cells
         reach each score (red = top 10%, at least ${fmtPct(q(0.9))}).</div>
       <div class="credit-line">Earth: <a href="${esc(state.sources.basemaps.earth.url)}" target="_blank" rel="noopener">${esc(state.sources.basemaps.earth.credit)}</a></div>`;
   } else {
@@ -494,8 +549,10 @@ function paintLayer() {
         Source:
         <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.dataset)}</a></div>`;
   }
-  globe.setOverlay(image);
-  flat.setOverlay(image);
+  // Analog zones: glowing outlines around the best share of land, on the score layer only.
+  const zones = state.layer === "score" ? zoneDecorator(state.field, state.sorted) : null;
+  globe.setOverlay(image, zones);
+  flat.setOverlay(image, zones);
   $("legend").classList.toggle("collapsed", ui.legend === false);
   $("legend").querySelector(".box-toggle").addEventListener("click", () => setUi("legend", ui.legend === false));
 }
@@ -594,69 +651,109 @@ async function setLayer(key) {
   if (seq !== layerSeq) return;
   state.layer = key;
   paintLayer();
+  syncActiveLayer(key);
 }
 
 /* ----------------------------------------------------------------- targets */
 
 function renderTargets() {
-  const groups = [];
-  for (const t of state.targets) {
-    let g = groups.find((x) => x.name === t.group);
-    if (!g) groups.push((g = { name: t.group, items: [] }));
-    g.items.push(t);
-  }
-  const card = (t) => `
-    <button class="target-card" role="radio" aria-checked="${state.mode === "target" && t.id === state.targetId}" data-id="${esc(t.id)}" type="button">
-      <span class="planet" style="background-image:url(assets/${esc(t.body.toLowerCase())}_sm.jpg)"></span>
-      <strong>${esc(t.short_name)}</strong>
-      <small>${Math.abs(t.latitude).toFixed(1)}°${t.latitude >= 0 ? "N" : "S"} ${Math.abs(t.longitude).toFixed(1)}°${t.longitude >= 0 ? "E" : "W"}</small>
-    </button>`;
-  const html = groups.map((g) => `
-    <p class="group-label">${esc(g.name)}</p>
-    <div class="target-grid">${g.items.map(card).join("")}</div>`).join("") + `
-    <p class="group-label">Your own</p>
-    <div class="target-grid">
-      <button class="target-card custom" role="radio" aria-checked="${state.mode === "custom"}" data-id="${CUSTOM_ID}" type="button">
-        <span class="planet planet-custom" aria-hidden="true">${icon("sliders-horizontal")}</span>
-        <strong>Your own profile</strong><small>type the values</small>
-      </button>
-    </div>`;
-  $("targets").innerHTML = html;
-  $("targets").querySelectorAll(".target-card").forEach((b) => b.addEventListener("click", () => chooseTarget(b.dataset.id)));
+  renderTargetPicker($("targets"), {
+    targets: state.targets, selectedId: state.targetId, custom: state.mode === "custom",
+    onChoose: chooseTarget, customId: CUSTOM_ID, esc, icon,
+  });
 }
+
+// Plain-language "what / why" for each built-in target, for first-time visitors.
+// Facts are taken from each target's summary and source in data/targets.json.
+const TARGET_PLAIN = {
+  lunar_south_pole: ["The rim of Shackleton crater, at the Moon's south pole.", "Sunlit ridges for solar power sit right next to dark craters that trap water ice. It is a candidate Artemis III landing region."],
+  malapert_massif: ["A mountain about 5 km high near the Moon's south pole.", "It is high, sunlit and always in sight of Earth for radio contact. NASA lists it as an Artemis III candidate landing region."],
+  haworth_psr: ["A crater near the south pole that never sees sunlight.", "It is among the coldest places on the Moon and traps water ice. Nothing on Earth is that cold, so we look for Earth's coldest, driest, steadiest land."],
+  lunar_lava_tube: ["A pit in the Marius Hills that opens into an underground lava tube.", "A natural shelter from radiation, micrometeoroids and temperature swings. Inside it stays near 17 °C, so we look for volcanic basalt land with a mild, steady climate."],
+  jezero_crater: ["Where NASA's Perseverance rover landed: an ancient lake bed with two river deltas.", "Old lake sediments are one of the best places to search for signs of past life on Mars."],
+  gale_crater: ["Where NASA's Curiosity rover explores, at the foot of a layered mountain called Mount Sharp.", "Its rock layers record how Mars changed from wet to dry. We match its climate and terrain."],
+  utopia_permafrost: ["A huge northern plain with ice buried under the ground.", "Radar found about as much water as Lake Superior: a possible water supply for a base. Mars is colder than any ice-free ground on Earth, so we look for Earth's cold, dry permafrost."],
+};
 
 function renderTargetDetail() {
   const selectedTarget = target();
   breadcrumbs($("finderBreadcrumbs"), [...targetTrail(selectedTarget), { label: state.mode === "custom" ? "Custom profile · Finder" : `${selectedTarget?.short_name || "Target"} · Finder` }]);
   if (state.mode === "custom") { renderCustomForm(); return; }
   const t = target();
+  // One row per condition: the value Earth is matched against, where it sits in
+  // Earth's own range, and a single plain-language status.
+  const STATUS = {
+    exact: ["Exact", "measured on the site and inside Earth's range"],
+    edge: ["Beyond Earth", "more extreme than any land on Earth, so Earth's closest value is used"],
+    est: ["Estimated", "a terrain class judged from finer-scale measurements"],
+    off: ["Not used", "this condition does not decide the match for this site"],
+  };
   const rows = state.criteria.map((c) => {
     const m = t.criteria[c.key];
-    if (m.value === null || m.value === undefined) {
-      return `<tr class="unused"><th scope="row">${esc(c.label)}</th><td><span class="tag" title="${esc(m.definition_note || "")}">not used for this site</span></td></tr>`;
+    const unusable = m.value === null || m.value === undefined;
+    const kind = unusable || (state.weights[c.key] ?? 0) === 0 ? "off"
+      : "earth_percentile" in m ? "est"
+        : Math.abs(m.effective_value - m.value) > 1e-9 ? "edge" : "exact";
+    if (kind === "off") {
+      return `<li class="pf-row is-off" data-key="${esc(c.key)}"><span class="pf-label">${esc(c.label)}</span><span class="pf-tag pf-off">Not used</span></li>`;
     }
-    const off = (state.weights[c.key] ?? 0) === 0;
-    let used = fmtValue(m.effective_value, c.unit);
-    let note = "";
-    if ("earth_percentile" in m) {
-      const measured = m.measured_value === null || m.measured_value === undefined
-        ? "qualitative" : `measured ${esc(fmtValue(m.measured_value, c.unit))} at ${esc(m.baseline || "a finer scale")}`;
-      note = `<span class="note"><span class="tag" title="A judgement-call terrain class, not a measurement at this scale">estimated</span> Earth's ${m.earth_percentile}th percentile (${measured})</span>`;
-    } else if (Math.abs(m.effective_value - m.value) > 1e-9) {
-      note = `<span class="note">real value ${esc(fmtValue(m.value, c.unit))} lies outside the range of 99% of Earth's land; matched to that range's edge</span>`;
-    }
-    if (off) { used = `<span class="tag">not scored</span>`; note = ""; }
-    return `<tr><th scope="row">${esc(c.label)}</th><td>${used}${note}</td></tr>`;
+    const lo = Number(c.earth_min), hi = Number(c.earth_max);
+    const pos = hi > lo ? Math.max(0, Math.min(1, (m.effective_value - lo) / (hi - lo))) : 0.5;
+    const detail = kind === "edge" ? `Real value ${esc(fmtValue(m.value, c.unit))}`
+      : kind === "est" ? `Earth's ${m.earth_percentile}th percentile${m.measured_value != null ? ` · measured ${esc(fmtValue(m.measured_value, c.unit))}` : ""}`
+        : "";
+    return `<li class="pf-row" data-key="${esc(c.key)}" data-layer="${esc(c.key)}" title="Show ${esc(c.label.toLowerCase())} across Earth">
+      <span class="pf-label">${esc(c.label)}</span>
+      <b class="pf-value num">${esc(fmtValue(m.effective_value, c.unit))}</b>
+      <span class="pf-bar" role="img" aria-label="${Math.round(pos * 100)}% of the way through Earth's range"><i style="left:${(pos * 100).toFixed(1)}%"></i></span>
+      <span class="pf-ends"><span>${esc(fmtValue(lo, c.unit))}</span><span>${esc(fmtValue(hi, c.unit))}</span></span>
+      <span class="pf-tag pf-${kind}" title="${esc(STATUS[kind][1])}">${STATUS[kind][0]}</span>
+      ${detail ? `<span class="pf-detail">${detail}</span>` : ""}
+      <span class="ti-readout"></span>
+    </li>`;
   }).join("");
+  const plain = TARGET_PLAIN[t.id];
+  const chips = state.criteria.filter((c) => {
+    const m = t.criteria[c.key];
+    return m.value !== null && m.value !== undefined && (state.weights[c.key] ?? 0) !== 0;
+  }).map((c) => `<li><button type="button" data-layer="${esc(c.key)}" title="Show ${esc(c.label.toLowerCase())} across Earth"><small>${esc(c.label)}</small><b class="num">${esc(fmtValue(t.criteria[c.key].effective_value, c.unit))}</b></button></li>`).join("");
   $("targetDetail").innerHTML = `
-    <p>${esc(t.summary)}</p>
-    <div class="target-links">
-      <a href="${esc(t.source_url)}" target="_blank" rel="noopener">Source: ${esc(t.source_label || "reference")}</a>
-      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">Open NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
-    </div>
-    <details><summary>How matching works</summary><p class="how">Earth cells are matched against this site's measured conditions using your weights.</p></details>
-    ${t.location_note ? `<p class="hint">${esc(t.location_note)}</p>` : ""}
-    <table class="profile"><caption>What Earth is matched against</caption>${rows}</table>`;
+    ${plain ? `<dl class="tp-plain"><dt>What it is</dt><dd>${esc(plain[0])}</dd><dt>Why it matters</dt><dd>${esc(plain[1])}</dd></dl>`
+      : `<p class="tp-summary">${esc(t.summary)}</p>`}
+    <h3 class="tp-chips-head">What Earth must look like to match</h3>
+    <p class="ti-hint">${icon("globe-hemisphere-east")}<span>Tap a condition to see it across Earth.</span>
+      <button type="button" class="ti-back link-button" hidden>Back to the match map</button></p>
+    <ul class="tp-chips">${chips}</ul>
+    <details class="tp-more"><summary>Full matching profile and sources</summary>
+      <p class="pf-intro">Each bar runs from Earth's lowest to highest value.</p>
+      <div class="ti-compare">
+        <span class="ti-keys"><span><i class="k-target"></i>this site</span><span><i class="k-match"></i><span class="ti-key-match">#1 match</span></span><span><i class="k-place"></i>a place you know:</span></span>
+        <select class="ti-place-select" aria-label="Compare with a place you know"></select>
+        <button type="button" class="ti-show-place link-button">Show on globe</button>
+      </div>
+      <ul class="pf-legend">${Object.entries(STATUS).map(([k, [name, why]]) => `<li><span class="pf-tag pf-${k}">${name}</span>${esc(why)}</li>`).join("")}</ul>
+      <ul class="pf-list">${rows}</ul>
+      ${t.location_note ? `<div class="pf-note"><b>About the pin</b><p>${esc(t.location_note)}</p></div>` : ""}
+      <div class="pf-sources"><b>Where this comes from</b>
+        <a href="${esc(t.source_url)}" target="_blank" rel="noopener">${esc(t.source_label || "Reference")} ${icon("arrow-square-out")}</a>
+        ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">See it on NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}</a>` : ""}
+      </div>
+    </details>`;
+  enhanceTargetDetail({
+    api, esc, fmtValue, decode, currentLayer: () => state.layer,
+    criterion: (k) => state.criteria.find((c) => c.key === k),
+    topResult: () => state.data?.results?.[0] || null,
+    showLayer: (k) => { $("layer").value = k; $("layer").dispatchEvent(new Event("change")); },
+    setOverlay: (img) => { globe.setOverlay(img); flat.setOverlay(img); },
+    restoreOverlay: () => paintLayer(),
+    setPlacePin: (pin, fly) => {
+      state.placePin = pin;
+      renderMarkers();
+      if (!pin || !fly) return;
+      if (state.view === "map") { flat.flyTo(pin.lat, pin.lon, 3); return; }
+      globe.flyTo(pin.lat, pin.lon);
+    },
+  });
   const caption = $("twinCaption");
   caption.innerHTML = `<strong>${esc(t.short_name)}</strong>${esc(t.body)} · ${fmtCoord(t.latitude, t.longitude)}`;
   $("twin").hidden = !twin;
@@ -897,6 +994,7 @@ const topKSoon = debounce(() => { if (!state.selected) showList(); runScore(); }
 
 /* fresh: a new ranking (stagger the rows in); otherwise an in-place refresh. */
 function renderResults(fresh = false) {
+  queueMicrotask(refreshComparison);
   const d = state.data;
   if (!d || state.awaitingCustom) return;
   const bits = [];
@@ -904,17 +1002,25 @@ function renderResults(fresh = false) {
   if (d.filters?.min_distance_km) bits.push(`${fmtInt(d.filters.min_distance_km)} km minimum spacing`);
   if (d.filters?.max_per_country) bits.push(`${d.filters.max_per_country} per country maximum`);
   if (d.filters?.tolerance) bits.push(`error band ×${d.filters.tolerance}`);
-  $("resultsSummary").innerHTML = `Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.`
-    + (d.shortfall ? `<br><span class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</span>` : "");
+  const SHORT = { precipitation: "Rain", vegetation: "Green", annual_temperature_range: "Seasons", lst_diurnal_range: "Day/night",
+    slope: "Slope", roughness: "Rough", elevation: "Height", mean_annual_temperature: "Temp", basaltic_volcanic: "Basalt" };
+  const view = {
+    esc, icon, fmtPct, fmtValue, stabilityOf, criteria: state.criteria, coord: fmtCoord,
+    label: (k) => state.criteria.find((c) => c.key === k)?.label || k,
+    short: (c) => SHORT[c.key] || c.label.split(" ")[0],
+    pinned: (r) => state.pins.some((x) => x.index === r.index),
+    selected: state.selected?.index,
+    rankingKey: state.mode === "custom" ? "custom" : state.targetId,
+  };
+  if ($("detail").hidden) $("resultsSummary").hidden = false;
+  $("resultsSummary").innerHTML = headlineHtml(d, view)
+    + `<p class="rv-filters">Top ${d.results.length} of ${fmtInt(state.sorted.length)} land cells${bits.length ? ` · ${bits.join(" · ")}` : ""}.</p>`
+    + (d.shortfall ? `<p class="shortfall">${esc(d.shortfall)} Loosen a filter to see more.</p>` : "");
+  $("resultsSummary").querySelector(".rv-known-toggle")?.addEventListener("click", () => {
+    const box = $("newOnly"); box.checked = false; box.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   $("siteList").classList.toggle("fresh", fresh);
-  $("siteList").innerHTML = d.results.map((r, n) => `
-    <li style="--n: ${n}"><button class="site ${state.selected?.index === r.index ? "active" : ""}" data-index="${r.index}" type="button">
-      <span class="rank num">${r.rank}</span>
-      <span class="name">${esc(r.label.text)}</span>
-      <span class="score"><span class="score-meter" style="--score-value:${r.score}" role="img" aria-label="${fmtPct(r.score)} match" data-source-url="/api/score" data-dataset-id="terra_nova_predictor_stack"><b aria-hidden="true">${fmtPct(r.score)}</b></span><small>match</small></span>
-      <span class="meta"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(r.novelty)}${state.pins.some((x) => x.index === r.index) ? `<span class="pin-star" title="Pinned">pinned</span>` : ""}${stabilityOf(r) !== null ? `<span class="stable" title="Stays in the top 1% of land in ${fmtPct(stabilityOf(r))} of ${state.robust.runs} simulated runs">stable ${fmtPct(stabilityOf(r))}</span>` : ""}</span>
-      <span class="bar" aria-hidden="true"><i style="width:${(r.score * 100).toFixed(1)}%"></i></span>
-    </button></li>`).join("");
+  $("siteList").innerHTML = listHtml(d, view);
   $("siteList").querySelectorAll(".site").forEach((b) => {
     const r = d.results.find((x) => String(x.index) === b.dataset.index);
     b.addEventListener("click", () => { hidePeek(); selectResult(r); });
@@ -987,6 +1093,8 @@ function showList() {
   state.card = null;
   $("detail").hidden = true;
   $("siteList").hidden = false;
+  $("resultsSummary").hidden = false;
+  document.querySelector("#results > .advanced-settings")?.removeAttribute("hidden");
   $("siteList").querySelectorAll(".site").forEach((b) => b.classList.remove("active"));
   renderMarkers();
 }
@@ -1028,46 +1136,57 @@ function renderDetail(r) {
   $("siteList").hidden = true;
   const det = $("detail");
   det.hidden = false;
-  det.innerHTML = `
-    <button class="ghost small back" type="button">${icon("arrow-left")}All ranked sites</button>
-    <h3>${title}</h3>
-    <div class="coords"><span class="num">${fmtCoord(r.lat, r.lon)}</span>${noveltyChip(nov)}
-      <button class="link-button" type="button" data-copy="${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}">Copy coordinates</button></div>
-    <div class="hero">
-      <div class="big num">${(r.score * 100).toFixed(0)}<small>%</small></div>
-      <div class="what">match to <b>${esc(t.short_name)}</b><br>
-        ${topShare(r.percentile)} of ${fmtInt(state.sorted.length)} land cells</div>
-    </div>
-    <div class="detail-actions">
-      <button class="godseye-button" type="button" id="openEye" ${Math.abs(r.lat) > 84 ? "disabled title=\"Elevation tiles stop at about 84 degrees latitude\"" : ""}>
-        ${icon("cube-focus")}Open in God's Eye 3D</button>
-      <button class="ghost small" type="button" id="pinSite">${state.pins.some((x) => x.index === r.index) ? "Unpin" : "Pin to compare"}</button>
-    </div>
-    <p class="notice">${novText}</p>
-    ${robustLine(r)}
-    ${lstNote}
-    <h4 class="section-title">See the place</h4>
-    ${viewsStrip(r)}
-    <h4 class="section-title">Criterion by criterion</h4>
-    ${crits}
-    <h4 class="section-title">Hardware test readiness</h4>
-    <div class="readiness" id="readiness" data-key="${r.lat},${r.lon}" aria-live="polite"><p class="hint">Checking which systems could be tested here…</p></div>
-    <h4 class="section-title">Verify it yourself</h4>
-    <div class="verify">
-      <a href="${esc(worldview)}" target="_blank" rel="noopener">NASA Worldview ${icon("arrow-square-out")}<small>MODIS true colour here</small></a>
-      <a href="${esc(gmaps)}" target="_blank" rel="noopener">Satellite view ${icon("arrow-square-out")}<small>Google Maps imagery</small></a>
-      ${t.trek_url ? `<a href="${esc(t.trek_url)}" target="_blank" rel="noopener">NASA ${esc(t.body)} Trek ${icon("arrow-square-out")}<small>the target site</small></a>` : ""}
-      ${t.source_url ? `<a href="${esc(t.source_url)}" target="_blank" rel="noopener">Target reference ${icon("arrow-square-out")}<small>${esc(t.source_label || "")}</small></a>` : ""}
-    </div>
-    <details class="drawer"><summary>Why, in words (with sources)</summary><div><ul>${claims}</ul></div></details>
-    <details class="drawer"><summary>Caveats</summary><div><ul>${caveats}</ul></div></details>
-    <details class="drawer"><summary>Raw data behind these numbers</summary><div>
-      <pre class="json">${esc(JSON.stringify({ lat: r.lat, lon: r.lon, score: r.score, percentile: r.percentile, values: r.values, similarities: r.similarities, weights: d.weights, target: d.profile, effective_target: eff, lst_source: r.lst_source, novelty: nov }, null, 2))}</pre></div></details>`;
+  const rawData = { lat: r.lat, lon: r.lon, score: r.score, percentile: r.percentile, values: r.values, similarities: r.similarities, weights: d.weights, target: d.profile, effective_target: eff, lst_source: r.lst_source, novelty: nov };
+  const moreHtml = dataFoldHtml(r, {
+    esc, icon, fmtValue, fmtPct, fmtInt, data: d, criteria: state.criteria, target: t,
+    stability: stabilityOf(r), runs: state.robust?.runs || 0, lstNote: !!lstNote, viewsHtml: viewsStrip(r),
+  });
+  void crits; void claims; void caveats;
+  void title;
+  det.innerHTML = dossierHtml(r, {
+    esc, icon, fmtValue, fmtPct, fmtInt, target: t, data: d, criteria: state.criteria,
+    coord: fmtCoord, topShare: topShare(r.percentile), cells: state.sorted.length,
+    stability: stabilityOf(r), pinned: state.pins.some((x) => x.index === r.index),
+    bodyImage: `assets/${t.body.toLowerCase()}_sm.jpg`,
+    quickUrl: localCrop(r.lat, r.lon), fallbackUrl: `/api/thumb?lat=${r.lat}&lon=${r.lon}`,
+    worldview, gmaps, moreHtml,
+  });
+  fillProcesses(det.querySelector("#sdProc"));
+  fillTwin(det, t);
+  $("resultsSummary").hidden = true;
+  document.querySelector("#results > .advanced-settings")?.setAttribute("hidden", "");
+  {
+    det.dataset.index = String(r.index);
+    const hero = det.querySelector(".sd-hero"), key = String(r.index);
+    const set = (url, sharp) => {
+      if (!hero || det.dataset.index !== key) return;
+      hero.style.backgroundImage = `url('${url}')`;
+      if (sharp) hero.classList.add("is-sharp");
+    };
+    const quick = localCrop(r.lat, r.lon);
+    if (quick) set(quick, false);
+    hero?.classList.add("is-loading");
+    // The NASA thumbnail counts as sharp only if it really came from the server (the
+    // offline fallback is the same low-resolution crop as the placeholder).
+    thumbFor(cellOf(r.lat, r.lon)).then((t) => { if (t && !t.src.startsWith("data:")) set(t.src, true); });
+    const relief = new Image();
+    relief.onload = () => { set(relief.src, true); hero?.classList.remove("is-loading"); };
+    const giveUp = () => {
+      if (!hero || det.dataset.index !== key || hero.classList.contains("is-sharp")) return;
+      hero.classList.remove("is-loading");
+      hero.classList.add("is-lowres");
+    };
+    relief.onerror = giveUp;
+    setTimeout(giveUp, 25000);
+    relief.src = `/api/peek.jpg?lat=${r.lat}&lon=${r.lon}`;
+  }
   det.querySelector(".back").addEventListener("click", showList);
   det.querySelector("#openEye").addEventListener("click", () => openGodsEye(r));
+  det.querySelector("#sdRaw")?.addEventListener("click", () => download(`terranova-site-${r.lat}_${r.lon}.json`, JSON.stringify(rawData, null, 2), "application/json"));
   det.querySelector("#pinSite").addEventListener("click", () => togglePin(r));
   det.querySelector("[data-copy]").addEventListener("click", async (e) => {
-    try { await navigator.clipboard.writeText(e.target.dataset.copy); e.target.textContent = "Copied"; } catch { e.target.textContent = e.target.dataset.copy; }
+    const b = e.currentTarget;
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.lastChild.textContent = "Copied"; } catch { b.lastChild.textContent = b.dataset.copy; }
   });
   // Hardware test readiness (src/compute/qualification.py), filled in when it arrives.
   const readinessKey = `${r.lat},${r.lon}`;
@@ -1105,23 +1224,8 @@ function renderValidation() {
   }
   $("statusAuc").innerHTML = `<span class="auc-label">AUC </span><span class="auc-value">${v.auc.toFixed(2)}</span>`;
   $("statusVal").innerHTML = `<span class="num">AUC ${v.auc.toFixed(2)}</span> on ${v.positives} known sites`;
-  const rows = v.controls.map((c) => `
-    <tr><td>${c.source_url ? `<a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.name)}</a>` : esc(c.name)}<br>${analogRoleBadge(c.role)}</td>
-      <td class="n">${c.score === null ? "–" : fmtPct(c.score)}</td>
-      <td class="pbar">${c.percentile === null ? "" : `<div class="bar" role="img" aria-label="percentile ${c.percentile}"><i style="width:${c.percentile}%"></i></div>`}</td>
-      <td class="n">${c.percentile === null ? "–" : `p${c.percentile.toFixed(0)}`}</td></tr>`).join("");
-  $("validation").innerHTML = `
-    <div class="auc-hero"><div class="big num">${v.auc.toFixed(2)}</div>
-      <p><b>ROC-AUC</b> measures how well scores separate environmental analogs from reference sites. It does not prove that ranked sites are analogs.</p></div>
-    <div class="analog-role-guide" aria-label="Validation roles">${Object.entries(ANALOG_ROLES).map(([role, definition]) => `<div>${analogRoleBadge(role)}<p>${definition.description}</p></div>`).join('')}</div>
-    <h4 class="section-title">Control sites under the current weights</h4>
-    <table class="controls validation-controls"><thead><tr><th>Site & role</th><th class="n">Score</th><th colspan="2">Percentile of land</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-    ${sensitivityTable()}
-    ${dataChecksTable()}
-    <details class="validation-method"><summary>How validation works</summary><div>
-      <p class="hint">${esc(v.method)}</p><p class="hint">Known analogs span different environments. No single target should rank all of them at the top. Geology-only sites are excluded from the validation score.</p>
-    </div></details>`;
+  dataChecksTable(); // starts the /api/datachecks fetch; re-renders when it lands
+  $("validation").innerHTML = validationHtml(v, state.robust, dataChecks, dataChecksFailed);
 }
 
 let dataChecks = null;
@@ -1217,6 +1321,11 @@ async function loadAnalogValues() {
   return analogValuesJob;
 }
 
+const exploreFields = new Map();
+function exploreField(key) {
+  if (!exploreFields.has(key)) exploreFields.set(key, api(`/api/predictor?key=${encodeURIComponent(key)}`).then(decode).catch((e) => { exploreFields.delete(key); throw e; }));
+  return exploreFields.get(key);
+}
 async function renderExplore() {
   const box = $("explore");
   const d = state.data;
@@ -1237,13 +1346,16 @@ async function renderExplore() {
     ...analogs.filter((a) => a.cell?.candidate).map((a) => ({ kind: "analog", a, x: a.cell.values[xKey], y: a.cell.values[yKey] })),
   ].filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
   const tx = d.effective_profile[xKey], ty = d.effective_profile[yKey];
-  const xs = pts.map((p) => p.x).concat(Number.isFinite(tx) ? [tx] : []);
-  const ys = pts.map((p) => p.y).concat(Number.isFinite(ty) ? [ty] : []);
-  // Pad the domain, but never below zero for quantities that cannot be negative.
-  const pad = (lo, hi) => { const m = (hi - lo || 1) * 0.08; return [lo >= 0 ? Math.max(0, lo - m) : lo - m, hi + m]; };
+  // Every land cell on Earth, as a faint density cloud behind the sites.
+  let fx = null, fy = null;
+  try { [fx, fy] = await Promise.all([exploreField(xKey), exploreField(yKey)]); } catch { /* cloud is optional */ }
+  if (d !== state.data || state.awaitingCustom) return;
+  const xs = pts.map((p) => p.x).concat(Number.isFinite(tx) ? [tx] : [], [X.earth_min, X.earth_max].filter(Number.isFinite));
+  const ys = pts.map((p) => p.y).concat(Number.isFinite(ty) ? [ty] : [], [Y.earth_min, Y.earth_max].filter(Number.isFinite));
+  const pad = (lo, hi) => { const m = (hi - lo || 1) * 0.05; return [lo >= 0 ? Math.max(0, lo - m) : lo - m, hi + m]; };
   const [x0, x1] = pad(Math.min(...xs), Math.max(...xs));
   const [y0, y1] = pad(Math.min(...ys), Math.max(...ys));
-  const W = 360, H = 290, L = 40, R = 12, T = 22, B = 38;
+  const W = 380, H = 320, L = 40, R = 40, T = 40, B = 38;
   const sx = (v) => L + ((v - x0) / (x1 - x0)) * (W - L - R);
   const sy = (v) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
   const ticks = (lo, hi) => [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
@@ -1254,36 +1366,68 @@ async function renderExplore() {
     if (a >= 10) return v.toFixed(0);
     return v.toFixed(a >= 1 ? 1 : 2);
   };
-  const unitOf = (c) => (c.unit === "1" || c.unit === "NDVI" ? "" : ` (${c.unit})`);
+  const unitOf = (c) => (c.unit === "1" || c.unit === "NDVI" || c.unit === "fraction" ? "" : ` (${c.unit})`);
   const grid = ticks(x0, x1).map((v) => `<line x1="${sx(v)}" x2="${sx(v)}" y1="${T}" y2="${H - B}" class="g"/><text x="${sx(v)}" y="${H - B + 14}" text-anchor="middle">${fmtT(v)}</text>`).join("")
     + ticks(y0, y1).map((v) => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" class="g"/><text x="${L - 5}" y="${sy(v) + 3}" text-anchor="end">${fmtT(v)}</text>`).join("");
+  let cloud = "", edges = "", pctX = null, pctY = null, landN = 0;
+  if (fx && fy) {
+    const NX = 48, NY = 36, bins = new Uint32Array(NX * NY), hx = new Uint32Array(NX), hy = new Uint32Array(NY);
+    let belowX = 0, belowY = 0;
+    for (let i = 0; i < fx.length; i++) {
+      const vx = fx[i], vy = fy[i];
+      if (!Number.isFinite(vx) || !Number.isFinite(vy)) continue;
+      landN++;
+      if (vx < tx) belowX++; if (vy < ty) belowY++;
+      const bx = Math.floor(((vx - x0) / (x1 - x0)) * NX), by = Math.floor(((vy - y0) / (y1 - y0)) * NY);
+      if (bx < 0 || bx >= NX || by < 0 || by >= NY) continue;
+      bins[by * NX + bx]++; hx[bx]++; hy[by]++;
+    }
+    const mx = Math.max(...bins) || 1, cw = (W - L - R) / NX, ch = (H - T - B) / NY;
+    for (let by = 0; by < NY; by++) for (let bx = 0; bx < NX; bx++) {
+      const n = bins[by * NX + bx]; if (!n) continue;
+      cloud += `<rect x="${(L + bx * cw).toFixed(1)}" y="${(H - B - (by + 1) * ch).toFixed(1)}" width="${(cw + .3).toFixed(1)}" height="${(ch + .3).toFixed(1)}" fill-opacity="${(0.08 + 0.55 * Math.sqrt(n / mx)).toFixed(2)}"/>`;
+    }
+    const mhx = Math.max(...hx) || 1, mhy = Math.max(...hy) || 1;
+    edges = [...hx].map((n, i) => `<rect x="${(L + i * cw).toFixed(1)}" y="${(T - 4 - 26 * n / mhx).toFixed(1)}" width="${(cw - .6).toFixed(1)}" height="${(26 * n / mhx).toFixed(1)}"/>`).join("")
+      + [...hy].map((n, i) => `<rect x="${W - R + 4}" y="${(H - B - (i + 1) * ch).toFixed(1)}" width="${(26 * n / mhy).toFixed(1)}" height="${(ch - .6).toFixed(1)}"/>`).join("");
+    if (landN) { pctX = (100 * belowX) / landN; pctY = (100 * belowY) / landN; }
+  }
+  const edgeMarks = Number.isFinite(tx) && Number.isFinite(ty)
+    ? `<line x1="${sx(tx)}" x2="${sx(tx)}" y1="${T - 32}" y2="${T - 2}" class="tm"/><line x1="${W - R + 2}" x2="${W - R + 34}" y1="${sy(ty)}" y2="${sy(ty)}" class="tm"/>` : "";
   const target = Number.isFinite(tx) && Number.isFinite(ty)
     ? `<line x1="${sx(tx)}" x2="${sx(tx)}" y1="${T}" y2="${H - B}" class="t"/><line x1="${L}" x2="${W - R}" y1="${sy(ty)}" y2="${sy(ty)}" class="t"/>
        <circle cx="${sx(tx)}" cy="${sy(ty)}" r="8" class="target"/><text x="${sx(tx) + 11}" y="${sy(ty) - 8}" class="tl">target</text>` : "";
+  const maxScore = Math.max(...d.results.map((r) => r.score)) || 1;
   const marks = pts.map((p, i) => p.kind === "site"
-    ? `<circle data-i="${i}" tabindex="0" role="button" aria-label="#${p.r.rank} ${esc(p.r.label.text)}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 6 : 4.5}" class="site"/>`
-    : `<svg data-i="${i}" tabindex="0" role="button" aria-label="${esc(p.a.site.name)}" data-analog-role="${catalogRole(p.a.site) || ''}" x="${sx(p.x) - 9}" y="${sy(p.y) - 9}" width="18" height="18" class="analog-rocket"><use href="icons.svg#i-${ANALOG_ROLES[catalogRole(p.a.site)]?.icon || 'rocket'}"></use></svg>`).join("");
+    ? `<circle data-i="${i}" tabindex="0" role="button" aria-label="#${p.r.rank} ${esc(p.r.label.text)}" cx="${sx(p.x)}" cy="${sy(p.y)}" r="${p.r.rank <= 10 ? 5.5 : 4}" class="site" style="fill-opacity:${(0.35 + 0.65 * p.r.score / maxScore).toFixed(2)}"/>`
+    : `<polygon data-i="${i}" tabindex="0" role="button" aria-label="${esc(p.a.site.name)}" points="${sx(p.x)},${sy(p.y) - 6} ${sx(p.x) + 6},${sy(p.y) + 5} ${sx(p.x) - 6},${sy(p.y) + 5}" class="analog-tri ${catalogRole(p.a.site) || ""}" data-cx="${sx(p.x)}" data-cy="${sy(p.y)}"/>`).join("");
+  const sitePts = pts.filter((p) => p.kind === "site"), anPts = pts.filter((p) => p.kind === "analog");
+  const side = (v, lab, pct) => pct == null ? "" : pct >= 99.5 ? `higher ${lab} than anywhere on Earth's land` : pct <= 0.5 ? `lower ${lab} than anywhere on Earth's land` : pct >= 50 ? `higher ${lab} than ${pct.toFixed(0)}% of Earth's land` : `lower ${lab} than ${(100 - pct).toFixed(0)}% of Earth's land`;
+  const reading = pctX != null ? `The target has ${side(tx, X.label.toLowerCase(), pctX)} and ${side(ty, Y.label.toLowerCase(), pctY)}. ${sitePts.length} ranked sites sit near it; ${anPts.length} known analogs spread ${anPts.length > 3 ? "wider" : "around it"}.` : "";
+  const PRESETS = [["Climate", "precipitation", "mean_annual_temperature"], ["Thermal", "annual_temperature_range", "lst_diurnal_range"], ["Terrain", "slope", "roughness"]];
   box.innerHTML = `
-    <p class="hint">Compare two criteria. Dots are ranked sites; icons are catalogued analogs. Hover for details or click to explore.</p>
+    <p class="hint">Where does the target sit in Earth's climate space? The grey cloud is every land cell on Earth.</p>
+    <div class="ex-presets" role="group" aria-label="Axis presets">${PRESETS.map(([n, a, b2]) => `<button type="button" class="ex-pre${a === xKey && b2 === yKey ? " is-on" : ""}" data-x="${a}" data-y="${b2}">${n}</button>`).join("")}</div>
     <div class="axes">
       <label>X <select id="exX">${opts(xKey)}</select></label>
       <label>Y <select id="exY">${opts(yKey)}</select></label>
     </div>
     <div class="scatter-wrap">
-      <svg class="scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter of ${esc(X.label)} against ${esc(Y.label)} for ranked sites and known analogs">
+      <svg class="scatter ex-v2" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter of ${esc(X.label)} against ${esc(Y.label)}: Earth's land cells, ranked sites and known analogs">
+        <g class="cloud">${cloud}</g><g class="edge">${edges}</g>${edgeMarks}
         ${grid}${target}${marks}
         <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" class="axis">${esc(X.label + unitOf(X))}</text>
-        <text x="${L}" y="${T - 8}" class="axis">${esc(Y.label + unitOf(Y))}</text>
+        <text x="${L}" y="12" class="axis">${esc(Y.label + unitOf(Y))}</text>
       </svg>
       <div class="scatter-tip" id="exTip" hidden></div>
     </div>
     <div class="scatter-legend">
-      <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site</span>
-      <span>${icon("rocket")} known analog</span><span>${icon("mountains")} geology only</span>
+      <span><svg width="14" height="10"><rect width="14" height="10" class="cloud-sw"/></svg> Earth's land (${fmtInt(landN)} cells)</span>
+      <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" class="site"/></svg> ranked site (brighter = better)</span>
+      <span><svg width="12" height="12"><polygon points="6,1 11,11 1,11" class="analog-tri positive"/></svg> known analog</span>
       <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" class="target"/></svg> target</span>
     </div>
-    <p class="hint">${pts.filter((p) => p.kind === "site").length} ranked sites · ${pts.filter((p) => p.kind === "analog").length} known analogs with data.
-      Distance from the crosshair on these two axes is part of each site's score.</p>`;
+    ${reading ? `<p class="ex-read">${esc(reading)}</p>` : ""}`;
   const svg = box.querySelector("svg");
   const tip = $("exTip");
   svg.querySelectorAll("[data-i]").forEach((el) => {
@@ -1294,8 +1438,8 @@ async function renderExplore() {
       tip.hidden = false;
       const rect = svg.getBoundingClientRect();
       const k = rect.width / W;
-      tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || el.getAttribute("x")) * k + 10)}px`;
-      tip.style.top = `${Number(el.getAttribute("cy") || el.getAttribute("y")) * k - 10}px`;
+      tip.style.left = `${Math.min(rect.width - 170, Number(el.getAttribute("cx") || el.dataset.cx) * k + 10)}px`;
+      tip.style.top = `${Number(el.getAttribute("cy") || el.dataset.cy) * k - 10}px`;
     };
     const open = () => (p.kind === "site" ? selectResult(p.r) : flyToPlace(p.a.site.lat, p.a.site.lon));
     el.addEventListener("mouseenter", show);
@@ -1305,6 +1449,7 @@ async function renderExplore() {
     el.addEventListener("click", open);
     el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
   });
+  box.querySelectorAll(".ex-pre").forEach((b) => b.addEventListener("click", () => { box.dataset.x = b.dataset.x; box.dataset.y = b.dataset.y; renderExplore(); }));
   $("exX").addEventListener("change", (e) => { box.dataset.x = e.target.value; renderExplore(); });
   $("exY").addEventListener("change", (e) => { box.dataset.y = e.target.value; renderExplore(); });
 }
@@ -1563,18 +1708,23 @@ const TOUR = [
   },
   {
     title: "Where Earth matches",
-    text: "The globe lights up where Earth behaves most like the target. Brighter means a closer match. Here is the top-ranked site.",
-    run: async (alive) => { await waitForData(); if (alive() && state.data) selectResult(state.data.results[0]); },
+    text: "The globe lights up where Earth behaves most like the target. Brighter means a closer match. Let's follow one: the Karakoram, a high, cold mountain range.",
+    run: async (alive) => { await waitForData(); if (alive() && state.data) selectResult(tourSite()); },
   },
   {
     title: "Why it matches",
     text: "Every score is explained criterion by criterion, with the dataset behind each number. Rest the pointer on a numbered site to preview it from orbit.",
-    run: async () => { if (!state.selected) selectResult(state.data.results[0]); },
+    run: async () => { const r = tourSite(); if (r && state.selected !== r) selectResult(r); },
   },
   {
     title: "God's Eye",
-    text: "Descend into the site's real terrain in 3D, lit the way the Sun lights the lunar pole: never more than about 1.5° above the horizon, with black shadows.",
-    run: async () => { await openGodsEye(state.selected || state.data.results[0], "lunar"); },
+    text: "Descend into the Karakoram's real terrain in 3D, a high, cold, rugged stand-in for the lunar south pole. Watch: a day passes, the heights are exaggerated, and a rover drives a route.",
+    run: async (alive) => {
+      const r = tourSite();
+      if (r && r !== state.selected) selectResult(r);
+      await openGodsEye(r, "lunar");
+      if (alive()) await tourGodsEyeSim(alive);
+    },
   },
   {
     title: "Mars",
@@ -1592,6 +1742,60 @@ const TOUR = [
     run: async () => { selectTab("results"); },
   },
 ];
+
+/* The God's Eye tour step plays itself: each control glows as the tour uses it. */
+function tourGlow(el) {
+  document.querySelectorAll(".tour-glow").forEach((e) => e.classList.remove("tour-glow"));
+  el?.classList.add("tour-glow");
+}
+async function tourGodsEyeSim(alive) {
+  const say = (t) => { if (alive()) $("tourText").textContent = t; };
+  const tab = async (name) => { const b = document.querySelector(`.ge-console [data-getab="${name}"]`); tourGlow(b); await sleep(700); if (alive()) b?.click(); await sleep(500); };
+  for (let i = 0; i < 120 && !$("geLoading").hidden; i++) await sleep(150);
+  await sleep(900); if (!alive()) return;
+  // 1. A day passes
+  say("1/3 · Climate → Play a day: the Sun rises over the Karakoram and shadows sweep across the peaks.");
+  await tab("climate"); if (!alive()) return;
+  // Start in the night, play until late morning, then hold daylight for the rest of the tour.
+  const hour = $("geHour");
+  hour.value = 3.5; hour.dispatchEvent(new Event("input", { bubbles: true }));
+  await sleep(1200); if (!alive()) return;
+  tourGlow($("geDayPlay"));
+  if ($("geDayPlay").getAttribute("aria-pressed") !== "true") $("geDayPlay").click();
+  for (let i = 0; i < 150 && Number(hour.value) < 11; i++) { await sleep(100); if (!alive()) return; }
+  if ($("geDayPlay").getAttribute("aria-pressed") === "true") $("geDayPlay").click();
+  hour.value = 11; hour.dispatchEvent(new Event("input", { bubbles: true }));
+  await sleep(800); if (!alive()) return;
+  // 2. Exaggerate heights
+  say("2/3 · View → Height exaggeration: stretch the relief to read ridges, valleys and slopes.");
+  await tab("view"); if (!alive()) return;
+  const ex = $("geExag"); tourGlow(ex.closest("label, .ge-row, div") || ex);
+  for (let v = Number(ex.value) || 1; v <= 4.01; v += 0.2) {
+    ex.value = v.toFixed(1); ex.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(110); if (!alive()) return;
+  }
+  await sleep(1800); if (!alive()) return;
+  // 3. Rover route
+  say("3/3 · Plan → drop waypoints and Drive it: the rover climbs and descends the real terrain, and every slope is checked.");
+  await tab("plan"); if (!alive()) return;
+  tourGlow($("geTraverseBtn")); await sleep(900);
+  if (eye?.data) {
+    const [u, v] = eye.data.site;
+    eye._clearRoute?.();
+    for (const [du, dv] of [[-0.09, -0.05], [-0.01, 0.03], [0.08, -0.02]]) { eye._addWaypoint(u + du, v + dv); await sleep(450); if (!alive()) return; }
+  }
+  await sleep(700);
+  const drive = $("geDrive");
+  if (drive && alive()) { tourGlow(drive); drive.click(); }
+  await sleep(8000);
+  if (alive()) { tourGlow(null); say("Your turn: try any tab yourself, or press Next."); }
+}
+
+/* The site the tour follows: the Karakoram for the lunar south pole, else the #1 site. */
+function tourSite() {
+  const res = state.data?.results || [];
+  return res.find((x) => /karakoram/i.test(x.label?.text || "")) || res.find((x) => x.lat > 33 && x.lat < 38 && x.lon > 73 && x.lon < 81) || res[0];
+}
 
 async function waitForData() {
   for (let i = 0; i < 50 && !state.data; i++) await sleep(100);
@@ -1616,6 +1820,7 @@ async function tourGo(i) {
   $("tourBar").style.transform = `scaleX(${(tourIndex + 1) / TOUR.length})`;
   $("tourPrev").disabled = tourIndex === 0;
   $("tourNext").textContent = tourIndex === TOUR.length - 1 ? "Finish" : "Next";
+  tourGlow(null);
   try { await step.run(alive); } catch (err) { if (alive()) toast(err.message); }
   if (alive() && typeof step.text === "function") $("tourText").textContent = step.text();
 }
@@ -1625,6 +1830,7 @@ function tourStop() {
   tourIndex = -1;
   $("tourCaption").hidden = true;
   document.body.classList.remove("touring");
+  tourGlow(null);
 }
 
 function wireTour() {
@@ -1956,7 +2162,9 @@ async function init() {
     if (hash.dialog === "sources") $("openSources").click();
     $("loading").classList.add("done");
     ["click", "change"].forEach((ev) => document.addEventListener(ev, () => setTimeout(writeHash, 0)));
-    selectTab(hash.target === "custom" ? "target" : "results");
+    // Open on Target unless the link points at a site or a specific tab.
+    if (["results", "explore", "validation"].includes(hash.tab)) selectTab(hash.tab);
+    else selectTab(hash.target !== "custom" && (hash.site !== undefined || enteringEye) ? "results" : "target");
     requestAnimationFrame(() => window.rocketTransition?.finderReady());
   } catch (err) {
     window.rocketTransition?.fail(err.message);

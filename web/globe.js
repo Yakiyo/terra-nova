@@ -85,6 +85,8 @@ function atmosphere(radius, color) {
   );
 }
 
+let OVERLAY_GRID = null;   // shared 720 x 360 scratch canvas for setOverlay
+
 export class Globe {
   constructor(container, { onPick, onHover } = {}) {
     this.container = container;
@@ -123,8 +125,8 @@ export class Globe {
     this.scene.add(this.earth);
 
     this.overlayCanvas = document.createElement("canvas");
-    this.overlayCanvas.width = 720;
-    this.overlayCanvas.height = 360;
+    this.overlayCanvas.width = 2880;
+    this.overlayCanvas.height = 1440;
     this.overlayTexture = new THREE.CanvasTexture(this.overlayCanvas);
     this.overlayTexture.colorSpace = THREE.SRGBColorSpace;
     this.overlayTexture.minFilter = THREE.LinearFilter;
@@ -248,10 +250,16 @@ export class Globe {
     }
   }
 
-  setOverlay(imageData) {
+  /* imageData: the 720 x 360 data layer. decorate(ctx, scale): optional extra drawing
+     (analog-zone outlines) on the 4x sharper canvas, in 720 x 360 grid units * scale. */
+  setOverlay(imageData, decorate = null) {
+    const grid = OVERLAY_GRID || (OVERLAY_GRID = Object.assign(document.createElement("canvas"), { width: 720, height: 360 }));
+    grid.getContext("2d").putImageData(imageData, 0, 0);
     const ctx = this.overlayCanvas.getContext("2d");
-    ctx.clearRect(0, 0, 720, 360);
-    ctx.putImageData(imageData, 0, 0);
+    ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(grid, 0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    if (decorate) decorate(ctx, this.overlayCanvas.width / 720);
     this.overlayTexture.needsUpdate = true;
   }
 

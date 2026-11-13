@@ -1,0 +1,75 @@
+/* God's Eye console: tabs, roomier panel, stat tiles. Layout only. */
+.godseye .ge-console { width: 360px; padding: 0 0 12px; display: flex; flex-direction: column; }
+.ge-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 10px;
+  background: var(--overlay); border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); }
+.ge-tabs button { display: grid; justify-items: center; gap: 3px; padding: 7px 2px; border: 1px solid transparent; border-radius: 10px;
+  background: none; color: var(--ink-3); font: 500 11px var(--font); cursor: pointer; transition: background-color var(--t-fast), color var(--t-fast); }
+.ge-tabs button .i { width: 18px; height: 18px; }
+.ge-tabs button:hover { color: var(--ink); background: var(--surface-2); }
+.ge-tabs button[aria-selected="true"] { color: var(--ink); background: var(--surface-3); border-color: var(--line-2); }
+.ge-tab { padding: 4px 16px 0; animation: panel-in var(--t-state) var(--ease) both; }
+.ge-console .ge-section { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 2px; }
+.ge-console .ge-tab > .ge-section:first-child, .ge-console .ge-tab > h3:first-child { border-top: 0; margin-top: 8px; }
+.ge-console h3 { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 14px 0 8px; }
+
+/* Overview: the stats as tiles with big numbers. */
+.ge-console .ge-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
+.ge-console .ge-stat { padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.ge-console .ge-stat span { font-size: 11px; line-height: 1.3; }
+.ge-console .ge-stat b { display: block; margin-top: 3px; font: 600 16px/1.2 var(--mono); color: var(--ink); }
+.ge-console .ge-stat.wide { grid-column: 1 / -1; }
+.ge-console .ge-stats > details, .ge-console .ge-stats > .ge-compare, .ge-console .ge-stats > a { grid-column: 1 / -1; }
+.ge-console .ge-stats-source { font-size: 11px; color: var(--ink-3); }
+
+/* Readiness: compact cards. */
+.ge-console .readiness .rd-cat { margin: 6px 0; }
+.ge-console .readiness .rd-note { font-size: 11px; }
+
+/* Plan: the dossier button full width at the end. */
+.ge-console .ge-dossier-btn { width: 100%; justify-content: center; margin-top: 12px; }
+.ge-console .ge-status:empty { display: none; }
+.ge-console .ge-status { margin: 10px 16px 0; }
+
+@media (max-width: 1020px) { .godseye .ge-console { width: auto; } }
+
+/* Readiness in the console: one compact row per system (name left, verdict right),
+   the system name and requirement table appear when a row is opened. */
+.ge-console .readiness { display: grid; gap: 6px; }
+.ge-console .rd-cat { border-radius: 10px; background: var(--surface-2); margin: 0; }
+.ge-console .rd-cat > summary { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; padding: 9px 10px; }
+.ge-console .rd-name { font-size: 13px; }
+.ge-console .rd-verdict { font-size: 11px; padding: 2px 8px; white-space: nowrap; }
+.ge-console .rd-verdict .i { width: 12px; height: 12px; }
+.ge-console .rd-system { grid-column: 1 / -1; display: none; font-size: 11.5px; }
+.ge-console .rd-cat[open] .rd-system { display: block; }
+.ge-console .rd-cat[open] { background: var(--surface); }
+.ge-console .rd-reqs { font-size: 11.5px; }
+.ge-console .rd-note { margin-top: 4px; }
+.ge-console .rd-verdict { order: 0; margin-top: 0; }
+
+/* Folded state: only a glowing tab bar floats over the terrain. */
+.ge-console { bottom: auto !important; max-height: calc(100% - 168px); transition: box-shadow .3s; }
+.ge-console .ge-tabs { position: relative; padding-right: 34px; }
+.ge-console .ge-fold { position: absolute; top: 4px; right: 2px; margin: 0; background: none; border: 0; color: inherit; opacity: .7; cursor: pointer; font-size: 15px; padding: 4px 8px; }
+.ge-console .ge-fold:hover { opacity: 1; }
+.ge-console .ge-hint { display: none; }
+.ge-console.is-collapsed { overflow: visible; padding-bottom: 8px; border-color: rgba(255,176,56,.7); animation: ge-glow 2.2s ease-in-out infinite; }
+.ge-console.is-collapsed [data-getab-panel], .ge-console.is-collapsed .ge-fold { display: none !important; }
+.ge-console.is-collapsed .ge-hint { display: block; font-size: 12px; color: #ffcf7a; text-align: center; padding: 6px 0 0; letter-spacing: .02em; }
+.ge-console.is-collapsed [data-getab] { color: #fff; }
+@keyframes ge-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(255,176,56,.0), 0 0 14px rgba(255,176,56,.25); } 50% { box-shadow: 0 0 0 4px rgba(255,176,56,.18), 0 0 26px rgba(255,176,56,.5); } }
+
+#geCredit { font-size: 10.5px !important; opacity: .45; line-height: 1.3; }
+#geCredit a { color: inherit; }
+
+.ge-console .ge-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 10px; cursor: ew-resize; z-index: 6; }
+.ge-console .ge-resize::after { content: ""; position: absolute; left: 3px; top: 50%; width: 4px; height: 44px; margin-top: -22px; border-radius: 2px; background: rgba(255,255,255,.28); transition: background .2s; }
+.ge-console .ge-resize:hover::after, .ge-console.is-resizing .ge-resize::after { background: #ffb038; }
+.ge-console.is-collapsed .ge-resize { display: none; }
+
+/* God's Eye title block */
+.godseye #geBadges { display: none !important; }
+.godseye #geSub { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+.godseye .ge-match { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(255,73,97,.14); border: 1px solid rgba(255,73,97,.55); font-size: 14px; color: #fff; }
+.godseye .ge-match b { font: 700 18px/1 "IBM Plex Mono", monospace; color: #ff6b7f; }
+.godseye .ge-coord { font: 500 13px "IBM Plex Mono", monospace; letter-spacing: .04em; color: rgba(255,255,255,.65); }

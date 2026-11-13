@@ -1,0 +1,17 @@
+{
+  "note": "Well-known lava tubes and caves used or proposed as analogs for lunar and Martian lava tubes and subsurface habitats. Hand-curated, approximate coordinates; shown for context, not scored.",
+  "sites": [
+    {"name": "Lava Beds National Monument", "country": "USA (California)", "lat": 41.71, "lon": -121.51, "kind": "lava tube", "note": "NASA lava-tube robotics and cave-mapping tests", "url": "https://www.nps.gov/labe/"},
+    {"name": "Kazumura Cave", "country": "USA (Hawaii)", "lat": 19.48, "lon": -155.07, "kind": "lava tube", "note": "One of the longest lava tubes on Earth", "url": "https://en.wikipedia.org/wiki/Kazumura_Cave"},
+    {"name": "Thurston Lava Tube", "country": "USA (Hawaii)", "lat": 19.41, "lon": -155.24, "kind": "lava tube", "note": "Basaltic tube in an active volcanic field", "url": "https://www.nps.gov/havo/"},
+    {"name": "Lava River Cave", "country": "USA (Arizona)", "lat": 35.34, "lon": -111.84, "kind": "lava tube", "note": "Near the San Francisco volcanic field where Apollo crews trained", "url": "https://en.wikipedia.org/wiki/Lava_River_Cave"},
+    {"name": "Ape Cave", "country": "USA (Washington)", "lat": 46.11, "lon": -122.21, "kind": "lava tube", "note": "Long basaltic tube at Mount St Helens", "url": "https://en.wikipedia.org/wiki/Ape_Cave"},
+    {"name": "Craters of the Moon", "country": "USA (Idaho)", "lat": 43.42, "lon": -113.52, "kind": "lava tube", "note": "Lava field and tubes used for NASA analog field work", "url": "https://www.nps.gov/crmo/"},
+    {"name": "Cueva de los Verdes", "country": "Spain (Lanzarote)", "lat": 29.16, "lon": -13.44, "kind": "lava tube", "note": "ESA PANGAEA and CAVES astronaut training", "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/CAVES_and_Pangaea"},
+    {"name": "Supramonte caves", "country": "Italy (Sardinia)", "lat": 40.20, "lon": 9.55, "kind": "cave", "note": "ESA CAVES underground astronaut training", "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/CAVES_and_Pangaea"},
+    {"name": "Raufarhólshellir", "country": "Iceland", "lat": 63.94, "lon": -21.40, "kind": "lava tube", "note": "Basaltic lava tube in a Mars-like volcanic landscape", "url": "https://en.wikipedia.org/wiki/Raufarh%C3%B3lshellir"},
+    {"name": "Manjanggul", "country": "South Korea (Jeju)", "lat": 33.53, "lon": 126.77, "kind": "lava tube", "note": "UNESCO-listed lava tube system", "url": "https://en.wikipedia.org/wiki/Manjanggul"},
+    {"name": "Undara lava tubes", "country": "Australia", "lat": -18.20, "lon": 144.58, "kind": "lava tube", "note": "Large, old basaltic tubes in a dry climate", "url": "https://en.wikipedia.org/wiki/Undara_Volcanic_National_Park"},
+    {"name": "Umm Jirsan", "country": "Saudi Arabia", "lat": 25.60, "lon": 39.60, "kind": "lava tube", "note": "Desert lava tube in the Harrat Khaybar volcanic field", "url": "https://en.wikipedia.org/wiki/Umm_Jirsan"}
+  ]
+}

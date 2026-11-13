@@ -4,6 +4,8 @@
 const MAX_ZOOM = 40;
 const TILE_SIZE = { 1: 10, 2: 2.5 };   // degrees; see src/acquire/tiles.py
 
+let OVERLAY_GRID = null;   // shared 720 x 360 scratch canvas for setOverlay
+
 export class FlatMap {
   constructor(canvas, { onPick, onHover } = {}) {
     this.canvas = canvas;
@@ -11,8 +13,8 @@ export class FlatMap {
     this.onHover = onHover;
     this.base = null;
     this.overlay = document.createElement("canvas");
-    this.overlay.width = 720;
-    this.overlay.height = 360;
+    this.overlay.width = 2880;
+    this.overlay.height = 1440;
     this.markers = [];
     this.frame = { x: 0, y: 0, w: 1, h: 1 };   // where the whole world fits at zoom 1
     this.zoom = 1;
@@ -77,8 +79,16 @@ export class FlatMap {
     }
   }
 
-  setOverlay(imageData) {
-    this.overlay.getContext("2d").putImageData(imageData, 0, 0);
+  /* imageData: the 720 x 360 data layer. decorate(ctx, scale): optional extra drawing
+     (analog-zone outlines) on the 4x sharper canvas, in 720 x 360 grid units * scale. */
+  setOverlay(imageData, decorate = null) {
+    const grid = OVERLAY_GRID || (OVERLAY_GRID = Object.assign(document.createElement("canvas"), { width: 720, height: 360 }));
+    grid.getContext("2d").putImageData(imageData, 0, 0);
+    const ctx = this.overlay.getContext("2d");
+    ctx.clearRect(0, 0, this.overlay.width, this.overlay.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(grid, 0, 0, this.overlay.width, this.overlay.height);
+    if (decorate) decorate(ctx, this.overlay.width / 720);
     this.draw();
   }
 

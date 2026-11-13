@@ -155,16 +155,55 @@ export function initPlanetJourney(root, getSelection) {
   }));
   sun.position.z = -9; scene.add(sun);
 
-  const ring = new THREE.Mesh(new THREE.RingGeometry(.018, .024, 48), new THREE.MeshBasicMaterial({
-    color: 0xff5b5b, side: THREE.DoubleSide, depthWrite: false,
+  // Selected-site highlight: a glowing amber ring, a bright core and a repeating pulse.
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.045, .056, 64), new THREE.MeshBasicMaterial({
+    color: 0xffc45c, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: .95,
   }));
-  ring.add(new THREE.Mesh(new THREE.SphereGeometry(.006, 12, 8), new THREE.MeshBasicMaterial({color: 0xffffff})));
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(.045, 48), new THREE.MeshBasicMaterial({
+    color: 0xffb038, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: .22,
+  }));
+  const pulse = new THREE.Mesh(new THREE.RingGeometry(.05, .058, 64), new THREE.MeshBasicMaterial({
+    color: 0xffc45c, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: .8,
+  }));
+  ring.add(glow, pulse);
+  ring.add(new THREE.Mesh(new THREE.CircleGeometry(.014, 24), new THREE.MeshBasicMaterial({color: 0xffffff, side: THREE.DoubleSide})));
+  ring.visible = false;
+  const siteLabel = document.createElement('div');
+  siteLabel.className = 'cinematic-site-label';
+  siteLabel.hidden = true;
+  root.appendChild(siteLabel);
+  const labelPos = new THREE.Vector3();
+  // Highlighted land for the selected analog (Natural Earth outlines, web/assets/analog-areas.json),
+  // painted on a transparent shell just above the Earth's surface.
+  const areaCanvas = Object.assign(document.createElement('canvas'), {width: 4096, height: 2048});
+  const areaTex = new THREE.CanvasTexture(areaCanvas);
+  areaTex.colorSpace = THREE.SRGBColorSpace;
+  const areaShell = new THREE.Mesh(new THREE.SphereGeometry(1.003, 128, 64),
+    new THREE.MeshBasicMaterial({map: areaTex, transparent: true, depthWrite: false, opacity: 0}));
+  areaShell.visible = false;
+  let areas = null, areaKey = '';
+  fetch('assets/analog-areas.json').then(r => r.json()).then(j => { areas = j.areas; }).catch(() => {});
+  const paintArea = (name) => {
+    const g = areaCanvas.getContext('2d'), W = areaCanvas.width, H = areaCanvas.height;
+    g.clearRect(0, 0, W, H);
+    const a = areas?.[name];
+    if (!a) return false;
+    g.beginPath();
+    a.ring.forEach(([lo, la], i) => { const x = (lo + 180) / 360 * W, y = (90 - la) / 180 * H; i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.closePath();
+    g.fillStyle = 'rgba(255, 176, 56, 0.55)'; g.fill();
+    g.lineJoin = 'round'; g.shadowColor = 'rgba(255, 170, 40, 1)'; g.shadowBlur = 10;
+    g.strokeStyle = 'rgb(255, 200, 90)'; g.lineWidth = 3; g.stroke();
+    areaTex.needsUpdate = true;
+    return true;
+  };
 
   const chapters = [...root.querySelectorAll('.cinematic-chapter')];
   const copies = chapters.map(c => c.querySelector('.cinematic-copy'));
   let tops = [], halfWidth = 5, raf, last = 0, failed = false;
   const pointer = new THREE.Vector2(), pointerAim = new THREE.Vector2();
   let spin = 0;
+  let shownIndex = -1, visSm = 0;
   const movePointer = event => { pointerAim.set(event.clientX / innerWidth * 2 - 1, event.clientY / innerHeight * 2 - 1); };
   const resetPointer = () => pointerAim.set(0, 0);
   window.addEventListener('pointermove', movePointer);
@@ -187,17 +226,23 @@ export function initPlanetJourney(root, getSelection) {
     navigation.raf(now);
     if (!reduced.matches) spin += dt * .16;
     pointer.lerp(reduced.matches ? new THREE.Vector2() : pointerAim, 1 - Math.exp(-dt * 4));
-    let index = 0;
-    while (index < chapters.length - 1 && scrollY >= tops[index + 1]) index++;
-    const raw = index < chapters.length - 1 ? clamp((scrollY - tops[index]) / (tops[index + 1] - tops[index])) : clamp((scrollY - tops[index]) / innerHeight);
-    // Exit -> full black hold -> scene swap -> entrance. Never crossfade two planets.
-    const arrive = index === 0 || reduced.matches ? 1 : ease(raw / .20);
-    const leave = index === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .55) / .45);
-    const visibility = arrive * (1 - leave);
+    let scrollIndex = 0;
+    while (scrollIndex < chapters.length - 1 && scrollY >= tops[scrollIndex + 1]) scrollIndex++;
+    const raw = scrollIndex < chapters.length - 1 ? clamp((scrollY - tops[scrollIndex]) / (tops[scrollIndex + 1] - tops[scrollIndex])) : clamp((scrollY - tops[scrollIndex]) / innerHeight);
+    // Exit -> dark -> scene swap -> entrance. Never crossfade two planets. The darkness is
+    // eased in time as well as by scroll, so a quick scroll still fades instead of cutting:
+    // the scene only swaps once the old world has faded out.
+    const arrive = scrollIndex === 0 || reduced.matches ? 1 : ease(raw / .30);
+    const leave = scrollIndex === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .62) / .38);
+    if (shownIndex < 0) shownIndex = scrollIndex;
+    const targetVis = scrollIndex !== shownIndex ? 0 : arrive * (1 - leave);
+    visSm += (targetVis - visSm) * (reduced.matches ? 1 : 1 - Math.exp(-dt * (targetVis < visSm ? 9 : 3.6)));
+    if (scrollIndex !== shownIndex && visSm < .08) shownIndex = scrollIndex;
+    const index = shownIndex, visibility = visSm;
     blackout.style.opacity = String(1 - visibility);
-    root.dataset.chapter = String(index);
+    root.dataset.chapter = String(scrollIndex);
     copies.forEach((copy, i) => {
-      copy.style.opacity = reduced.matches ? String(i === index ? 1 : 0) : String(i === index ? (index === 0 ? 1 : ease((raw - .04) / .20)) * (index === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
+      copy.style.opacity = reduced.matches ? String(i === scrollIndex ? 1 : 0) : String(i === scrollIndex ? (scrollIndex === 0 ? 1 : Math.min(ease((raw - .04) / .20), shownIndex === scrollIndex ? Math.min(1, visSm * 1.4) : 0)) * (scrollIndex === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
       copy.style.pointerEvents = Number(copy.style.opacity) > .1 ? '' : 'none';
     });
     for (const w of Object.values(worlds)) w.group.visible = false;
@@ -243,8 +288,20 @@ export function initPlanetJourney(root, getSelection) {
       earth.group.position.set(halfWidth * .64 + (1 - enter) * halfWidth, -.1, 0);
       earthMaterial.uniforms.exposure.value = .8;
     }
+    else if (index === chapters.length - 1) {
+      // Finale: the story ends where it began, a soft Earth horizon under the call to action.
+      earth.group.visible = true;
+      earth.group.position.set(0, -9.3 + (1 - enter) * -1.2, 0);
+      earth.group.scale.setScalar(8.2);
+      earth.surface.rotation.set(-.35, 1.4 + spin * .3, -.1);
+      earthMaterial.uniforms.exposure.value = .32;
+    }
+    // Worlds drift in: slightly smaller and further while they fade up.
+    for (const w of Object.values(worlds)) if (w.group.visible) w.group.scale.multiplyScalar(.93 + .07 * visibility);
     const chosen = getSelection(index);
     ring.visible = false;
+    siteLabel.hidden = true;
+    if (!(chosen && index === 4)) { areaShell.visible = false; areaShell.material.opacity = 0; }
     if (chosen && index === 4) {
       const name = index === 2 ? 'moon' : index === 3 ? 'mars' : 'earth', w = worlds[name];
       const key = `${name}:${chosen.lat},${chosen.lon}`, normal = surfacePoint(chosen.lat, chosen.lon);
@@ -253,11 +310,31 @@ export function initPlanetJourney(root, getSelection) {
         const facing = new THREE.Vector3(index === 2 ? -.76 : index === 3 ? .76 : -.25, 0, .65).normalize();
         targetQ.setFromUnitVectors(normal, facing);
         w.surface.add(ring); ring.position.copy(normal).multiplyScalar(1.006);
+        if (!areaShell.parent) w.surface.add(areaShell);
         ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
         root.dataset.selectedLocation = chosen.name || key;
         if (arrive < .1) w.surface.quaternion.copy(targetQ);
       }
       w.surface.quaternion.slerp(targetQ, reduced.matches ? 1 : 1 - Math.exp(-dt * 3));
+      ring.visible = visibility > .05;
+      if (areas && areaKey !== (chosen.name || '')) { areaKey = chosen.name || ""; areaShell.userData.has = paintArea(areaKey); areaShell.material.opacity = 0; }
+      areaShell.visible = !!areaShell.userData.has && ring.visible;
+      areaShell.material.opacity = Math.min(1, areaShell.material.opacity + dt * 2) * visibility;
+      // Pulse: expand and fade every 1.8 s.
+      const ph = reduced.matches ? .3 : (now / 1800) % 1;
+      pulse.scale.setScalar(1 + ph * 1.6);
+      pulse.material.opacity = .8 * (1 - ph);
+      // Name label beside the marker, in screen space.
+      ring.getWorldPosition(labelPos);
+      const facingCam = labelPos.clone().sub(w.group.position).dot(camera.position.clone().sub(labelPos)) > 0;
+      labelPos.project(camera);
+      if (ring.visible && facingCam && Math.abs(labelPos.x) < 1 && Math.abs(labelPos.y) < 1) {
+        siteLabel.hidden = false;
+        siteLabel.textContent = chosen.name || '';
+        siteLabel.style.left = `${((labelPos.x + 1) / 2) * 100}%`;
+        siteLabel.style.top = `${((1 - labelPos.y) / 2) * 100}%`;
+        siteLabel.style.opacity = String(visibility);
+      }
     }
     if (!reduced.matches && index < 2) earthMaterial.uniforms.cloudDrift.value += dt * .00035;
     renderer.render(scene, camera);

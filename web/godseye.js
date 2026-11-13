@@ -132,6 +132,35 @@ function niceLength(km) {
   return steps.reduce((best, s) => (s <= km ? s : best), steps[0]);
 }
 
+/* A small six-wheeled rover in white and grey with a red accent, built from primitives
+   (body, rocker arms, wheels, solar deck, camera mast). It faces +Z, wheels resting on y = 0. */
+function buildRover() {
+  const g = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: 0xeef0f3, roughness: 0.55, metalness: 0.2 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0x3a3d44, roughness: 0.8, metalness: 0.3 });
+  const red = new THREE.MeshStandardMaterial({ color: 0xd5092b, roughness: 0.5 });
+  const panel = new THREE.MeshStandardMaterial({ color: 0x1d3b6e, roughness: 0.35, metalness: 0.6 });
+  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
+  box(1.5, 0.45, 2.1, white, 0, 0.95, 0);              // body
+  box(1.62, 0.06, 2.3, panel, 0, 1.22, -0.1);          // solar deck
+  box(1.52, 0.08, 0.12, red, 0, 0.98, 1.06);           // red stripe at the front
+  const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.28, 18);
+  for (const side of [-1, 1]) {
+    box(0.08, 0.08, 2.2, grey, side * 0.9, 0.62, 0);   // rocker arm
+    for (const z of [-0.85, 0, 0.85]) {
+      const w = new THREE.Mesh(wheelGeo, grey);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(side * 0.98, 0.34, z);
+      g.add(w);
+    }
+  }
+  box(0.1, 0.9, 0.1, white, 0.45, 1.65, 0.7);          // mast
+  box(0.42, 0.22, 0.22, white, 0.45, 2.15, 0.72);      // camera head
+  box(0.28, 0.1, 0.04, grey, 0.45, 2.15, 0.84);        // camera lenses
+  g.traverse((o) => { o.castShadow = true; });
+  return g;
+}
+
 export class GodsEye {
   constructor(root) {
     this.root = root;
@@ -415,7 +444,7 @@ export class GodsEye {
       this._loadReadiness(site, generation);
       this.root.dataset.status = "ready";
       this.root.querySelector(".ge-panel").inert = false;
-      $("geCredit").innerHTML = `Terrain: ${esc(data.credits.elevation)} · Imagery: ${esc(data.credits.imagery)} (${esc(data.imagery.s2.licence)})`;
+      $("geCredit").innerHTML = `Terrain: AWS Terrain Tiles · Imagery: <a href="https://cloudless.eox.at" target="_blank" rel="noopener">EOX Sentinel-2 cloudless</a> (${esc(data.imagery.s2.licence)})`;
       $("geLoading").hidden = true;
       $("geStatus").textContent = reuse ? (this.imageryMessage || "") : "Terrain ready. Loading satellite imagery…";
       this._introFlight(true);
@@ -936,8 +965,7 @@ export class GodsEye {
     for (const obj of [this.routeLine, this.rover]) {
       if (!obj) continue;
       this.scene.remove(obj);
-      obj.geometry.dispose();
-      obj.material.dispose();
+      obj.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
     }
     this.routeLine = this.rover = null;
     this.routePath = null;
@@ -1081,10 +1109,11 @@ export class GodsEye {
   _startDrive() {
     if (!this.routePath || this.routePath.length < 2) return;
     if (!this.rover) {
-      this.rover = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xeef0f3 }));
+      this.rover = buildRover();
       this.scene.add(this.rover);
     }
-    this.rover.scale.setScalar(this.sizeKm * 0.006);
+    // Shown far larger than life (a real rover is ~3 m on a ~128 km block) so it reads on screen.
+    this.rover.scale.setScalar(this.sizeKm * 0.007);
     this.drive = { t0: performance.now(), dur: REDUCED ? 1 : Math.min(16000, 6000 + 1500 * (this.route.legs.length - 1)) };
   }
 
@@ -1095,7 +1124,16 @@ export class GodsEye {
     const f = t * (path.length - 1);
     const i = Math.min(path.length - 2, Math.floor(f));
     const p = path[i].clone().lerp(path[i + 1], f - i);
-    this.rover.position.copy(p).add(new THREE.Vector3(0, this.sizeKm * 0.006, 0));
+    this.rover.position.copy(p);
+    // Face the direction of travel and pitch with the ground.
+    const ahead = path[Math.min(path.length - 1, i + 2)], dir = ahead.clone().sub(path[Math.max(0, i - 1)]);
+    if (dir.lengthSq() > 1e-12) {
+      const flat = Math.hypot(dir.x, dir.z) || 1e-9;
+      this.rover.rotation.set(0, Math.atan2(dir.x, dir.z), 0);
+      this.rover.rotateX(-Math.atan2(dir.y, flat));
+    }
+    // A gentle bob, as if the suspension were working.
+    this.rover.position.y += Math.sin(performance.now() / 90) * this.sizeKm * 0.00012;
     const s = this.route.samples;
     const k = Math.min(s.d_km.length - 1, Math.round(t * (s.d_km.length - 1)));
     const dot = $("geRoverDot");

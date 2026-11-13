@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-from src.acquire.download import REPO_ROOT, fetch
+from src.acquire.download import REPO_ROOT, FetchError, fetch, offline_mode
 from src.compute import terrain
 
 CACHE = REPO_ROOT / "cache" / "sitetiles"
@@ -68,14 +69,27 @@ def mosaic_origin(lat: float, lon: float) -> tuple[int, int]:
 def dem_tile(x: int, y: int, offline: bool | None = None) -> np.ndarray:
     n = 2**DEM_ZOOM
     x %= n
-    item = fetch(
-        TERRARIUM.format(z=DEM_ZOOM, x=x, y=y),
-        filename=f"{y}_{x}.png",
-        raw_dir=CACHE / "dem" / str(DEM_ZOOM),
-        offline=offline,
-        timeout=20,
-        max_seconds=30,
-    )
+    # One slow or dropped tile used to fail the whole 16-tile view, so retry a few times
+    # with short timeouts; a tile already on disk returns immediately.
+    last: Exception | None = None
+    for attempt in range(3):
+        try:
+            item = fetch(
+                TERRARIUM.format(z=DEM_ZOOM, x=x, y=y),
+                filename=f"{y}_{x}.png",
+                raw_dir=CACHE / "dem" / str(DEM_ZOOM),
+                offline=offline,
+                timeout=12,
+                max_seconds=18,
+            )
+            break
+        except FetchError as exc:
+            last = exc
+            if offline_mode(offline):
+                raise
+            time.sleep(0.6 * (attempt + 1))
+    else:
+        raise last  # type: ignore[misc]
     with Image.open(item.path) as image:
         return terrain.decode_terrarium(np.asarray(image.convert("RGB")))
 
