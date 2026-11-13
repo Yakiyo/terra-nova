@@ -1708,20 +1708,19 @@ const TOUR = [
   },
   {
     title: "Where Earth matches",
-    text: "The globe lights up where Earth behaves most like the target. Brighter means a closer match. Here is the top-ranked site.",
-    run: async (alive) => { await waitForData(); if (alive() && state.data) selectResult(state.data.results[0]); },
+    text: "The globe lights up where Earth behaves most like the target. Brighter means a closer match. Let's follow one: the Karakoram, a high, cold mountain range.",
+    run: async (alive) => { await waitForData(); if (alive() && state.data) selectResult(tourSite()); },
   },
   {
     title: "Why it matches",
     text: "Every score is explained criterion by criterion, with the dataset behind each number. Rest the pointer on a numbered site to preview it from orbit.",
-    run: async () => { if (!state.selected) selectResult(state.data.results[0]); },
+    run: async () => { const r = tourSite(); if (r && state.selected !== r) selectResult(r); },
   },
   {
     title: "God's Eye",
     text: "Descend into the Karakoram's real terrain in 3D, a high, cold, rugged stand-in for the lunar south pole. Watch: a day passes, the heights are exaggerated, and a rover drives a route.",
     run: async (alive) => {
-      const res = state.data?.results || [];
-      const r = res.find((x) => /karakoram/i.test(x.label?.text || "")) || res.find((x) => x.lat > 33 && x.lat < 38 && x.lon > 73 && x.lon < 81) || state.selected || res[0];
+      const r = tourSite();
       if (r && r !== state.selected) selectResult(r);
       await openGodsEye(r, "lunar");
       if (alive()) await tourGodsEyeSim(alive);
@@ -1790,6 +1789,12 @@ async function tourGodsEyeSim(alive) {
   if (drive && alive()) { tourGlow(drive); drive.click(); }
   await sleep(8000);
   if (alive()) { tourGlow(null); say("Your turn: try any tab yourself, or press Next."); }
+}
+
+/* The site the tour follows: the Karakoram for the lunar south pole, else the #1 site. */
+function tourSite() {
+  const res = state.data?.results || [];
+  return res.find((x) => /karakoram/i.test(x.label?.text || "")) || res.find((x) => x.lat > 33 && x.lat < 38 && x.lon > 73 && x.lon < 81) || res[0];
 }
 
 async function waitForData() {
