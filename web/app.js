@@ -1757,10 +1757,16 @@ async function tourGodsEyeSim(alive) {
   // 1. A day passes
   say("1/3 · Climate → Play a day: the Sun rises over the Karakoram and shadows sweep across the peaks.");
   await tab("climate"); if (!alive()) return;
+  // Start in the night, play until late morning, then hold daylight for the rest of the tour.
+  const hour = $("geHour");
+  hour.value = 3.5; hour.dispatchEvent(new Event("input", { bubbles: true }));
+  await sleep(1200); if (!alive()) return;
   tourGlow($("geDayPlay"));
   if ($("geDayPlay").getAttribute("aria-pressed") !== "true") $("geDayPlay").click();
-  await sleep(6500); if (!alive()) return;
+  for (let i = 0; i < 150 && Number(hour.value) < 11; i++) { await sleep(100); if (!alive()) return; }
   if ($("geDayPlay").getAttribute("aria-pressed") === "true") $("geDayPlay").click();
+  hour.value = 11; hour.dispatchEvent(new Event("input", { bubbles: true }));
+  await sleep(800); if (!alive()) return;
   // 2. Exaggerate heights
   say("2/3 · View → Height exaggeration: stretch the relief to read ridges, valleys and slopes.");
   await tab("view"); if (!alive()) return;
