@@ -38,7 +38,7 @@ export function createChapterNavigation(root, reduced) {
       }
     };
     if (lenis && !reduced.matches && !immediate) {
-      lenis.scrollTo(stops[next], {duration:1.8, lerp:0, easing, lock:true, force:true, onComplete:finish});
+      lenis.scrollTo(stops[next], {duration:1.5, lerp:0, easing, lock:true, force:true, onComplete:finish});
     } else {
       if (lenis) lenis.scrollTo(stops[next], {immediate:true, force:true});
       else window.scrollTo({top:stops[next], behavior:'instant'});
