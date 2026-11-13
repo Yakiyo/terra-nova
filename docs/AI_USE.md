@@ -1,5 +1,15 @@
 # Use of AI in this project
 
+### 2026-11-13 — Final build (Anthropic Claude)
+
+Prompts were plain-language feature requests and bug reports from the team (for example
+"make the God's Eye panel collapsible", "the compare slider shows a black band"). Claude
+wrote or changed interface code for the Learn page, the Validation and Explore views,
+the Earth-process context (MERRA-2 dust, MODIS snow), drag-to-compare, the God's Eye
+console, the guided tour and the landing transitions, and drafted the README and video
+script. Every change was reviewed and tested by the team in the running app. No AI
+produces or influences any score: ranking is deterministic code in `src/compute`.
+
 ### 2026-11-12 — Pre-demo review and polish
 
 AI Assistant reviewed the whole project and fixed the issues the user
