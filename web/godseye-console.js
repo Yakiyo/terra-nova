@@ -55,6 +55,18 @@
     new MutationObserver(() => { if (!el.hidden) show(tab); }).observe(el, { attributes: true, attributeFilter: ["hidden"] });
   };
   watch("geProbe", "plan"); watch("geRoute", "plan"); watch("geProfile", "plan");
+  // Title block: a match pill and the coordinates, no rank/candidate badges.
+  const sub = document.getElementById("geSub");
+  if (sub) {
+    const tidy = () => {
+      if (sub.querySelector(".ge-match")) return;
+      const m = sub.textContent.match(/^(.*?)\s*·\s*(\d+%)\s*match to\s*(.+)$/);
+      if (!m) return;
+      sub.innerHTML = `<span class="ge-match"><b>${m[2]}</b> match to ${m[3].replace(/[<>&]/g, "")}</span><span class="ge-coord">${m[1].replace(/[<>&]/g, "")}</span>`;
+    };
+    new MutationObserver(tidy).observe(sub, { childList: true, characterData: true, subtree: true });
+    tidy();
+  }
   // Each time God's Eye opens, start on the overview.
   const root = document.getElementById("godseye");
   if (root) new MutationObserver(() => { if (!root.hidden) { show("overview"); setCollapsed(true); } }).observe(root, { attributes: true, attributeFilter: ["hidden"] });

@@ -2162,7 +2162,9 @@ async function init() {
     if (hash.dialog === "sources") $("openSources").click();
     $("loading").classList.add("done");
     ["click", "change"].forEach((ev) => document.addEventListener(ev, () => setTimeout(writeHash, 0)));
-    selectTab(hash.target === "custom" ? "target" : "results");
+    // Open on Target unless the link points at a site or a specific tab.
+    if (["results", "explore", "validation"].includes(hash.tab)) selectTab(hash.tab);
+    else selectTab(hash.target !== "custom" && (hash.site !== undefined || enteringEye) ? "results" : "target");
     requestAnimationFrame(() => window.rocketTransition?.finderReady());
   } catch (err) {
     window.rocketTransition?.fail(err.message);
