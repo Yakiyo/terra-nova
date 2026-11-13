@@ -65,7 +65,3 @@
 
 /* No 'next' arrow on the last screen: nothing follows it. */
 .chapter-finale .cinematic-scroll { display: none !important; }
-
-/* "Other worlds" list: mission and the Moon/Mars setting under each place */
-.cinematic-analog-list button .cinematic-analog-meta { display: block; margin-top: 3px; font: 500 12.5px/1.4 "IBM Plex Mono", monospace; letter-spacing: .03em; color: rgba(255,255,255,.55); font-weight: 400; }
-.cinematic-analog-list button[aria-pressed=true] .cinematic-analog-meta { color: #ffcf7a; }
