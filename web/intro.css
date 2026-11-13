@@ -44,3 +44,19 @@
 
 /* Home footer: no divider line or solid band, so the Earth horizon runs to the bottom. */
 .page-home .site-foot { border-top: 0; background: transparent; z-index: 2; }
+
+/* Story lists: every site visible at once (no scrolling inside the list), compact rows,
+   and the "next" chevron centred on the screen. Desktop sizes only. */
+@media (min-width:1021px), (hover:hover) and (pointer:fine) {
+  .cinematic .cinematic-copy { max-height: none !important; overflow: visible !important; }
+  .cinematic-list, .chapter-analogs .cinematic-copy { top: 12vh !important; }
+  .cinematic-list h2, .chapter-analogs h2 { font-size: clamp(36px, 3.4vw, 56px) !important; margin-bottom: 4px; }
+  .cinematic-targets { margin-top: 18px !important; }
+  .cinematic-target { padding: 7px 0 !important; gap: 18px !important; }
+  .cinematic-target .regional-thumb { width: 58px !important; height: 58px !important; }
+  .cinematic-copy .cinematic-site-link, .cinematic-target button { font-size: clamp(17px, 1.3vw, 22px) !important; padding: 4px 0 !important; }
+  .cinematic-analog-list { margin-top: 16px !important; }
+  .cinematic-analog-list button { font-size: clamp(18px, 1.35vw, 24px) !important; padding: 8px 0 !important; }
+  .cinematic-chapter:not(.chapter-hero):not(.chapter-finale):not(.chapter-orbit) .cinematic-scroll {
+    position: fixed; left: 50%; bottom: 3.5vh; margin: 0 !important; transform: translateX(-50%); z-index: 5; }
+}
