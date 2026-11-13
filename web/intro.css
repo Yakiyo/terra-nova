@@ -50,13 +50,18 @@
 @media (min-width:1021px), (hover:hover) and (pointer:fine) {
   .cinematic .cinematic-copy { max-height: none !important; overflow: visible !important; }
   .cinematic-list, .chapter-analogs .cinematic-copy { top: 12vh !important; }
-  .cinematic-list h2, .chapter-analogs h2 { font-size: clamp(36px, 3.4vw, 56px) !important; margin-bottom: 4px; }
+  .cinematic-list h2, .chapter-analogs h2 { font-size: clamp(44px, 4vw, 68px) !important; margin-bottom: 4px; }
   .cinematic-targets { margin-top: 18px !important; }
-  .cinematic-target { padding: 7px 0 !important; gap: 18px !important; }
-  .cinematic-target .regional-thumb { width: 58px !important; height: 58px !important; }
-  .cinematic-copy .cinematic-site-link, .cinematic-target button { font-size: clamp(17px, 1.3vw, 22px) !important; padding: 4px 0 !important; }
+  .cinematic-target { padding: 12px 0 !important; gap: 24px !important; }
+  .cinematic-target .regional-thumb { width: 96px !important; height: 96px !important; }
+  .cinematic-copy .cinematic-site-link, .cinematic-target button { font-size: clamp(21px, 1.8vw, 32px) !important; padding: 6px 0 !important; }
+  .chapter-moon .cinematic-copy { width: 52vw !important; max-width: 900px !important; }
+  .chapter-mars .cinematic-copy { margin-left: 48vw !important; width: 46vw !important; max-width: 860px !important; }
   .cinematic-analog-list { margin-top: 16px !important; }
   .cinematic-analog-list button { font-size: clamp(18px, 1.35vw, 24px) !important; padding: 8px 0 !important; }
   .cinematic-chapter:not(.chapter-hero):not(.chapter-finale):not(.chapter-orbit) .cinematic-scroll {
     position: fixed; left: 50%; bottom: 3.5vh; margin: 0 !important; transform: translateX(-50%); z-index: 5; }
 }
+
+/* No 'next' arrow on the last screen: nothing follows it. */
+.chapter-finale .cinematic-scroll { display: none !important; }

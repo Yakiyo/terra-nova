@@ -8,7 +8,8 @@ export function createChapterNavigation(root, reduced) {
   const paused = new Set();
   let lenis, stops = [], current = 0, moving = false, gesture = false;
   let wheelTimer, resizeFrame, wheelSum = 0, lastWheel = 0, tabbing = false;
-  const easing = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2;
+  // Gentle sine ease: soft start and soft landing between chapters.
+  const easing = t => -(Math.cos(Math.PI * t) - 1) / 2;
   const nearest = () => stops.reduce((best, y, i) => Math.abs(y-scrollY) < Math.abs(stops[best]-scrollY) ? i : best, 0);
   const measure = () => {
     lenis?.resize();
@@ -37,7 +38,7 @@ export function createChapterNavigation(root, reduced) {
       }
     };
     if (lenis && !reduced.matches && !immediate) {
-      lenis.scrollTo(stops[next], {duration:1.1, lerp:0, easing, lock:true, force:true, onComplete:finish});
+      lenis.scrollTo(stops[next], {duration:1.8, lerp:0, easing, lock:true, force:true, onComplete:finish});
     } else {
       if (lenis) lenis.scrollTo(stops[next], {immediate:true, force:true});
       else window.scrollTo({top:stops[next], behavior:'instant'});
