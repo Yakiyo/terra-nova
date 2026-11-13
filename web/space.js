@@ -221,7 +221,8 @@ export class SpaceScenery {
 
   update(dt) {
     const step = Math.min(dt || 0, 0.1);
-    if (!this.placed && this._settled(step)) this._place();
+    // Keep the bodies fixed in the corners of the view as the camera moves around the globe.
+    if (this.placed || this._settled(step)) this._place();
     for (const b of this.bodies) {
       if (!REDUCED) b.angle += b.spin * step;
       b.mesh.quaternion.copy(b.axis).multiply(SPIN.setFromAxisAngle(Y_AXIS, b.angle));
