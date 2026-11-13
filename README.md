@@ -451,15 +451,6 @@ Team backlog and dataset requests: [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.
 
 **Team DaRK_MATTER** — NASA Space Apps Challenge 2026 · Khulna, Bangladesh
 
-| Member | Role |
-|--------|---------------------------|
-| *Rafsan Kabir* | Project lead / integration |
-| *Sazidul Karim Saad* | Lunar targets & validation |
-| *Mahfuz Kamal Sohan* | Mars targets & science narrative |
-| *Rayat Bin Nasir* | Earth data pipeline |
-| *Nafi Abrar Chowdhury* | Scoring & robustness |
-| *Farhan Fuad* | Frontend & demo |
-
 Repository: **https://github.com/Yakiyo/terra-nova**
 
 ---
