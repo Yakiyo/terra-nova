@@ -3,11 +3,11 @@ import { initPlanetJourney } from './planet-journey.js';
 const desktop = matchMedia('(min-width: 1021px), (hover: hover) and (pointer: fine)');
 if (desktop.matches) {
   const analogs = [
-    { name: 'Lanzarote, Spain', lat: 29.04, lon: -13.63, kind: 'Moon & Mars geology', detail: 'ESA PANGAEA trains astronauts in planetary field geology across its volcanic terrain.', source_url: 'https://www.esa.int/Newsroom/Press_Releases/Media_invitation_Astronaut_geology_training_in_Lanzarote_for_future_missions_to_Moon_and_Mars', dataset_id: 'esa_pangaea_lanzarote' },
-    { name: 'Atacama Desert, Chile', lat: -23.5, lon: -68.2, kind: 'Mars life detection', detail: 'NASA has used the dry desert to test life-detection instruments and rover drilling.', source_url: 'https://astrobiology.nasa.gov/research-locations/', dataset_id: 'nasa_astrobiology_atacama' },
-    { name: 'Devon Island, Canada', lat: 75.4, lon: -89.8, kind: 'Mars mission operations', detail: 'The Haughton-Mars Project studies exploration in an isolated Arctic analog environment.', source_url: 'https://ntrs.nasa.gov/api/citations/20240011157/downloads/NASA%20TM20240011157.pdf', dataset_id: 'nasa_haughton_mars_project' },
-    { name: 'Mauna Kea, Hawaiʻi', lat: 19.82, lon: -155.47, kind: 'Lunar resource testing', detail: 'NASA field-tested lunar resource prospecting systems on this volcanic terrain.', source_url: 'https://www.nasa.gov/mission/in-situ-resource-utilization-isru/', dataset_id: 'nasa_isru_mauna_kea' },
-    { name: 'Black Point Lava Flow, Arizona', lat: 35.68, lon: -111.47, kind: 'Lunar rover operations', detail: 'NASA and JAXA tested pressurized rover operations in this simulated lunar environment.', source_url: 'https://www.nasa.gov/humans-in-space/nasa-practices-rover-operations-in-simulated-lunar-environment/', dataset_id: 'nasa_drats_black_point' },
+    { name: 'Lanzarote, Spain', mission: 'ESA PANGAEA astronaut training', resembles: 'Moon & Mars · volcanic plains and lava tubes', lat: 29.04, lon: -13.63, kind: 'Moon & Mars geology', detail: 'ESA PANGAEA trains astronauts in planetary field geology across its volcanic terrain.', source_url: 'https://www.esa.int/Newsroom/Press_Releases/Media_invitation_Astronaut_geology_training_in_Lanzarote_for_future_missions_to_Moon_and_Mars', dataset_id: 'esa_pangaea_lanzarote' },
+    { name: 'Atacama Desert, Chile', mission: 'NASA ARADS life-detection drilling', resembles: 'Mars · hyper-dry, near-sterile soil', lat: -23.5, lon: -68.2, kind: 'Mars life detection', detail: 'NASA has used the dry desert to test life-detection instruments and rover drilling.', source_url: 'https://astrobiology.nasa.gov/research-locations/', dataset_id: 'nasa_astrobiology_atacama' },
+    { name: 'Devon Island, Canada', mission: 'NASA Haughton-Mars Project', resembles: 'Mars · cold, dry impact crater', lat: 75.4, lon: -89.8, kind: 'Mars mission operations', detail: 'The Haughton-Mars Project studies exploration in an isolated Arctic analog environment.', source_url: 'https://ntrs.nasa.gov/api/citations/20240011157/downloads/NASA%20TM20240011157.pdf', dataset_id: 'nasa_haughton_mars_project' },
+    { name: 'Mauna Kea, Hawaiʻi', mission: 'NASA lunar resource (ISRU) field tests', resembles: 'Moon · volcanic regolith', lat: 19.82, lon: -155.47, kind: 'Lunar resource testing', detail: 'NASA field-tested lunar resource prospecting systems on this volcanic terrain.', source_url: 'https://www.nasa.gov/mission/in-situ-resource-utilization-isru/', dataset_id: 'nasa_isru_mauna_kea' },
+    { name: 'Black Point Lava Flow, Arizona', mission: 'NASA Desert RATS rover tests', resembles: 'Moon · rover traverse terrain', lat: 35.68, lon: -111.47, kind: 'Lunar rover operations', detail: 'NASA and JAXA tested pressurized rover operations in this simulated lunar environment.', source_url: 'https://www.nasa.gov/humans-in-space/nasa-practices-rover-operations-in-simulated-lunar-environment/', dataset_id: 'nasa_drats_black_point' },
   ];
   const root = document.createElement('div');
   root.className = 'cinematic';
@@ -56,6 +56,7 @@ if (desktop.matches) {
   };
   analogs.forEach((site,i) => {
     const button = document.createElement('button'); button.type='button'; button.textContent=site.name;
+    if (site.mission) { const meta = document.createElement('small'); meta.className='cinematic-analog-meta'; meta.textContent=`${site.mission} · ${site.resembles}`; button.append(meta); }
     button.addEventListener('click',()=>showAnalog(i));
     list.append(button);
   }); showAnalog(0);
