@@ -203,6 +203,7 @@ export function initPlanetJourney(root, getSelection) {
   let tops = [], halfWidth = 5, raf, last = 0, failed = false;
   const pointer = new THREE.Vector2(), pointerAim = new THREE.Vector2();
   let spin = 0;
+  let shownIndex = -1, visSm = 0;
   const movePointer = event => { pointerAim.set(event.clientX / innerWidth * 2 - 1, event.clientY / innerHeight * 2 - 1); };
   const resetPointer = () => pointerAim.set(0, 0);
   window.addEventListener('pointermove', movePointer);
@@ -225,17 +226,23 @@ export function initPlanetJourney(root, getSelection) {
     navigation.raf(now);
     if (!reduced.matches) spin += dt * .16;
     pointer.lerp(reduced.matches ? new THREE.Vector2() : pointerAim, 1 - Math.exp(-dt * 4));
-    let index = 0;
-    while (index < chapters.length - 1 && scrollY >= tops[index + 1]) index++;
-    const raw = index < chapters.length - 1 ? clamp((scrollY - tops[index]) / (tops[index + 1] - tops[index])) : clamp((scrollY - tops[index]) / innerHeight);
-    // Exit -> full black hold -> scene swap -> entrance. Never crossfade two planets.
-    const arrive = index === 0 || reduced.matches ? 1 : ease(raw / .20);
-    const leave = index === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .55) / .45);
-    const visibility = arrive * (1 - leave);
+    let scrollIndex = 0;
+    while (scrollIndex < chapters.length - 1 && scrollY >= tops[scrollIndex + 1]) scrollIndex++;
+    const raw = scrollIndex < chapters.length - 1 ? clamp((scrollY - tops[scrollIndex]) / (tops[scrollIndex + 1] - tops[scrollIndex])) : clamp((scrollY - tops[scrollIndex]) / innerHeight);
+    // Exit -> dark -> scene swap -> entrance. Never crossfade two planets. The darkness is
+    // eased in time as well as by scroll, so a quick scroll still fades instead of cutting:
+    // the scene only swaps once the old world has faded out.
+    const arrive = scrollIndex === 0 || reduced.matches ? 1 : ease(raw / .30);
+    const leave = scrollIndex === chapters.length - 1 || reduced.matches ? 0 : ease((raw - .62) / .38);
+    if (shownIndex < 0) shownIndex = scrollIndex;
+    const targetVis = scrollIndex !== shownIndex ? 0 : arrive * (1 - leave);
+    visSm += (targetVis - visSm) * (reduced.matches ? 1 : 1 - Math.exp(-dt * (targetVis < visSm ? 5.5 : 2.6)));
+    if (scrollIndex !== shownIndex && visSm < .04) shownIndex = scrollIndex;
+    const index = shownIndex, visibility = visSm;
     blackout.style.opacity = String(1 - visibility);
-    root.dataset.chapter = String(index);
+    root.dataset.chapter = String(scrollIndex);
     copies.forEach((copy, i) => {
-      copy.style.opacity = reduced.matches ? String(i === index ? 1 : 0) : String(i === index ? (index === 0 ? 1 : ease((raw - .04) / .20)) * (index === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
+      copy.style.opacity = reduced.matches ? String(i === scrollIndex ? 1 : 0) : String(i === scrollIndex ? (scrollIndex === 0 ? 1 : ease((raw - .04) / .20)) * (scrollIndex === chapters.length - 1 ? 1 : 1 - ease((raw - .52) / .36)) : 0);
       copy.style.pointerEvents = Number(copy.style.opacity) > .1 ? '' : 'none';
     });
     for (const w of Object.values(worlds)) w.group.visible = false;
@@ -281,6 +288,16 @@ export function initPlanetJourney(root, getSelection) {
       earth.group.position.set(halfWidth * .64 + (1 - enter) * halfWidth, -.1, 0);
       earthMaterial.uniforms.exposure.value = .8;
     }
+    else if (index === chapters.length - 1) {
+      // Finale: the story ends where it began, a soft Earth horizon under the call to action.
+      earth.group.visible = true;
+      earth.group.position.set(0, -10.6 + (1 - enter) * -1.2, 0);
+      earth.group.scale.setScalar(8.2);
+      earth.surface.rotation.set(-.35, 1.4 + spin * .3, -.1);
+      earthMaterial.uniforms.exposure.value = .32;
+    }
+    // Worlds drift in: slightly smaller and further while they fade up.
+    for (const w of Object.values(worlds)) if (w.group.visible) w.group.scale.multiplyScalar(.93 + .07 * visibility);
     const chosen = getSelection(index);
     ring.visible = false;
     siteLabel.hidden = true;
