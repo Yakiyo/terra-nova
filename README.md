@@ -17,6 +17,29 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 
 ---
 
+## Screenshots
+
+<table>
+<tr>
+<td width="50%" valign="top"><img src="docs/images/finder-map.jpg" alt="Global screening"><br><b>Global screening</b><br><sub>All 78,247 land cells scored against the Lunar South Pole; brighter means a closer match.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/finder-globe.jpg" alt="Ranked analogs on a 3D globe"><br><b>Ranked analogs on a 3D globe</b><br><sub>Numbered top sites, known analogs and new candidates, with the target on the right.</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/images/haworth-antarctica.jpg" alt="Each target finds its own Earth"><br><b>Each target finds its own Earth</b><br><sub>For the Haworth cold trap, the closest matches are on the East Antarctic Ice Sheet.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/godseye-relief.jpg" alt="God's Eye: real terrain in 3D"><br><b>God's Eye: real terrain in 3D</b><br><sub>The Karakoram (87% match to the lunar south pole) rebuilt from elevation data.</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/images/godseye-thermal.jpg" alt="Thermal view"><br><b>Thermal view</b><br><sub>Surface temperature draped on the terrain, with contour lines.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/godseye-lunar-light.jpg" alt="Lunar-pole lighting"><br><b>Lunar-pole lighting</b><br><sub>The Sun about 1.5° above the horizon, as at the Moon's south pole: long black shadows.</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/images/godseye-satellite.jpg" alt="Satellite view"><br><b>Satellite view</b><br><sub>Sentinel-2 imagery on the 3D terrain, heights exaggerated 3.5×.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/godseye-rover-route.jpg" alt="Rover traverse planning"><br><b>Rover traverse planning</b><br><sub>Waypoints, an elevation profile, slopes over 15° flagged, distance, climb and walking time.</sub></td>
+</tr>
+</table>
+
+---
+
 ## Table of contents
 
 1. [The operational bottleneck](#the-operational-bottleneck)
