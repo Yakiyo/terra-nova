@@ -13,7 +13,7 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 **Team DaRK_MATTER** · Khulna, Bangladesh · [Repository](https://github.com/Yakiyo/terra-nova)
 
 ▶ **Demo video (240 s):** https://youtu.be/co5NBEqUfJA
-📄 **Docs:** [How we used AI](docs/AI_USE.md) · [Video script](docs/VIDEO_SCRIPT.md) · [Design notes and roadmap](docs/WINNING_FEATURES.md) · [Data requests](docs/DATA_REQUESTS.md)
+📄 **Use of AI:** [docs/AI_USE.md](docs/AI_USE.md)
 
 ---
 
