@@ -9,3 +9,6 @@
 .tour-fab small { display: block; font: 500 10.5px/1.3 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
 @keyframes tfab { 50% { box-shadow: 0 0 0 6px rgba(255,122,74,.12), 0 0 34px rgba(255,122,74,.65); } }
 @media (max-width: 760px) { .tour-fab { top: auto; bottom: 90px; right: 14px; } }
+
+.tour-glow { position: relative; outline: 2px solid #ff7a4a !important; outline-offset: 3px; border-radius: 10px; animation: tglow 1.2s ease-in-out infinite; z-index: 3; }
+@keyframes tglow { 50% { outline-color: rgba(255,122,74,.35); box-shadow: 0 0 22px rgba(255,122,74,.6); } }

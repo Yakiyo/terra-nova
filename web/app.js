@@ -1718,8 +1718,14 @@ const TOUR = [
   },
   {
     title: "God's Eye",
-    text: "Descend into the site's real terrain in 3D, lit the way the Sun lights the lunar pole: never more than about 1.5° above the horizon, with black shadows.",
-    run: async () => { await openGodsEye(state.selected || state.data.results[0], "lunar"); },
+    text: "Descend into the Karakoram's real terrain in 3D, a high, cold, rugged stand-in for the lunar south pole. Watch: a day passes, the heights are exaggerated, and a rover drives a route.",
+    run: async (alive) => {
+      const res = state.data?.results || [];
+      const r = res.find((x) => /karakoram/i.test(x.label?.text || "")) || res.find((x) => x.lat > 33 && x.lat < 38 && x.lon > 73 && x.lon < 81) || state.selected || res[0];
+      if (r && r !== state.selected) selectResult(r);
+      await openGodsEye(r, "lunar");
+      if (alive()) await tourGodsEyeSim(alive);
+    },
   },
   {
     title: "Mars",
@@ -1737,6 +1743,48 @@ const TOUR = [
     run: async () => { selectTab("results"); },
   },
 ];
+
+/* The God's Eye tour step plays itself: each control glows as the tour uses it. */
+function tourGlow(el) {
+  document.querySelectorAll(".tour-glow").forEach((e) => e.classList.remove("tour-glow"));
+  el?.classList.add("tour-glow");
+}
+async function tourGodsEyeSim(alive) {
+  const say = (t) => { if (alive()) $("tourText").textContent = t; };
+  const tab = async (name) => { const b = document.querySelector(`.ge-console [data-getab="${name}"]`); tourGlow(b); await sleep(700); if (alive()) b?.click(); await sleep(500); };
+  for (let i = 0; i < 120 && !$("geLoading").hidden; i++) await sleep(150);
+  await sleep(900); if (!alive()) return;
+  // 1. A day passes
+  say("1/3 · Climate → Play a day: the Sun rises over the Karakoram and shadows sweep across the peaks.");
+  await tab("climate"); if (!alive()) return;
+  tourGlow($("geDayPlay"));
+  if ($("geDayPlay").getAttribute("aria-pressed") !== "true") $("geDayPlay").click();
+  await sleep(6500); if (!alive()) return;
+  if ($("geDayPlay").getAttribute("aria-pressed") === "true") $("geDayPlay").click();
+  // 2. Exaggerate heights
+  say("2/3 · View → Height exaggeration: stretch the relief to read ridges, valleys and slopes.");
+  await tab("view"); if (!alive()) return;
+  const ex = $("geExag"); tourGlow(ex.closest("label, .ge-row, div") || ex);
+  for (let v = Number(ex.value) || 1; v <= 4.01; v += 0.2) {
+    ex.value = v.toFixed(1); ex.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(110); if (!alive()) return;
+  }
+  await sleep(1800); if (!alive()) return;
+  // 3. Rover route
+  say("3/3 · Plan → drop waypoints and Drive it: the rover climbs and descends the real terrain, and every slope is checked.");
+  await tab("plan"); if (!alive()) return;
+  tourGlow($("geTraverseBtn")); await sleep(900);
+  if (eye?.data) {
+    const [u, v] = eye.data.site;
+    eye._clearRoute?.();
+    for (const [du, dv] of [[-0.09, -0.05], [-0.01, 0.03], [0.08, -0.02]]) { eye._addWaypoint(u + du, v + dv); await sleep(450); if (!alive()) return; }
+  }
+  await sleep(700);
+  const drive = $("geDrive");
+  if (drive && alive()) { tourGlow(drive); drive.click(); }
+  await sleep(8000);
+  if (alive()) { tourGlow(null); say("Your turn: try any tab yourself, or press Next."); }
+}
 
 async function waitForData() {
   for (let i = 0; i < 50 && !state.data; i++) await sleep(100);
@@ -1761,6 +1809,7 @@ async function tourGo(i) {
   $("tourBar").style.transform = `scaleX(${(tourIndex + 1) / TOUR.length})`;
   $("tourPrev").disabled = tourIndex === 0;
   $("tourNext").textContent = tourIndex === TOUR.length - 1 ? "Finish" : "Next";
+  tourGlow(null);
   try { await step.run(alive); } catch (err) { if (alive()) toast(err.message); }
   if (alive() && typeof step.text === "function") $("tourText").textContent = step.text();
 }
@@ -1770,6 +1819,7 @@ function tourStop() {
   tourIndex = -1;
   $("tourCaption").hidden = true;
   document.body.classList.remove("touring");
+  tourGlow(null);
 }
 
 function wireTour() {
