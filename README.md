@@ -457,15 +457,6 @@ This MVP proves **global screening + explainable ranks + local terrain preview**
 6. **Rock type is the dominant class of a 55 km cell** (GLiM): it marks basaltic country, not individual caves.
 7. **Ice is context only:** MODIS snow/ice months are shown per site but not scored, so cold targets (Haworth, Utopia) can still match glacier ice; telling ice sheets from ice-cemented permafrost needs a dedicated layer.
 
-### Roadmap (post-MVP / extended hackathon)
-
-| Phase | Focus |
-|-------|--------|
-| **A — Planetary truth** | Ingest PGDA 78 + Mars ODE DTMs; refresh `targets.json` with measured slope/TRI/thermal stats |
-| **B — Earth resolution** | GEE funnel + Copernicus 30 m tiles; optional CRISM/M3-style mineral features where data allow |
-| **C — Mission ops** | Permafrost layer, `F_ops` masks, cave/skylight module; richer novelty catalog |
-| **D — Product UI** | React + MapLibre map client on the same FastAPI scoring API |
-
 ---
 
 ## Team and credits
