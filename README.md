@@ -40,6 +40,10 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 <td width="50%" valign="top"><img src="docs/images/learn-moon.jpg" alt="Learn page: Moon"><br><b>Learn page: Moon</b><br><sub>An interactive intro for newcomers: a lunar day slider, Apollo training sites on Earth, processes and a quiz.</sub></td>
 <td width="50%" valign="top"><img src="docs/images/learn-mars.jpg" alt="Learn page: Mars"><br><b>Learn page: Mars</b><br><sub>Feel a Martian day and a dust storm, see where rovers were tested on Earth, and be the scientist.</sub></td>
 </tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/images/learn-mars-day.jpg" alt="Feel a day on Mars"><br><b>Feel a day on Mars</b><br><sub>Drag the time and dust sliders: Mars temperature against the Atacama Desert, live.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/learn-moon-processes.jpg" alt="Same processes, two worlds"><br><b>Same processes, two worlds</b><br><sub>Moon and Earth side by side: dust, ice, volcanic rock and lava-tube caves.</sub></td>
+</tr>
 </table>
 
 ---
