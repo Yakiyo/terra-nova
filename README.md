@@ -414,7 +414,7 @@ Interactive docs: **http://127.0.0.1:8000/docs** when the server is running.
 
 ---
 
-## Target, status, and roadmap
+## Target and status
 
 ### North-star target (TerraNova)
 
