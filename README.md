@@ -38,11 +38,11 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 </tr>
 <tr>
 <td width="50%" valign="top"><img src="docs/images/learn-moon.jpg" alt="Learn page: Moon"><br><b>Learn page: Moon</b><br><sub>An interactive intro for newcomers: a lunar day slider, Apollo training sites on Earth, processes and a quiz.</sub></td>
-<td width="50%" valign="top"><img src="docs/images/learn-mars.jpg" alt="Learn page: Mars"><br><b>Learn page: Mars</b><br><sub>Feel a Martian day and a dust storm, see where rovers were tested on Earth, and be the scientist.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/learn-mars-day.jpg" alt="Feel a day on Mars"><br><b>Feel a day on Mars</b><br><sub>Drag the time and dust sliders: Mars temperature against the Atacama Desert, live.</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/learn-mars-day.jpg" alt="Feel a day on Mars"><br><b>Feel a day on Mars</b><br><sub>Drag the time and dust sliders: Mars temperature against the Atacama Desert, live.</sub></td>
-<td width="50%" valign="top"><img src="docs/images/learn-moon-processes.jpg" alt="Same processes, two worlds"><br><b>Same processes, two worlds</b><br><sub>Moon and Earth side by side: dust, ice, volcanic rock and lava-tube caves.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/learn-mars-processes.jpg" alt="Same processes: Mars and Earth"><br><b>Same processes: Mars and Earth</b><br><sub>Dust storms, polar ice, Olympus Mons and lava-tube pits next to their Earth counterparts.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/learn-moon-processes.jpg" alt="Same processes: Moon and Earth"><br><b>Same processes: Moon and Earth</b><br><sub>Lunar dust, polar craters, mare basalt and a lava-tube skylight next to Earth analogs.</sub></td>
 </tr>
 </table>
 
@@ -60,7 +60,7 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 8. [Repository layout](#repository-layout)
 9. [Quick start](#quick-start)
 10. [HTTP API (summary)](#http-api-summary)
-11. [Target, status, and roadmap](#target-and-status)
+11. [Target and status](#target-and-status)
 12. [Team and credits](#team-and-credits)
 13. [License](#license)
 
@@ -101,7 +101,7 @@ TerraNova treats analog search as an **operational proxy problem**: match the **
 
 **Design principle:** scoring at request time is **deterministic arithmetic** in `src/compute`—no LLM, no randomness, no network when `OFFLINE=1`.
 
-For **full vision vs what this repository ships today**, see [Target, status, and roadmap](#target-and-status).
+For **full vision vs what this repository ships today**, see [Target and status](#target-and-status).
 
 ---
 
@@ -218,7 +218,7 @@ Reproduce:
 OFFLINE=1 python -m scripts.check_controls
 ```
 
-**Interpretation:** validation shows the score **separates barren/analog-like land from rainforests and humid farmland** on a 0.5° grid—it is a **screening tool**, not a field geologic survey. See [Target, status, and roadmap](#target-and-status).
+**Interpretation:** validation shows the score **separates barren/analog-like land from rainforests and humid farmland** on a 0.5° grid—it is a **screening tool**, not a field geologic survey. See [Target and status](#target-and-status).
 
 Example control percentiles (lunar south pole target, from `check_controls`):
 
