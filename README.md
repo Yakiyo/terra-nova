@@ -36,6 +36,10 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 <td width="50%" valign="top"><img src="docs/images/godseye-satellite.jpg" alt="Satellite view"><br><b>Satellite view</b><br><sub>Sentinel-2 imagery on the 3D terrain, heights exaggerated 3.5×.</sub></td>
 <td width="50%" valign="top"><img src="docs/images/godseye-rover-route.jpg" alt="Rover traverse planning"><br><b>Rover traverse planning</b><br><sub>Waypoints, an elevation profile, slopes over 15° flagged, distance, climb and walking time.</sub></td>
 </tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/images/learn-moon.jpg" alt="Learn page: Moon"><br><b>Learn page: Moon</b><br><sub>An interactive intro for newcomers: a lunar day slider, Apollo training sites on Earth, processes and a quiz.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/learn-mars.jpg" alt="Learn page: Mars"><br><b>Learn page: Mars</b><br><sub>Feel a Martian day and a dust storm, see where rovers were tested on Earth, and be the scientist.</sub></td>
+</tr>
 </table>
 
 ---
