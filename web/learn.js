@@ -36,10 +36,10 @@ const W = {
   },
 };
 const PROCESSES = [
-  { t: "Dust & wind", mars: "Planet-wide dust storms bury solar panels.", earth: "Sahara and Taklamakan dust, measured by NASA MERRA-2.", q: "Mars dust storm|Mars dust", qe: "Sahara dust storm|dust storm Africa satellite|dust storm" },
-  { t: "Ice & cold", mars: "Ice caps and ground ice; lunar craters hide ice.", earth: "Permafrost and ice fields, from NASA MODIS snow cover.", q: "Mars north polar ice cap|Mars polar ice", qe: "Devon Island Haughton crater|Devon Island|Arctic ice" },
-  { t: "Volcanic rock", mars: "Basalt plains and giant volcanoes.", earth: "Basalt fields in Iceland, Hawaii, Lanzarote.", q: "Olympus Mons|Mars volcano", qe: "Iceland lava field|Iceland volcano|lava field" },
-  { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes on Lanzarote are used for astronaut and robot training.", q: "Mars pit crater skylight|Mars pit crater|Arsia Mons pit", qe: "Lanzarote, Canary Islands|Lanzarote|Canary Islands" },
+  { t: "Dust & wind", mars: "Planet-wide dust storms bury solar panels.", earth: "Sahara and Taklamakan dust, measured by NASA MERRA-2.", q: "id:PIA11230|Mars dust storm", qe: "Sahara dust storm|dust storm Africa satellite|dust storm" },
+  { t: "Ice & cold", mars: "Ice caps and ground ice; lunar craters hide ice.", earth: "Permafrost and ice fields, from NASA MODIS snow cover.", q: "id:PIA13163|Mars north polar ice cap", qe: "Devon Island Haughton crater|Devon Island|Arctic ice" },
+  { t: "Volcanic rock", mars: "Basalt plains and giant volcanoes.", earth: "Basalt fields in Iceland, Hawaii, Lanzarote.", q: "id:PIA02982|Olympus Mons", qe: "Iceland lava field|Iceland volcano|lava field" },
+  { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes on Lanzarote are used for astronaut and robot training.", q: "id:PIA01686|Mars pit crater", qe: "Lanzarote, Canary Islands|Lanzarote|Canary Islands" },
 ];
 
 
@@ -182,7 +182,7 @@ async function loadPhoto(el) {
   try {
     let item = null;
     for (const q of el.dataset.q.split("|")) {
-      const r = await fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=image`);
+      const r = await fetch(q.startsWith("id:") ? `https://images-api.nasa.gov/search?nasa_id=${encodeURIComponent(q.slice(3))}` : `https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=image`);
       item = (await r.json()).collection.items.find((x) => x.links?.[0]?.href);
       if (item) break;
     }
