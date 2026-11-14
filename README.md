@@ -103,28 +103,30 @@ End-to-end pipeline (offline build → online query):
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. PLANETARY GROUND TRUTH (signatures)                                      │
+│ 1. PLANETARY GROUND TRUTH (target signatures)                               │
 │    Moon/Mars literature + agency products → data/targets.json               │
-│    (values, earth_percentile terrain classes, weights, source_url each)     │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    ▼
+│    (values, Earth-percentile terrain classes, weights, source_url each)     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 2. EARTH DATA LAYER (offline build)                                         │
 │    src/acquire/build_predictor_stack.py                                     │
-│    NASA POWER · GIBS MODIS NDVI · MODIS LST (Zenodo) · AWS Terrain Tiles    │
-│    → cache/derived/*.npy → cache/predictors.zarr (360×720 × 9 predictors)   │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    ▼
+│    NASA POWER · GIBS MODIS NDVI · MODIS LST · AWS Terrain Tiles · GLiM rock │
+│    → cache/predictors.zarr (360×720 grid × 9 scored predictors)             │
+│    + context (not scored): MERRA-2 dust, MODIS snow → cache/context.npz     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. SCORING ENGINE (Python)                                                  │
-│    similarity.py · validation.py · robustness.py · rationale.py             │
-│    Weighted geometric mean · ranking · novelty · ROC-AUC                    │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    ▼
+│ 3. SCORING ENGINE (Python, deterministic)                                   │
+│    similarity · validation · robustness · traverse · qualification          │
+│    Weighted geometric mean · ranking · novelty · ROC-AUC · leave-one-out    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 4. WEB APPLICATION                                                          │
-│    FastAPI (src/api/main.py) + static web/ (Three.js globe, God's Eye)      │
-│    http://127.0.0.1:8000/ · float32 score surfaces · weight sliders         │
+│    FastAPI (src/api/main.py) + static web/ (Three.js)                       │
+│    Finder globe · site dossier · God's Eye 3D + rover traverse              │
+│    Validation & Explore views · guided tour · Learn page (Moon / Mars)      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -460,7 +462,7 @@ Team backlog and dataset requests: [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.
 4. **Novelty** is distance to a **16-site** catalog—not a claim of “never studied anywhere.”
 5. **Physics ceiling:** open-Earth sites cannot replicate lunar PSR vacuum or exact regolith chemistry; scores mean **best terrestrial proxy** for listed stresses.
 6. **Rock type is the dominant class of a 55 km cell** (GLiM): it marks basaltic country, not individual caves.
-7. **No ice-cover layer:** cold targets (Haworth, Utopia) can still match glacier ice; telling ice sheets from ice-cemented permafrost needs one.
+7. **Ice is context only:** MODIS snow/ice months are shown per site but not scored, so cold targets (Haworth, Utopia) can still match glacier ice; telling ice sheets from ice-cemented permafrost needs a dedicated layer.
 
 ### Roadmap (post-MVP / extended hackathon)
 
