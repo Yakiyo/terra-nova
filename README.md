@@ -439,20 +439,13 @@ Scoring stays **deterministic code** in `src/compute`; AI assistants may help bu
 
 This MVP proves **global screening + explainable ranks + local terrain preview** on open NASA-centric data at hackathon scale.
 
-### Not yet implemented (gaps vs full vision)
+### Next steps
 
-| Planned capability | Status in this repo |
-|--------------------|---------------------|
-| **PGDA Product 78** (5 m lunar DEM/slope at site folders) downsampled to **30 m** for fair compare with Earth DEM | Not ingested; lunar terrain targets use percentile classes |
-| **HiRISE/CTX** site DTMs + **CRISM** mineral / hydration ratios for Mars targets | Not in predictor stack |
-| **GEE (or equivalent) multi-stage screening funnel** @ 1 km → 30 m on survivor tiles | Single global 0.5° pass only |
-| **Copernicus GLO-30** as primary global elevation (polar coverage) | AWS Terrarium / derived slopes at 0.5° only |
-| **ESA CCI permafrost** (MAGT) for PSR / cryic-soil proxy (e.g. Haworth mode) | Documented plan; see Haworth note in [Scoring model](#scoring-model) and [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.md) |
-| **Operational access** (`F_ops`: roads, WDPA, hazards) | Not scored |
-| **Cave / lava-tube skylight** detection layer (LROC / HiRISE pit catalogs) | Partly: the lava-tube target scores basaltic rock (GLiM); individual caves are not detected |
-| **React + MapLibre** production frontend | Not in repo; current demo is Three.js + FastAPI |
-
-Team backlog and dataset requests: [`docs/DATA_REQUESTS.md`](docs/DATA_REQUESTS.md). Mentor-style gap analysis: [`docs/REVIEW.md`](docs/REVIEW.md).
+- **Sharper planetary terrain:** NASA LOLA (PGDA) and HiRISE site elevation for Moon and Mars targets.
+- **Below the surface:** cave / lava-tube and underground ice layers.
+- **Finer Earth screening:** 30 m terrain for the top candidates.
+- **Field access:** roads, protected areas and hazards.
+- **Hosted public version** of the app.
 
 ### Known limits (current MVP)
 
