@@ -39,7 +39,7 @@ const PROCESSES = [
   { t: "Dust & wind", mars: "Planet-wide dust storms bury solar panels.", earth: "Sahara and Taklamakan dust, measured by NASA MERRA-2.", q: "Mars dust storm|Mars dust", qe: "Sahara dust storm|dust storm Africa satellite|dust storm" },
   { t: "Ice & cold", mars: "Ice caps and ground ice; lunar craters hide ice.", earth: "Permafrost and ice fields, from NASA MODIS snow cover.", q: "Mars north polar ice cap|Mars polar ice", qe: "Devon Island Haughton crater|Devon Island|Arctic ice" },
   { t: "Volcanic rock", mars: "Basalt plains and giant volcanoes.", earth: "Basalt fields in Iceland, Hawaii, Lanzarote.", q: "Olympus Mons|Mars volcano", qe: "Iceland lava field|Iceland volcano|lava field" },
-  { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes used for astronaut and robot training.", q: "Mars pit crater skylight|Mars pit crater|Arsia Mons pit", qe: "Lava Beds National Monument|lava tube|cave" },
+  { t: "Caves & lava tubes", mars: "Skylights into lava tubes: shelter from radiation.", earth: "Lava tubes on Lanzarote are used for astronaut and robot training.", q: "Mars pit crater skylight|Mars pit crater|Arsia Mons pit", qe: "Lanzarote, Canary Islands|Lanzarote|Canary Islands" },
 ];
 
 
@@ -127,7 +127,7 @@ document.getElementById("learn").innerHTML = `
 <section class="ln-sec" id="ch4">
   <header class="ln-h"><span class="ln-mono">04</span><h2>Same processes, two worlds/</h2></header>
   <div class="ln-grid">${PROCESSES.map((p, i) => `<article class="ln-pair">
-    <div class="ln-ph" data-q="${esc(worldId === "moon" && i < 2 ? (i ? "lunar south pole|Shackleton crater|Moon south pole" : "lunar dust Apollo|Apollo footprint lunar soil|Apollo regolith") : worldId === "moon" && i === 2 ? "lunar mare|Mare Tranquillitatis|Moon surface" : worldId === "moon" ? "Marius Hills pit|lunar pit|Moon crater" : p.q)}"><span class="ln-mono">${esc(w.name)}</span></div>
+    <div class="ln-ph" data-q="${esc(worldId === "moon" && i < 2 ? (i ? "lunar south pole|Shackleton crater|Moon south pole" : "Apollo 11 bootprint|Apollo Footprint|lunar footprint") : worldId === "moon" && i === 2 ? "lunar mare|Mare Tranquillitatis|Moon surface" : worldId === "moon" ? "Marius Hills pit|lunar pit|Moon crater" : p.q)}"><span class="ln-mono">${esc(w.name)}</span></div>
     <div class="ln-ph" data-q="${esc(p.qe)}"><span class="ln-mono">Earth</span></div>
     <div class="ln-pair-t"><span class="ln-mono">${pad(i + 1)}</span><h3>${esc(p.t)}</h3><p>${esc(worldId === "moon" ? p.earth : p.mars + " " + p.earth)}</p></div>
   </article>`).join("")}</div>
