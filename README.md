@@ -60,7 +60,7 @@ Open-source discovery platform that scores **78,247** land cells on Earth (0.5°
 8. [Repository layout](#repository-layout)
 9. [Quick start](#quick-start)
 10. [HTTP API (summary)](#http-api-summary)
-11. [Target, status, and roadmap](#target-status-and-roadmap)
+11. [Target, status, and roadmap](#target-and-status)
 12. [Team and credits](#team-and-credits)
 13. [License](#license)
 
@@ -101,7 +101,7 @@ TerraNova treats analog search as an **operational proxy problem**: match the **
 
 **Design principle:** scoring at request time is **deterministic arithmetic** in `src/compute`—no LLM, no randomness, no network when `OFFLINE=1`.
 
-For **full vision vs what this repository ships today**, see [Target, status, and roadmap](#target-status-and-roadmap).
+For **full vision vs what this repository ships today**, see [Target, status, and roadmap](#target-and-status).
 
 ---
 
@@ -218,7 +218,7 @@ Reproduce:
 OFFLINE=1 python -m scripts.check_controls
 ```
 
-**Interpretation:** validation shows the score **separates barren/analog-like land from rainforests and humid farmland** on a 0.5° grid—it is a **screening tool**, not a field geologic survey. See [Target, status, and roadmap](#target-status-and-roadmap).
+**Interpretation:** validation shows the score **separates barren/analog-like land from rainforests and humid farmland** on a 0.5° grid—it is a **screening tool**, not a field geologic survey. See [Target, status, and roadmap](#target-and-status).
 
 Example control percentiles (lunar south pole target, from `check_controls`):
 
@@ -422,7 +422,7 @@ Interactive docs: **http://127.0.0.1:8000/docs** when the server is running.
 
 ---
 
-## Target, status, and roadmap
+## Target and status
 
 ### North-star target (TerraNova)
 
